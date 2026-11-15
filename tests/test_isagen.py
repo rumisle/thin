@@ -31,15 +31,15 @@ def test_another_bundle_is_refused(tmp_path):
 
 
 @pytest.mark.skipif("THIN_ISA_BUNDLE" not in os.environ, reason="set THIN_ISA_BUNDLE to the bundle")
-def test_a_clean_run_reproduces_the_manifest():
-    rules = TARGETS["gfx1201"]
+@pytest.mark.parametrize("target", sorted(TARGETS))
+def test_a_clean_run_reproduces_checked_in_tables(target):
+    rules = TARGETS[target]
     isa = bundle.isa_root(Path(os.environ["THIN_ISA_BUNDLE"]), rules.member)
-    assert (
-        canonical.sha256(isa_tables.generate(isa, rules))
-        == MANIFEST["isa_tables"]["sha256_canonical_json"]
-    )
-    rows = operand_table.generate(isa, rules)
-    assert canonical.sha256(rows) == MANIFEST["operand_table"]["sha256_canonical_json"]
+    data_dir = ROOT / "crates/thin-targets/data" / target
+    got_isa = canonical.sha256(isa_tables.generate(isa, rules))
+    got_ops = canonical.sha256(operand_table.generate(isa, rules))
+    assert got_isa == hashlib.sha256((data_dir / "isa_tables.json").read_bytes()).hexdigest()
+    assert got_ops == hashlib.sha256((data_dir / "operand_table.json").read_bytes()).hexdigest()
 
 
 @pytest.mark.parametrize("table", ["isa_tables", "operand_table"])
@@ -48,3 +48,11 @@ def test_the_checked_in_tables_are_the_manifests(table):
     path = ROOT / "crates/thin-targets/data/gfx1201" / f"{table}.json"
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     assert digest == MANIFEST[table]["sha256_canonical_json"]
+
+
+@pytest.mark.parametrize("target", sorted(TARGETS))
+@pytest.mark.parametrize("table", ["isa_tables", "operand_table"])
+def test_every_targets_checked_in_tables_are_canonical_json(target, table):
+    path = ROOT / "crates/thin-targets/data" / target / f"{table}.json"
+    parsed = json.loads(path.read_text())
+    assert canonical.dumps(parsed).encode() == path.read_bytes()

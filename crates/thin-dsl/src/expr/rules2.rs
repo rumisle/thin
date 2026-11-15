@@ -240,24 +240,86 @@ impl Builder {
             ..Vop::default()
         };
         if self.t.spell("v.permlane16.swap.b32").is_none() {
-            let lo = self.temp('s', Some(Ty::U32))?;
-            let hi = self.temp('s', Some(Ty::U32))?;
-            self.emit_op("s.mov.b32", Some(&lo), &[Opd::Int(0x7654_3210)], &[])?;
-            self.emit_op("s.mov.b32", Some(&hi), &[Opd::Int(0xFEDC_BA98)], &[])?;
-            let t = self.temp('v', Some(Ty::F32))?;
+            if lanes == 32 && self.t.spell("v.permlanex16.b32").is_some() {
+                let lo = self.temp('s', Some(Ty::U32))?;
+                let hi = self.temp('s', Some(Ty::U32))?;
+                self.emit_op("s.mov.b32", Some(&lo), &[Opd::Int(0x7654_3210)], &[])?;
+                self.emit_op("s.mov.b32", Some(&hi), &[Opd::Int(0xFEDC_BA98)], &[])?;
+                let t = self.temp('v', Some(Ty::F32))?;
+                self.emit_op(
+                    "v.permlanex16.b32",
+                    Some(&t),
+                    &[dd.clone(), Opd::Reg(lo, 0), Opd::Reg(hi, 0)],
+                    &[],
+                )?;
+                return self.vop(
+                    &format!("v.{op}.f32"),
+                    d,
+                    vec![dd, Opd::Reg(t, 0)],
+                    Ty::F32,
+                    vc,
+                );
+            }
+            let lid = self.temp('v', Some(Ty::U32))?;
+            if wave == 32 {
+                self.emit_op(
+                    "v.mbcnt.lo.u32.b32",
+                    Some(&lid),
+                    &[Opd::Int(-1), Opd::Int(0)],
+                    &[],
+                )?;
+            } else {
+                let lo = self.temp('v', Some(Ty::U32))?;
+                self.emit_op(
+                    "v.mbcnt.lo.u32.b32",
+                    Some(&lo),
+                    &[Opd::Int(-1), Opd::Int(0)],
+                    &[],
+                )?;
+                self.emit_op(
+                    "v.mbcnt.hi.u32.b32",
+                    Some(&lid),
+                    &[Opd::Int(-1), Opd::Reg(lo, 0)],
+                    &[],
+                )?;
+            }
+            let base = self.temp('v', Some(Ty::U32))?;
             self.emit_op(
-                "v.permlanex16.b32",
-                Some(&t),
-                &[dd.clone(), Opd::Reg(lo, 0), Opd::Reg(hi, 0)],
+                "v.lshlrev.b32",
+                Some(&base),
+                &[Opd::Int(2), Opd::Reg(lid, 0)],
                 &[],
             )?;
-            return self.vop(
-                &format!("v.{op}.f32"),
-                d,
-                vec![dd, Opd::Reg(t, 0)],
-                Ty::F32,
-                vc,
-            );
+            let steps: &[i128] = if lanes == 32 { &[64] } else { &[64, 128] };
+            for &step in steps {
+                let addr = self.temp('v', Some(Ty::U32))?;
+                self.emit_op(
+                    "v.xor.b32",
+                    Some(&addr),
+                    &[Opd::Int(step), Opd::Reg(base.clone(), 0)],
+                    &[],
+                )?;
+                let t = self.temp('v', Some(Ty::F32))?;
+                self.emit_op(
+                    "ds.bpermute.b32",
+                    Some(&t),
+                    &[Opd::Reg(addr, 0), dd.clone()],
+                    &[],
+                )?;
+                let w = Wait {
+                    comment: "the across".into(),
+                    ..Wait::default()
+                };
+                self.wait(vec![Thing::Reg(t.reg())], w)?;
+                self.vop(
+                    &format!("v.{op}.f32"),
+                    d,
+                    vec![dd.clone(), Opd::Reg(t, 0)],
+                    Ty::F32,
+                    vc.clone(),
+                )?;
+            }
+            return Ok(());
         }
         let swaps: &[&str] = if lanes == 32 {
             &["v.permlane16.swap.b32"]

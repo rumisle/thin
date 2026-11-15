@@ -242,11 +242,12 @@ def _refuse(bounds, sched) -> Team:
 def emulate(bounds, sched=None, staged=()) -> None:
     """Runs the Bounds of one emulated group together, rank r's on device r."""
     from thin.runtime import emulated as emu
-    from thin.runtime.bound import joint_run
+    from thin.runtime.bound import _co_target, joint_run
 
     bounds = list(bounds)
     team = _refuse(bounds, sched)
-    devices = emu.group(team.world, **(sched or {}))
+    target = _co_target(bounds[0].kernel.co) if bounds else None
+    devices = emu.group(team.world, target=target, **(sched or {}))
     try:
         on = [devices[b.group.rank] for b in bounds]
         joint_run(bounds, on, team.held, lambda b: b.group.rank, tuple(staged))

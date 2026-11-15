@@ -1,0 +1,18 @@
+{
+ "args": [
+  {
+   "kind": "u32",
+   "name": "unused",
+   "offset": 0
+  }
+ ],
+ "block": [
+  64,
+  1
+ ],
+ "kernarg_bytes": 4,
+ "meta": {
+  "per_cu": 8
+ },
+ "symbol": "metron_icache_inv"
+}

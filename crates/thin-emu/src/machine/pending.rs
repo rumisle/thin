@@ -109,7 +109,14 @@ fn reg_of(base: &Base) -> Option<(char, u32, u32)> {
 pub fn landing(facts: &Facts, ins: &Ins) -> Option<(usize, bool, (char, u32, u32))> {
     let c = ins.canon.as_str();
     let (counter, unordered) = match ins.kind.as_str() {
-        "smem" if c.starts_with("s.load") || c.starts_with("s.buffer.load") => (role::SMEM, true),
+        "smem"
+            if c.starts_with("s.load")
+                || c.starts_with("s.buffer.load")
+                || c == "s.memtime"
+                || c == "s.memrealtime" =>
+        {
+            (role::SMEM, true)
+        }
         // A returning message counts with scalar memory, out of order.
         "salu" if c.starts_with("s.sendmsg.rtn") => (role::SMEM, true),
         "ds" if c.starts_with("ds.load")

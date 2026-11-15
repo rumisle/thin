@@ -156,10 +156,14 @@ def _target_fact(t, key: str, case) -> None:
 def test_selection_and_errors():
     from thin.target import Flags, target, target_names, targeting
 
-    assert target_names() == ["gfx1201"]
+    assert target_names() == ["gfx1201", "gfx942"]
     assert target() is target("gfx1201")
     with targeting("gfx1201") as t:
         assert target() is t
+    with targeting("gfx942") as t942:
+        assert target() is t942
+        assert t942.wave == 64
+        assert t942.counters == {"vm": "vmcnt", "lgkm": "lgkmcnt"}
     with pytest.raises(ValueError, match="not a target"):
         target("gfx9999")
     with pytest.raises(ValueError, match="not a target"), targeting("gfx9999"):

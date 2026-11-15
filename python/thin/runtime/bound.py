@@ -326,6 +326,15 @@ def _first(kind: str, given):
     return make
 
 
+def _co_target(co) -> str | None:
+    from thin import formats
+
+    try:
+        return formats.read(co).target
+    except Exception:
+        return None
+
+
 def emulate(b: Bound, sched=None) -> dict:
     """One Bound on an emulated device, rank 0, the process's held table."""
     from thin.runtime.emulated import EmulatedDevice, group
@@ -340,7 +349,8 @@ def emulate(b: Bound, sched=None) -> dict:
         raise LaunchError(
             f"{k}: co-resident, {workgroups} workgroups; sched resident {sched['resident']}"
         )
-    device = group(1, **sched)[0] if sched else EmulatedDevice()
+    target = _co_target(b.kernel.co)
+    device = group(1, target=target, **sched)[0] if sched else EmulatedDevice(target=target)
     try:
         joint_run([b], [device], PROCESS_HELD, lambda _: "emulated", ())
     finally:

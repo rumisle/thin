@@ -103,12 +103,13 @@ fn maker_op(
     Ok(out(target, Family::Made(made)))
 }
 
-/// A family's options from (offset, th, scope, comment, tag, bytes,
+/// A family's options from (offset, th, scope, flags, comment, tag, bytes,
 /// bytes_repr, signed, ordered).
 type OptsIn<'py> = (
     Bound<'py, PyTuple>,
     String,
     String,
+    Vec<String>,
     String,
     Option<Bound<'py, PyAny>>,
     Option<i128>,
@@ -118,7 +119,7 @@ type OptsIn<'py> = (
 );
 
 fn opts(o: OptsIn<'_>) -> PyResult<Opts> {
-    let (offset, th, scope, comment, t, bytes, bytes_repr, signed, ordered) = o;
+    let (offset, th, scope, flags, comment, t, bytes, bytes_repr, signed, ordered) = o;
     let bytes = match (bytes, bytes_repr) {
         (Some(b), _) => Some(Ok(b)),
         (None, Some(r)) => Some(Err(r)),
@@ -126,7 +127,7 @@ fn opts(o: OptsIn<'_>) -> PyResult<Opts> {
     };
     Ok(Opts {
         offset: val(&offset)?,
-        cache: Cache { th, scope },
+        cache: Cache { th, scope, flags },
         comment,
         tag: t.map(|t| tag(&t)).transpose()?,
         bytes,

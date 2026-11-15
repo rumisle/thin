@@ -165,16 +165,24 @@ def default_encoding(encoding: ET.Element) -> bool:
 class _Instructions:
     """The opcodes, encodings and operands of the instructions."""
 
-    def __init__(self, isa: ET.Element, arch: str):
+    def __init__(self, isa: ET.Element, rules: TargetRules):
         self.enum: dict[str, dict[int, str]] = defaultdict(dict)
         self.seen: dict[tuple[str, int], list[str]] = defaultdict(list)
         self.types: dict[tuple[str, str], dict] = {}
+        self.short: set[str] = set()
+        drop = set(rules.drop)
         for instruction in isa.iterfind("Instructions/Instruction"):
-            name = _text(instruction, "InstructionName")
+            raw = _text(instruction, "InstructionName")
+            low = raw.lower()
+            name = rules.renames.get(low, raw).upper()
             for encoding in instruction.iterfind("InstructionEncodings/InstructionEncoding"):
-                if default_encoding(encoding):
-                    self._add(name, encoding)
-        for fmt, opcodes in FIXES.get(arch, {}).items():
+                en = _text(encoding, "EncodingName")
+                if (low, en) in drop or not default_encoding(encoding):
+                    continue
+                if en in ("ENC_VOP1", "ENC_VOP2", "ENC_VOPC"):
+                    self.short.add(name)
+                self._add(name, encoding)
+        for fmt, opcodes in FIXES.get(rules.arch, {}).items():
             self.enum[fmt].update(opcodes)
         self.suffix_only: dict[tuple[str, int], str] = {}
         for key, names in self.seen.items():
@@ -199,7 +207,7 @@ class _Instructions:
         info = {}
         for operand in encoding.iterfind("Operands/Operand"):
             field = _text(operand, "FieldName")
-            if field:
+            if field and not ("_LOAD_LDS_" in name and field.lower() == "vdst"):
                 info[field.lower()] = (
                     _text(operand, "DataFormatName"),
                     int(_text(operand, "OperandSize") or 0),
@@ -216,7 +224,7 @@ class _Instructions:
         return self.types.get((name, fmt), {}).get("vdst", ("", 0, ""))[2]
 
 
-def _kind(field: tuple, fmt: str, identifier: int | None) -> dict:
+def _kind(field: tuple, fmt: str, identifier: int | None, rules: TargetRules) -> dict:
     """A field's kind and value in class fmt."""
     name, hi, lo = field
     bits, b = hi - lo + 1, base(fmt)
@@ -230,16 +238,19 @@ def _kind(field: tuple, fmt: str, identifier: int | None) -> dict:
         return kinded("op")
     if name in VGPR_FIELDS and bits == 8:
         return kinded("vgpr")
-    rules = [
+    table = [
         (name == "sbase" and bits == 6, "sbase", 0),
         (name in ("srsrc", "ssamp") and bits == 5, "srsrc", 0),
         (name in ("sdst", "sdata") and bits == 7, "sgpr", 0),
-        (name in ("soffset", "saddr") and bits == 7, "sgpr", 124),
+        (name == "saddr" and bits == 7 and b == "FLAT", "sgpr", 0),
+        (name == "saddr" and bits == 7, "sgpr", rules.saddr_default),
+        (name == "soffset" and bits == 7, "sgpr", rules.soffset_default),
         (name.startswith("ssrc") and bits == 8, "ssrc", 0),
+        (name == "soffset" and bits == 8 and b == "MUBUF", "ssrc", 128),
         (name in ("saddr", "soffset") and bits == 8, "ssrc", 124),
         (name.startswith("src") and bits == 9, "src", 0),
     ]
-    for applies, kind, value in rules:
+    for applies, kind, value in table:
         if applies:
             return kinded(kind, value)
     if name == "offset" and b in ("GLOBAL", "SCRATCH"):
@@ -258,7 +269,7 @@ def _class(name: str, fields: list[dict]) -> dict:
     return {"class": name, "bytes": (max(f["hi"] for f in fields) + 8) // 8, "fields": fields}
 
 
-def _classes(encodings: dict, instructions: _Instructions) -> dict[str, dict]:
+def _classes(encodings: dict, instructions: _Instructions, rules: TargetRules) -> dict[str, dict]:
     """Every encoding class with its kinded fields."""
     classes: dict[str, dict] = {}
     kinded: dict[str, list[dict]] = {}
@@ -270,12 +281,12 @@ def _classes(encodings: dict, instructions: _Instructions) -> dict[str, dict]:
                 kinded[cls] = [
                     {"name": "seg", "hi": f[1], "lo": f[2], "kind": "fixed", "value": seg}
                     if f[0] == "seg"
-                    else _kind(f, cls, identifier)
+                    else _kind(f, cls, identifier, rules)
                     for f in fields
                 ]
                 classes[cls] = _class(cls, kinded[cls])
         elif name not in ("FLAT_GLOBAL", "FLAT_SCRATCH", "FLAT_GLBL", "DPP", "SDWA"):
-            kinded[name] = [_kind(f, name, identifier) for f in fields]
+            kinded[name] = [_kind(f, name, identifier, rules) for f in fields]
             classes[name] = _class(name, kinded[name])
     for name in sorted(n for n in encodings if base(n) != n):
         if base(name) not in bases or base(name) not in kinded:
@@ -290,12 +301,13 @@ def _classes(encodings: dict, instructions: _Instructions) -> dict[str, dict]:
                 for f in base_fields
                 if not any(e[2] <= f["hi"] and f["lo"] <= e[1] for e in extra)
             ]
-            classes[name] = _class(name, kept + [_kind(f, name, None) for f in extra])
+            classes[name] = _class(name, kept + [_kind(f, name, None, rules) for f in extra])
     for name, hi, lo in (("VOP1", 24, 17), ("VOP3", 7, 0)):
         if name not in kinded:
             continue
         if not any(
-            instructions.vdst_type(n, name) == "OPR_SREG" for n in instructions.enum[name].values()
+            instructions.vdst_type(n, name).startswith("OPR_SREG")
+            for n in instructions.enum[name].values()
         ):
             continue
         sdst = [
@@ -330,11 +342,11 @@ def _ops(encodings: dict, instructions: _Instructions) -> dict[str, dict]:
         for opcode, name in sorted(instructions.enum[fmt].items()):
             if "ADDTID" in name and fmt == "FLAT":
                 continue
-            msuf = "" if fmt == "VOP3" and opcode >= 512 else suffix
+            msuf = "" if fmt == "VOP3" and name not in instructions.short else suffix
             vdst = instructions.vdst_type(name, fmt)
-            if fmt == "VOP1" and vdst == "OPR_SREG":
+            if fmt == "VOP1" and vdst.startswith("OPR_SREG"):
                 cls = "VOP1_SDST"
-            elif fmt == "VOP3" and (vdst == "OPR_SREG" or opcode < 256):
+            elif fmt == "VOP3" and (vdst.startswith("OPR_SREG") or opcode < 256):
                 cls = "VOP3_SDST"
             elif (fmt, opcode) in instructions.suffix_only:
                 cls = fmt + instructions.suffix_only[(fmt, opcode)]
@@ -357,8 +369,8 @@ def _ops(encodings: dict, instructions: _Instructions) -> dict[str, dict]:
 def generate(isa: ET.Element, rules: TargetRules) -> dict:
     """``{encodings, ops}`` sorted by class name and by mnemonic."""
     encodings = _encodings(isa)
-    instructions = _Instructions(isa, rules.arch)
-    classes = _classes(encodings, instructions)
+    instructions = _Instructions(isa, rules)
+    classes = _classes(encodings, instructions, rules)
     ops = _ops(encodings, instructions)
     return {
         "encodings": [classes[name] for name in sorted(classes)],

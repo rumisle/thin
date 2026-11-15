@@ -1,7 +1,7 @@
 //! Concrete target instances and their registry.
 //!
-//! The gfx1201 instance owns its instruction tables, encoder/decoder, line
-//! syntax, code-object facts, hazard model, WMMA layouts and emulator
+//! Each target instance owns its instruction tables, encoder/decoder, line
+//! syntax, code-object facts, hazard model, matrix layouts and emulator
 //! hooks. It is the only crate that names target instances.
 //!
 //! The registry pairs a target with its hardware analyses. Instances are
@@ -17,16 +17,21 @@ use thin_target::{assemble, CodeItem, Error, Target};
 
 pub use decode::{Decode, DecodeError, Instruction};
 
-/// The ELF machine number of each target. gfx1201's
-/// code objects use e_flags 0x4E exactly: code object v6, no xnack or
-/// sramecc bits.
-pub static MACHINES: [Machine; 1] = [Machine {
-    number: 0x4E,
-    target: gfx1201::NAME,
-}];
+/// The ELF machine number (`e_flags & 0xFF`) of each registered target.
+pub static MACHINES: [Machine; 2] = [
+    Machine {
+        number: 0x4E,
+        target: gfx1201::NAME,
+    },
+    Machine {
+        number: 0x4C,
+        target: gfx942::NAME,
+    },
+];
 
 pub mod decode;
 mod gfx1201;
+mod gfx942;
 mod tables;
 
 use std::sync::OnceLock;
@@ -36,6 +41,7 @@ use std::sync::OnceLock;
 pub fn hazards(name: &str) -> Result<&'static dyn thin_passes::hazards::HazardModel, Error> {
     match name {
         gfx1201::NAME => Ok(&gfx1201::hazards::Model),
+        gfx942::NAME => Ok(&gfx942::hazards::Model),
         _ => get(name).map(|_| unreachable!("every registered target has a hazard model")),
     }
 }
@@ -43,7 +49,7 @@ pub fn hazards(name: &str) -> Result<&'static dyn thin_passes::hazards::HazardMo
 /// The known target names, in the registry's order. The first is
 /// the default.
 pub fn names() -> &'static [&'static str] {
-    &[gfx1201::NAME]
+    &[gfx1201::NAME, gfx942::NAME]
 }
 
 /// The default target's name.
@@ -56,9 +62,13 @@ pub fn default_name() -> &'static str {
 /// that fails to build is a bug of its module, so that panics.
 pub fn get(name: &str) -> Result<&'static Target, Error> {
     static GFX1201: OnceLock<Target> = OnceLock::new();
+    static GFX942: OnceLock<Target> = OnceLock::new();
     match name {
         gfx1201::NAME => Ok(GFX1201.get_or_init(|| {
             gfx1201::build().unwrap_or_else(|e| panic!("gfx1201 does not build: {e}"))
+        })),
+        gfx942::NAME => Ok(GFX942.get_or_init(|| {
+            gfx942::build().unwrap_or_else(|e| panic!("gfx942 does not build: {e}"))
         })),
         _ => Err(Error::Value(format!(
             "{name}: not a target (one of {})",
@@ -77,6 +87,7 @@ pub fn physical_form(
 ) -> Result<&'static thin_target::Form, Error> {
     match name {
         gfx1201::NAME => gfx1201::decoder::physical_form(instruction),
+        gfx942::NAME => gfx942::decoder::physical_form(instruction),
         _ => get(name).map(|_| unreachable!("registered target has physical forms")),
     }
 }
@@ -85,6 +96,7 @@ pub fn physical_form(
 pub fn decoder(name: &str) -> Result<&'static dyn Decode, Error> {
     match name {
         gfx1201::NAME => Ok(gfx1201::decoder::decoder()?),
+        gfx942::NAME => Ok(gfx942::decoder::decoder()?),
         _ => get(name).map(|_| unreachable!("every registered target has a decoder")),
     }
 }

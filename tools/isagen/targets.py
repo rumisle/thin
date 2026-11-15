@@ -33,8 +33,16 @@ class TargetRules:
     """Rows given by hand, by (mnemonic, count)."""
     alias: dict[str, str] = field(default_factory=dict)
     """Other spellings."""
+    renames: dict[str, str] = field(default_factory=dict)
+    """XML instruction names replaced by their assembler spellings."""
+    drop: tuple[tuple[str, str], ...] = field(default=())
+    """(instruction, encoding) pairs present in the XML that the target lacks."""
     lds_dma: bool = False
     """Whether a buffer load of 4 operands also has a DMA-into-LDS form."""
+    saddr_default: int = 124
+    """Default 7-bit saddr field value (124 = null on RDNA4, 127 = off on CDNA3)."""
+    soffset_default: int = 124
+    """Default 7-bit soffset field value (124 = null on RDNA4, 0 on CDNA3)."""
 
 
 TARGETS = {
@@ -64,6 +72,42 @@ TARGETS = {
             ("s_wait_kmcnt", 0),
             ("s_wait_alu", 0),
         ),
+    ),
+    "gfx942": TargetRules(
+        member="amdgpu_isa_cdna3.xml",
+        arch="cdna3",
+        vector=(
+            "ENC_VOP",
+            "VOP",
+            "ENC_DS",
+            "ENC_FLAT",
+            "ENC_MUBUF",
+            "ENC_MTBUF",
+        ),
+        flat=("ENC_FLAT",),
+        rtn_encodings=("ENC_MUBUF", "ENC_MTBUF"),
+        tied=r"^(v_fmac_|v_dot\d+c_|v_pk_fmac_|v_smfmac_|v_cvt_pkaccum_|v_writelane_|s_bitset[01]_)",
+        no_exec=("v_readlane_b32", "v_writelane_b32"),
+        mask_dwords=2,
+        unwritten={},
+        skip=("ENC_MTBUF",),
+        hand=(("s_waitcnt", 0),),
+        renames={
+            "v_accvgpr_read": "v_accvgpr_read_b32",
+            "v_accvgpr_write": "v_accvgpr_write_b32",
+            "v_mad_mix_f32": "v_fma_mix_f32",
+            "v_mad_mixlo_f16": "v_fma_mixlo_f16",
+            "v_mad_mixhi_f16": "v_fma_mixhi_f16",
+        },
+        drop=(
+            ("s_set_valu_coexec_mode", "ENC_SOPP"),
+            ("v_readfirstlane_b32", "ENC_VOP3"),
+            ("v_swap_b32", "ENC_VOP3"),
+            ("v_accvgpr_mov_b32", "ENC_VOP3"),
+        ),
+        lds_dma=True,
+        saddr_default=127,
+        soffset_default=0,
     ),
 }
 """The targets the generator knows."""

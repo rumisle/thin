@@ -40,8 +40,9 @@ pub use target::{
     GROUPS,
 };
 pub use vocab::{
-    dst_half, dst_sel, mem_of_encoding, phys_named, DstHalf, DstSel, FieldKind, Flags, Kind, Mem,
-    Phys, SlotKind, Space, FIELD_NAMES, FLAG_BITS, LINE_FIELDS, PHYS,
+    dst_half, dst_sel, is_line_field, mem_of_encoding, phys_named, DstHalf, DstSel, FieldKind,
+    Flags, Kind, Mem, Phys, SlotKind, Space, FIELD_NAMES, FLAG_BITS, LINE_FIELDS, LINE_FIELD_NAMES,
+    PHYS,
 };
 
 /// A failure of the target interface.

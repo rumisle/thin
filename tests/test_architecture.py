@@ -8,7 +8,7 @@ from tools import check_binding
 
 ROOT = Path(__file__).resolve().parent.parent
 INSTANCE_CRATES = {"thin-targets"}
-TARGET_NAMES = ("gfx1201",)
+TARGET_NAMES = ("gfx1201", "gfx942")
 
 
 def _rust_code_lines(path: Path):

@@ -713,7 +713,11 @@ fn atomic(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, op: &str) -> Result<(), Emu
     let wn = w.w;
     let exec = w.exec;
     let ops = &ins.operands;
-    let wide = op.ends_with("b64") || op.ends_with("u64") || op.ends_with("i64");
+    let wide = op.ends_with("b64")
+        || op.ends_with("u64")
+        || op.ends_with("i64")
+        || op.ends_with("f64")
+        || op.ends_with("x2");
     let returning_form = ops.len() >= 4;
     let returns = returning_form && e.facts.scope.returns.is_none_or(|f| ins.field(f).is_some());
     if wide && returning_form {

@@ -1,4 +1,4 @@
-//! The lift: shipped gfx1201 code objects (see docs/dev/lift.md) back into
+//! The lift: shipped AMDHSA code objects (see docs/dev/lift.md) back into
 //! thin's terms, each step the inverse of one of thin's lowering steps.
 //!
 //! **Owns** reading a multi-kernel code object ([`object`]) and its typed

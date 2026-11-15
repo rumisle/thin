@@ -106,30 +106,31 @@ pub struct Rendering {
     end: usize,
 }
 
-fn physical(file: char, first: u32, count: u32) -> Operand {
-    Operand::Reg(Reg::new(
-        if file == 'v' { 0 } else { 1 },
-        file,
-        first,
-        count,
-    ))
+fn physical(target: &Target, file: char, first: u32, count: u32) -> Operand {
+    let idx = target
+        .definition()
+        .files
+        .iter()
+        .position(|f| f.letter == file)
+        .expect("a target register file") as i32;
+    Operand::Reg(Reg::new(idx, file, first, count))
 }
 
-fn entry_bindings(interface: &Interface) -> Vec<EntryBinding> {
+fn entry_bindings(target: &Target, interface: &Interface) -> Vec<EntryBinding> {
     let mut out = Vec::new();
     let mut filled = 0;
     for user in &interface.user_sgprs {
         let n = user.value.dwords();
         out.push(EntryBinding {
             value: EntryValue::User(user.value),
-            operand: physical('s', user.first, n),
+            operand: physical(target, 's', user.first, n),
         });
         filled = filled.max(user.first + n);
     }
     if filled < interface.user_sgpr_count {
         out.push(EntryBinding {
             value: EntryValue::UserTail,
-            operand: physical('s', filled, interface.user_sgpr_count - filled),
+            operand: physical(target, 's', filled, interface.user_sgpr_count - filled),
         });
     }
     let mut next = interface.user_sgpr_count;
@@ -137,7 +138,7 @@ fn entry_bindings(interface: &Interface) -> Vec<EntryBinding> {
         if *enabled {
             out.push(EntryBinding {
                 value: EntryValue::WorkgroupId(axis as u8),
-                operand: physical('s', next, 1),
+                operand: physical(target, 's', next, 1),
             });
             next += 1;
         }
@@ -145,35 +146,40 @@ fn entry_bindings(interface: &Interface) -> Vec<EntryBinding> {
     if interface.workgroup_info {
         out.push(EntryBinding {
             value: EntryValue::WorkgroupInfo,
-            operand: physical('s', next, 1),
+            operand: physical(target, 's', next, 1),
         });
     }
-    // RDNA4 ISA guide: CS local X/Y/Z are packed in VGPR0.
+    // CS local X/Y/Z are packed in VGPR0.
     out.push(EntryBinding {
         value: EntryValue::WorkitemIds(interface.workitem_id_components),
-        operand: physical('v', 0, 1),
+        operand: physical(target, 'v', 0, 1),
     });
-    // Table 12: grid X and packed grid Y/Z are also delivered in TTMPs.
-    out.push(EntryBinding {
-        value: EntryValue::ConditionalHardware {
-            name: "ttmp7",
-            condition: "GridYZvalid",
-        },
-        operand: Operand::Phys(phys_named("ttmp7").expect("ttmp7")),
-    });
-    for name in ["ttmp9", "exec"] {
+    // Where the target also delivers grid X and packed grid Y/Z in TTMPs:
+    if !target.definition().chip.wgids.is_empty() {
         out.push(EntryBinding {
-            value: EntryValue::HardwareNamed(name),
-            operand: Operand::Phys(phys_named(name).expect("hardware input")),
+            value: EntryValue::ConditionalHardware {
+                name: "ttmp7",
+                condition: "GridYZvalid",
+            },
+            operand: Operand::Phys(phys_named("ttmp7").expect("ttmp7")),
+        });
+        out.push(EntryBinding {
+            value: EntryValue::HardwareNamed("ttmp9"),
+            operand: Operand::Phys(phys_named("ttmp9").expect("hardware input")),
         });
     }
+    out.push(EntryBinding {
+        value: EntryValue::HardwareNamed("exec"),
+        operand: Operand::Phys(phys_named("exec").expect("hardware input")),
+    });
     out
 }
 
-fn operand(i: &Instruction, k: usize, o: &Opd) -> Result<Operand, ProgramError> {
+fn operand(target: &Target, i: &Instruction, k: usize, o: &Opd) -> Result<Operand, ProgramError> {
     Ok(match *o {
-        Opd::V { n, count } => physical('v', n.into(), count.into()),
-        Opd::S { n, count } => physical('s', n.into(), count.into()),
+        Opd::V { n, count } => physical(target, 'v', n.into(), count.into()),
+        Opd::S { n, count } => physical(target, 's', n.into(), count.into()),
+        Opd::A { n, count } => physical(target, 'a', n.into(), count.into()),
         Opd::Named(&(name, _, _)) => Operand::Phys(
             phys_named(name).ok_or_else(|| error(Some(i.offset), "named register", name))?,
         ),
@@ -208,6 +214,18 @@ fn fields(i: &Instruction, f: &Form) -> Result<Vec<(FieldId, FieldValue)>, Progr
                     "field",
                     "physical DPP fi has no IR field",
                 ));
+            }
+            match (m.key, m.value) {
+                ("mul", MVal::Int(2)) => {
+                    return Ok((FieldId::named("omod").expect("omod"), FieldValue::Int(1)))
+                }
+                ("mul", MVal::Int(4)) => {
+                    return Ok((FieldId::named("omod").expect("omod"), FieldValue::Int(2)))
+                }
+                ("div", MVal::Int(2)) => {
+                    return Ok((FieldId::named("omod").expect("omod"), FieldValue::Int(3)))
+                }
+                _ => {}
             }
             let id = FieldId::named(m.key);
             if id.is_err() && f.field("dpp").is_some() {
@@ -268,7 +286,7 @@ fn instr_of(target: &'static Target, i: &Instruction) -> Result<Instr, ProgramEr
         .operands()
         .iter()
         .enumerate()
-        .map(|(k, o)| operand(i, k, o))
+        .map(|(k, o)| operand(target, i, k, o))
         .collect::<Result<Vec<_>, _>>()?;
     let mods: Vec<_> = (0..ops.len())
         .map(|k| {
@@ -353,18 +371,20 @@ pub fn unrender(
     for t in labels {
         label(t, &mut rows, &mut addresses);
     }
-    let values = ['v', 's']
+    let values = target
+        .definition()
+        .files
         .iter()
-        .map(|&file| ValueInfo {
-            file,
-            n: target.hooks().reg_count(file),
+        .map(|f| ValueInfo {
+            file: f.letter,
+            n: target.hooks().reg_count(f.letter),
             phys: Some(0),
             pin: Some(0),
             align: 1,
             ..ValueInfo::default()
         })
         .collect();
-    let entry = entry_bindings(interface);
+    let entry = entry_bindings(target, interface);
     let entry_regs = entry
         .iter()
         .filter_map(|b| b.operand.reg().copied())

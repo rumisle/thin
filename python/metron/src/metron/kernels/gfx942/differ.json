@@ -1,0 +1,35 @@
+{
+ "args": [
+  {
+   "kind": "ptr",
+   "name": "base",
+   "offset": 0
+  },
+  {
+   "kind": "ptr",
+   "name": "ref",
+   "offset": 8
+  },
+  {
+   "kind": "ptr",
+   "name": "flags",
+   "offset": 16
+  },
+  {
+   "kind": "u32",
+   "name": "stride",
+   "offset": 24
+  }
+ ],
+ "block": [
+  256,
+  1
+ ],
+ "kernarg_bytes": 28,
+ "meta": {
+  "chunk": 32768,
+  "copies_max": 65536,
+  "stride_max": 4294901760
+ },
+ "symbol": "metron_differ"
+}

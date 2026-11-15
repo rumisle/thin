@@ -246,7 +246,7 @@ impl Builder {
                 return self.land_in(dst, x);
             }
             (Op::Val, Val::Value(v)) => {
-                if dst.is_some_and(|d| d.file == 's') && v.file == 'v' {
+                if dst.is_some_and(|d| d.file == 's') && matches!(v.file, 'v' | 'a') {
                     return expr(format!(
                         "{}: a vector value into an SGPR (v_readfirstlane is never implied: first_lane(x))",
                         top(n)
@@ -393,12 +393,26 @@ impl Builder {
                     Opd::Int(c) => Opd::Int(c >> (32 * k) & 0xFFFF_FFFF),
                     x => x.clone(),
                 };
-                self.emit_op("v.mov.b32", Some(&half), &[src], &[])?;
+                self.mov(&half, &src)?;
             }
             return Ok(());
         }
+        if d.file == 'a' {
+            if matches!(x, Opd::Reg(v, _) if v.file == 'a') {
+                return self.emit_op("v.accvgpr.mov.b32", Some(d), std::slice::from_ref(x), &[]);
+            }
+            if x.literal() || matches!(x, Opd::Float(_)) {
+                let tmp = self.vgpr_copy(x, d.ty)?;
+                return self.emit_op("v.accvgpr.write.b32", Some(d), &[tmp], &[]);
+            }
+            return self.emit_op("v.accvgpr.write.b32", Some(d), std::slice::from_ref(x), &[]);
+        }
         let op = if d.file == 'v' {
-            "v.mov.b32"
+            if matches!(x, Opd::Reg(v, _) if v.file == 'a') {
+                "v.accvgpr.read.b32"
+            } else {
+                "v.mov.b32"
+            }
         } else {
             "s.mov.b32"
         };

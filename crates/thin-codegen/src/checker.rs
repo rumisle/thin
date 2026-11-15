@@ -258,9 +258,10 @@ pub fn message(r: &Record) -> String {
     )
 }
 
-/// gfx1201's split counters: load, store, ds, km.
-const COUNTERS: [&str; 4] = ["loadcnt", "storecnt", "dscnt", "kmcnt"];
-const KM: u8 = 3;
+/// Split and combined wait counters.
+const COUNTERS: [&str; 6] = ["loadcnt", "storecnt", "dscnt", "kmcnt", "vmcnt", "lgkmcnt"];
+const VM: u8 = 4;
+const LGKM: u8 = 5;
 
 /// Whether an LDS op returns data to a register.
 fn lds_returns(op: &str) -> bool {
@@ -268,7 +269,7 @@ fn lds_returns(op: &str) -> bool {
         return false;
     };
     [
-        "load", "bpermute", "permute", "swizzle", "consume", "append",
+        "load", "read", "bpermute", "permute", "swizzle", "consume", "append",
     ]
     .iter()
     .any(|k| r.starts_with(k))
@@ -276,111 +277,193 @@ fn lds_returns(op: &str) -> bool {
             .is_some_and(|k| k > 0 && r[..k].chars().all(word))
 }
 
-/// An op's counter and whether it returns, by mnemonic prefix.
-fn split_counter(op: &str, rest: &str) -> Option<(u8, bool)> {
+/// An op's counter, whether it returns, and whether it completes out of order.
+fn op_counter(op: &str, rest: &str, unified: bool) -> Option<(u8, bool, bool)> {
     let unit = ["buffer_", "global_", "flat_", "scratch_"]
         .iter()
         .find_map(|u| op.strip_prefix(u).map(|r| (*u, r)));
     if let Some((u, r)) = unit {
         if r.starts_with("load") {
-            return Some((0, true));
+            let dma = u == "buffer_" && rest.split_whitespace().any(|t| t == "lds");
+            return Some((if unified { VM } else { 0 }, !dma, false));
         }
-        if r.starts_with("store") {
-            return Some((1, false));
+        if r.starts_with("store") || r == "wbl2" || r == "inv" {
+            return Some((if unified { VM } else { 1 }, false, false));
         }
         if r.starts_with("atomic") && u != "scratch_" {
-            let returns = rest.contains("th:TH_ATOMIC_RETURN");
-            return Some(if returns { (0, true) } else { (1, false) });
+            let has_sc0 = rest.split_whitespace().any(|t| t == "sc0");
+            let returns = rest.contains("th:TH_ATOMIC_RETURN") || has_sc0;
+            let c = if unified {
+                VM
+            } else if returns {
+                0
+            } else {
+                1
+            };
+            return Some((c, returns, false));
         }
         return None;
     }
     if op.starts_with("ds_") {
-        return Some((2, lds_returns(op)));
+        return Some((if unified { LGKM } else { 2 }, lds_returns(op), false));
     }
-    // Scalar loads and returning messages land on kmcnt, out of order.
+    // Scalar loads, clocks and returning messages land out of order.
     if op.starts_with("s_load")
         || op.starts_with("s_buffer_load")
         || op.starts_with("s_sendmsg_rtn")
+        || op == "s_memtime"
+        || op == "s_memrealtime"
     {
-        return Some((KM, true));
+        return Some((if unified { LGKM } else { 3 }, true, true));
+    }
+    if unified
+        && (op.starts_with("s_store")
+            || op.starts_with("s_atomic")
+            || op.starts_with("s_buffer_atomic"))
+    {
+        return Some((
+            LGKM,
+            op.contains("atomic") && rest.split_whitespace().any(|t| t == "glc"),
+            true,
+        ));
     }
     None
 }
 
-/// A pending register: (its load's counter, younger ops, the load's line).
-type Split = BTreeMap<String, (u8, u32, usize)>;
+fn parse_u32(word: &str) -> Option<u32> {
+    word.strip_prefix("0x")
+        .map_or_else(|| word.parse().ok(), |h| u32::from_str_radix(h, 16).ok())
+}
 
-/// The split-counter check; the counter of each violation kept
-/// for its message.
-#[derive(Default)]
-struct Counters(std::cell::RefCell<BTreeMap<(usize, String), u8>>);
+fn waitcnt_fields(rest: &str) -> Vec<(u8, u32)> {
+    let trimmed = rest.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    if let Some(simm) = parse_u32(trimmed) {
+        let vm = (simm & 0xF) | (((simm >> 14) & 3) << 4);
+        let lgkm = (simm >> 8) & 0xF;
+        return vec![(VM, vm), (LGKM, lgkm)];
+    }
+    let mut out = Vec::new();
+    for piece in trimmed.split(|c: char| c.is_whitespace() || c == '&' || c == ',') {
+        let Some((name, num)) = piece.strip_suffix(')').and_then(|p| p.split_once('(')) else {
+            continue;
+        };
+        let Some(n) = parse_u32(num.trim()) else {
+            continue;
+        };
+        match name.trim() {
+            "vmcnt" => out.push((VM, n)),
+            "lgkmcnt" => out.push((LGKM, n)),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// A pending register: (its load's counter, younger ops, unordered, the load's line).
+type Split = BTreeMap<String, (u8, u32, bool, usize)>;
+
+/// The counter check; the counter of each violation kept for its message.
+struct Counters {
+    unified: bool,
+    seen: std::cell::RefCell<BTreeMap<(usize, String), u8>>,
+}
 
 impl Check for Counters {
     type State = Split;
 
     fn step(&self, st: &mut Split, x: &Ins, found: &mut Found) {
-        if let Some(c) = x.op.strip_prefix("s_wait_") {
-            let Some(c) = COUNTERS.iter().position(|n| *n == c) else {
-                return; // s_wait_alu and the like change nothing
-            };
-            let word = x.rest.split([' ', ',']).next().unwrap_or("");
-            let n = word
-                .strip_prefix("0x")
-                .map_or_else(|| word.parse().ok(), |h| u32::from_str_radix(h, 16).ok());
-            if let Some(n) = n {
-                let c = c as u8;
-                st.retain(|_, e| !(e.0 == c && (n == 0 || (c != KM && e.1 >= n))));
+        if x.op == "s_waitcnt" {
+            for (c, n) in waitcnt_fields(&x.rest) {
+                st.retain(|_, e| !(e.0 == c && (n == 0 || (!e.2 && e.1 >= n))));
             }
             return;
         }
-        for r in regs(&x.rest, "vs") {
-            if let Some(&(c, _, load)) = st.get(&r) {
+        if let Some(c) = x.op.strip_prefix("s_wait_") {
+            let Some(c) = COUNTERS[..4].iter().position(|n| *n == c) else {
+                return; // s_wait_alu and the like change nothing
+            };
+            let word = x.rest.split([' ', ',']).next().unwrap_or("");
+            if let Some(n) = parse_u32(word) {
+                let c = c as u8;
+                st.retain(|_, e| !(e.0 == c && (n == 0 || (!e.2 && e.1 >= n))));
+            }
+            return;
+        }
+        for r in regs(&x.rest, "vsa") {
+            if let Some(&(c, _, _, load)) = st.get(&r) {
                 let key = (x.line, r.clone());
                 if !found.0.contains_key(&key) {
-                    self.0.borrow_mut().insert(key.clone(), c);
+                    self.seen.borrow_mut().insert(key.clone(), c);
                 }
                 found.add(key, (x.line, x.op.clone(), r, load));
             }
         }
-        let Some((own, returns)) = split_counter(&x.op, &x.rest) else {
+        let Some((own, returns, unordered)) = op_counter(&x.op, &x.rest, self.unified) else {
             return;
         };
-        if own != KM {
+        if !unordered {
             st.values_mut()
-                .filter(|e| e.0 == own)
+                .filter(|e| e.0 == own && !e.2)
                 .for_each(|e| e.1 = (e.1 + 1).min(64));
         }
         if returns {
             let ops = operands(&x.rest);
-            for r in regs(ops[0], "vs") {
-                st.insert(r, (own, 0, x.line));
+            for r in regs(ops[0], "vsa") {
+                st.insert(r, (own, 0, unordered, x.line));
             }
         }
     }
 
     fn merge(&self, old: &Split, new: &Split) -> Split {
         let mut out = old.clone();
-        for (r, &(c, n, line)) in new {
+        for (r, &(c, n, u, line)) in new {
             out.entry(r.clone())
-                .and_modify(|e| e.1 = e.1.min(n))
-                .or_insert((c, n, line));
+                .and_modify(|e| {
+                    e.1 = e.1.min(n);
+                    e.2 |= u;
+                })
+                .or_insert((c, n, u, line));
         }
         out
     }
 }
 
-/// gfx1201's split-counter wait check: each violation's record and
+/// Independent counter wait check: each violation's record and
 /// message, sorted by (line, register).
 pub fn counter_waits(text: &str) -> Vec<(Record, String)> {
-    let c = Counters::default();
+    let unified = [
+        "s_waitcnt",
+        "s_load_dword",
+        "s_buffer_load_dword",
+        "global_load_dword",
+        "global_load_ubyte",
+        "global_load_sbyte",
+        "global_load_ushort",
+        "global_load_sshort",
+        "buffer_load_dword",
+        "ds_read_",
+        "ds_write_",
+        "s_memtime",
+        "s_memrealtime",
+    ]
+    .iter()
+    .any(|m| text.contains(m));
+    let c = Counters {
+        unified,
+        seen: Default::default(),
+    };
     let records = run(text, &c);
-    let counters = c.0.into_inner();
+    let counters = c.seen.into_inner();
+    let fallback = if unified { "vmcnt" } else { "loadcnt" };
     records
         .into_iter()
         .map(|r| {
             let cnt = counters
                 .get(&(r.0, r.2.clone()))
-                .map_or("loadcnt", |&k| COUNTERS[k as usize]);
+                .map_or(fallback, |&k| COUNTERS[k as usize]);
             let m = format!("{} ({cnt})", message(&r));
             (r, m)
         })

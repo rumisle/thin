@@ -381,7 +381,16 @@ def codeobject_data():
     }
     minimal = {"amdhsa.kernels": [{".name": symbol, ".symbol": symbol + ".kd"}]}
     flag_cases = []
-    for flag in (flags, flags | 1 << 8, flags | 3 << 8, flags | 0xFFFFFF00, flags - 2, 0):
+    for flag in (
+        flags,
+        flags | 1 << 8,
+        flags | 3 << 8,
+        flags | 0xFFFFFF00,
+        flags - 2,
+        (flags - 2) | 5 << 8,
+        0x3F,
+        0,
+    ):
         case = {"e_flags": flag}
         try:
             back = f.read(f.write(symbol, struct.pack("<I", 0xBF810000), bytes(64), minimal, flag))

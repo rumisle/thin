@@ -45,12 +45,13 @@ class StaleReads(UserWarning):
 class Emulator:
     """The emulator as the device sees it: its target, wave width, memory and run."""
 
-    def __init__(self):
+    def __init__(self, target=None):
         from thin import _native
         from thin.emu import Memory
+        from thin.target import target as active_target
 
-        self.target = _native.target_names()[0]
-        """The emulator's target name: the registry's default target."""
+        self.target = target or active_target().name
+        """The emulator's target name (defaults to the active target)."""
         self.wave = _native.target_info(self.target)[0]
         """The emulated wave width (the target's)."""
         self.memory = Memory()
@@ -92,7 +93,14 @@ class Emulator:
         options = {k: v for k, v in interleaving.items() if k in INTERLEAVING}
         try:
             c = Cluster(
-                asm, man, self.memory, kernargs, grid[:2], stall_rounds=stall_rounds, **options
+                asm,
+                man,
+                self.memory,
+                kernargs,
+                grid[:2],
+                stall_rounds=stall_rounds,
+                target=self.target,
+                **options,
             )
             # A staged copy takes its bytes as its rank's first launch starts:
             # later launches find what the earlier ones left in it.
@@ -146,8 +154,8 @@ def _bank_warning(whats, machines, texts, target) -> None:
 class _Shared:
     """A group's one memory and one queue."""
 
-    def __init__(self, world, stall_rounds, interleaving, emulator=None):
-        self.emu = emulator or Emulator()
+    def __init__(self, world, stall_rounds, interleaving, emulator=None, target=None):
+        self.emu = emulator or Emulator(target)
         self.world, self.stall_rounds, self.interleaving = world, stall_rounds, interleaving
         self.queue: list = []
         self.after: list = []
@@ -160,9 +168,9 @@ class EmulatedDevice(Device):
 
     guard = 0
 
-    def __init__(self, shared=None, rank=None):
+    def __init__(self, shared=None, rank=None, *, target=None):
         super().__init__(rank)
-        self.shared = shared or _Shared(1, 20000, {})
+        self.shared = shared or _Shared(1, 20000, {}, target=target)
         self.shared.devices.append(self)
 
     def alloc_bytes(self, n, fill, meta):
@@ -302,7 +310,7 @@ def _encodes(key, asm, obj) -> None:
         raise LaunchError(f"{key}: the .s does not encode to the code object's .text")
 
 
-def group(world, stall_rounds=20000, **interleaving) -> list[EmulatedDevice]:
+def group(world, stall_rounds=20000, *, target=None, **interleaving) -> list[EmulatedDevice]:
     """``world`` emulated devices on one memory and one queue."""
     if type(world) is not int or world < 1:
         raise LaunchError(f"a group of {world!r} ranks: a positive int")
@@ -311,5 +319,5 @@ def group(world, stall_rounds=20000, **interleaving) -> list[EmulatedDevice]:
         raise LaunchError(f"a group's interleaving {bad}: the Cluster's are {INTERLEAVING}")
     if type(stall_rounds) is not int or stall_rounds < 1:
         raise LaunchError(f"a group's stall_rounds {stall_rounds!r}: a positive int")
-    shared = _Shared(world, stall_rounds, interleaving)
+    shared = _Shared(world, stall_rounds, interleaving, target=target)
     return [EmulatedDevice(shared, rank) for rank in range(world)]

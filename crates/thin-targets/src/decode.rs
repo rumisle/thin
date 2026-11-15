@@ -34,6 +34,13 @@ pub enum Opd {
         /// How many.
         count: u16,
     },
+    /// AGPRs `a[n: n+count-1]`.
+    A {
+        /// The first.
+        n: u16,
+        /// How many.
+        count: u16,
+    },
     /// A named register of the scalar source space (`vcc_lo`, `m0`,...):
     /// the target's entry (name, number, dwords).
     Named(&'static (&'static str, u32, u32)),
@@ -216,6 +223,8 @@ fn opd_text(out: &mut impl fmt::Write, o: &Opd) -> fmt::Result {
         Opd::V { n, count } => write!(out, "v[{n}:{}]", n + count - 1),
         Opd::S { n, count: 1 } => write!(out, "s{n}"),
         Opd::S { n, count } => write!(out, "s[{n}:{}]", n + count - 1),
+        Opd::A { n, count: 1 } => write!(out, "a{n}"),
+        Opd::A { n, count } => write!(out, "a[{n}:{}]", n + count - 1),
         Opd::Named(&(name, _, _)) => out.write_str(name),
         Opd::Int(v) => int_text(out, v),
         Opd::Float(f) => write!(out, "{f:?}"),
@@ -260,6 +269,7 @@ fn operand(o: &Opd, signs: (bool, bool)) -> Operand {
     let (kind, n, count, value, name) = match *o {
         Opd::V { n, count } => (OperandKind::V, n, count, None, None),
         Opd::S { n, count } => (OperandKind::S, n, count, None, None),
+        Opd::A { n, count } => (OperandKind::A, n, count, None, None),
         Opd::Named(&(name, n, count)) => (
             OperandKind::S,
             n as u16,

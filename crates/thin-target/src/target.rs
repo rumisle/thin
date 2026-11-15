@@ -224,6 +224,7 @@ pub struct Target {
     own: Vec<Form>,
     keys: HashMap<(String, usize, bool), usize>,
     ops: BTreeSet<String>,
+    line_fields: Vec<&'static str>,
 }
 
 impl std::fmt::Debug for Target {
@@ -254,12 +255,28 @@ impl Target {
         let names: Vec<String> = def.counter_names.iter().map(|n| n.to_string()).collect();
         let own = own_ops(&names)?;
         let ops = keys.keys().map(|(op, _, _)| op.clone()).collect();
+        let present: BTreeSet<&str> = def
+            .forms
+            .iter()
+            .flat_map(|f| f.fields.iter().map(|x| x.name))
+            .collect();
+        let line_fields = crate::vocab::LINE_FIELD_NAMES
+            .iter()
+            .copied()
+            .filter(|name| present.contains(name) || *name == "omod")
+            .collect();
         Ok(Target {
             def,
             own,
             keys,
             ops,
+            line_fields,
         })
+    }
+
+    /// The line modifier fields that appear on at least one form of this target.
+    pub fn line_fields(&self) -> &[&'static str] {
+        &self.line_fields
     }
 
     /// The definition the target was built from.
@@ -468,7 +485,7 @@ fn canon_in(spellings: &[(&str, &str)], mnemonic: &str) -> String {
     }
     // An encoding variant of a spelled op is that op's: v_max_num_f32_dpp
     // is v.max.f32.dpp as v_max_num_f32 is v.max.f32.
-    for suffix in ["_e32", "_e64", "_dpp"] {
+    for suffix in ["_e32", "_e64", "_dpp", "_sdwa"] {
         if let Some(dotted) = mnemonic.strip_suffix(suffix).and_then(spelled) {
             return format!("{dotted}.{}", &suffix[1..]);
         }

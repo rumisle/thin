@@ -265,9 +265,9 @@ named! {
     }
 }
 
-/// Every field name, in the normative order; the first 17 are the fields a
-/// target's line spells.
-pub static FIELD_NAMES: [&str; 40] = [
+/// Every field name, in the normative order; the first 17 and indices 40..49
+/// are the fields a target's line spells.
+pub static FIELD_NAMES: [&str; 52] = [
     "dpp",
     "row_mask",
     "bank_mask",
@@ -309,10 +309,58 @@ pub static FIELD_NAMES: [&str; 40] = [
     "depctr_vm_vsrc",
     // ir.undefined's place, appended.
     "on",
+    // Appended line fields and wait-count fields (preserving indices 0..40).
+    "sc0",
+    "sc1",
+    "nt",
+    "glc",
+    "lds",
+    "gds",
+    "cbsz",
+    "abid",
+    "blgp",
+    "vmcnt",
+    "lgkmcnt",
+    "expcnt",
 ];
 
-/// How many of [`FIELD_NAMES`] a target's line spells.
+/// How many leading entries of [`FIELD_NAMES`] a target's line spells.
 pub const LINE_FIELDS: usize = 17;
+
+/// Every field name a target's line may spell.
+pub static LINE_FIELD_NAMES: [&str; 26] = [
+    "dpp",
+    "row_mask",
+    "bank_mask",
+    "bound_ctrl",
+    "offen",
+    "idxen",
+    "offset",
+    "offset0",
+    "offset1",
+    "th",
+    "scope",
+    "op_sel",
+    "op_sel_hi",
+    "neg_lo",
+    "neg_hi",
+    "clamp",
+    "omod",
+    "sc0",
+    "sc1",
+    "nt",
+    "glc",
+    "lds",
+    "gds",
+    "cbsz",
+    "abid",
+    "blgp",
+];
+
+/// Whether a [`FIELD_NAMES`] index is spelled on an instruction line.
+pub fn is_line_field(index: usize) -> bool {
+    index < LINE_FIELDS || (40..49).contains(&index)
+}
 
 named! {
     /// A memory form's class, from its encoding name.
@@ -335,11 +383,11 @@ named! {
 /// The memory class of an XML encoding name.
 pub fn mem_of_encoding(encoding: &str) -> Option<Mem> {
     match encoding {
-        "ENC_VDS" => Some(Mem::Ds),
-        "ENC_VFLAT" => Some(Mem::Flat),
-        "ENC_VGLOBAL" => Some(Mem::Global),
-        "ENC_VSCRATCH" => Some(Mem::Scratch),
-        "ENC_VBUFFER" => Some(Mem::Buffer),
+        "ENC_VDS" | "ENC_DS" => Some(Mem::Ds),
+        "ENC_VFLAT" | "ENC_FLAT" => Some(Mem::Flat),
+        "ENC_VGLOBAL" | "ENC_FLAT_GLBL" => Some(Mem::Global),
+        "ENC_VSCRATCH" | "ENC_FLAT_SCRATCH" => Some(Mem::Scratch),
+        "ENC_VBUFFER" | "ENC_MUBUF" | "ENC_MUBUF lds" | "ENC_MTBUF" => Some(Mem::Buffer),
         "ENC_SMEM" => Some(Mem::Smem),
         _ => None,
     }

@@ -93,6 +93,7 @@ class Cluster:
         lds_seed=None,
         lds_carry=None,
         max_ins=0,
+        target=None,
     ):
         """A cluster; `man` = {wgsize, vgpr, agpr, lds}; kernargs[r] one buffer or a list."""
         from thin.emu import _target
@@ -119,7 +120,13 @@ class Cluster:
         launches = [_launches(k) for k in kernargs]
         self.mem, self.staged, self.ranks, self.hooks = mem, [], len(launches), hooks
         self._native = _native.EmuCluster(
-            text, _target(), counts, launches, (g[0], g[1]), _Options(options), (sum_records, trace)
+            text,
+            target or _target(),
+            counts,
+            launches,
+            (g[0], g[1]),
+            _Options(options),
+            (sum_records, trace),
         )
 
     def run(self) -> list[RankMachine]:

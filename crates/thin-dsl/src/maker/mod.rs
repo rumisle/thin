@@ -19,7 +19,7 @@ pub use num::{int0, is_literal32, py_float};
 /// (`thin_target::FIELD_NAMES`); whether a form has one is the verifier's
 /// check.
 pub fn fields() -> &'static [&'static str] {
-    &thin_target::FIELD_NAMES[..thin_target::LINE_FIELDS]
+    &thin_target::LINE_FIELD_NAMES
 }
 
 /// An operand as the author gives it, after `as_reg`.
@@ -168,13 +168,21 @@ pub fn op(
             "{name}: operand {k} is None (a register, a value or a constant expected)"
         ));
     }
-    let fields = check_fields(&name, fields)?;
+    let fields = check_fields(t, &name, fields)?;
     let args: Vec<Arg> = args.into_iter().map(|a| masked(t, a)).collect();
     checks::before_form(c, &name, &args, &fields)?;
-    let th = fields.iter().find_map(|(k, v)| match (k.as_str(), v) {
-        ("th", FArg::Str(s)) => Some(s.as_str()),
-        _ => None,
-    });
+    let th = fields
+        .iter()
+        .find_map(|(k, v)| match (k.as_str(), v) {
+            ("th", FArg::Str(s)) => Some(s.as_str()),
+            _ => None,
+        })
+        .or_else(|| {
+            fields.iter().find_map(|(k, v)| match (k.as_str(), v) {
+                ("sc0", FArg::Bool(true) | FArg::Int(1)) => Some("sc0"),
+                _ => None,
+            })
+        });
     let returning = t.hooks().returning(&name, th);
     let Some(form) = t.form(&name, args.len(), returning) else {
         return Err(no_form(c, &name, &args, &fields));
@@ -213,8 +221,12 @@ fn masked(t: &Target, a: Arg) -> Arg {
 }
 
 /// Unknown names refused; the set fields kept in the given order.
-fn check_fields(name: &str, fields: Vec<(String, FArg)>) -> Result<Vec<(String, FArg)>> {
-    let known = self::fields();
+fn check_fields(
+    t: &Target,
+    name: &str,
+    fields: Vec<(String, FArg)>,
+) -> Result<Vec<(String, FArg)>> {
+    let known = t.line_fields();
     let mut unknown: Vec<&str> = fields
         .iter()
         .map(|f| f.0.as_str())

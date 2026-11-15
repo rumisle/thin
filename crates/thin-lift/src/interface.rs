@@ -278,6 +278,7 @@ impl Interface {
     /// allocation and other target directives remain the caller's choice.
     /// The target writer still validates all directives (including wave size).
     pub fn apply_to(&self, file: &mut SFile) {
+        let has_wf32 = file.block.contains_key("wavefront_size32");
         let mut put = |key: &str, value: u32| {
             file.block.insert(key.to_owned(), (value.to_string(), 0));
         };
@@ -292,7 +293,9 @@ impl Interface {
             "uses_dynamic_stack",
             self.private_segment.dynamic_stack.into(),
         );
-        put("wavefront_size32", u32::from(self.wave_size == 32));
+        if self.wave_size == 32 || has_wf32 {
+            put("wavefront_size32", u32::from(self.wave_size == 32));
+        }
         put("user_sgpr_count", self.user_sgpr_count);
         for (value, _) in USER_VALUES {
             put(

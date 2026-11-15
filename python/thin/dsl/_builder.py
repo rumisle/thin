@@ -129,8 +129,8 @@ class Builder:
         self._n = _native.DslBuilder(self.target.name, vgprs, sgprs, placement)
         BUILDERS[self._n.id] = self
         self._program = Program(self.target)
-        self.v, self.s = RegFile(self, "v"), RegFile(self, "s")
-        self.files = {"v": self.v, "s": self.s}
+        self.v, self.s, self.a = RegFile(self, "v"), RegFile(self, "s"), RegFile(self, "a")
+        self.files = {"v": self.v, "s": self.s, "a": self.a}
         self.ablate: set = set()
         """The ablation classes the build drops: a live set."""
         self._records: dict = {0: {}}

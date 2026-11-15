@@ -38,6 +38,7 @@ fn shape(i: &Instruction) -> String {
         };
         let kind = match o {
             Opd::V { count, .. } => format!("v{count}"),
+            Opd::A { count, .. } => format!("a{count}"),
             Opd::S { count, .. } => format!("s{count}"),
             Opd::Named(&(name, _, _)) => name.to_owned(),
             Opd::Int(v) if (-16..=64).contains(v) => "inline".into(),

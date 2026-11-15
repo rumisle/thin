@@ -232,7 +232,7 @@ impl Builder {
             files: [
                 File::new('v', size('v', sizes.vgprs), pv),
                 File::new('s', size('s', sizes.sgprs), ps),
-                File::new('a', 0, pa),
+                File::new('a', size('a', None), pa),
             ],
             values: Vec::new(),
             rows: Vec::new(),

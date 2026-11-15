@@ -745,7 +745,11 @@ fn valu_inner(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result
             let dst = relative(wv, &ops[0], by_dst)?;
             wv.vwrite(&dst, 0, &out, copy_tags(&x, w).as_deref(), exec)?;
         }
-        "v.mov.b32" | "v.not.b32" => {
+        "v.mov.b32"
+        | "v.accvgpr.read.b32"
+        | "v.accvgpr.write.b32"
+        | "v.accvgpr.mov.b32"
+        | "v.not.b32" => {
             let x = wv.vread(arg(1)?, 0)?;
             for l in 0..w {
                 out[l] = if canon == "v.not.b32" {
@@ -1575,11 +1579,30 @@ fn dpp_source(ins: &Ins, l: usize) -> Result<Option<usize>, EmuError> {
     if ins.field("row_half_mirror").is_some() {
         return Ok(Some((l & !7) + 7 - (l & 7)));
     }
-    if let Some(n) = ins.field("row_share") {
+    if let Some(n) = ins.field("row_share").or_else(|| ins.field("row_newbcast")) {
         return Ok(Some(row * 16 + field_int(n) as usize % 16));
     }
     if let Some(n) = ins.field("row_xmask") {
         return Ok(Some(row * 16 + (col ^ (field_int(n) as usize % 16))));
+    }
+    if let Some(n) = ins.field("row_bcast") {
+        return match field_int(n) {
+            15 => Ok(Some(if row & 1 == 1 { (row - 1) * 16 + 15 } else { l })),
+            31 => Ok(Some(if row >= 2 { 31 } else { l })),
+            _ => Err(limit("dpp control not emulated: row_bcast".into())),
+        };
+    }
+    if ins.field("wave_shr").is_some() {
+        return Ok((l >= 1).then(|| l - 1));
+    }
+    if ins.field("wave_shl").is_some() {
+        return Ok(Some(l + 1));
+    }
+    if ins.field("wave_ror").is_some() {
+        return Ok(Some((l + 63) % 64));
+    }
+    if ins.field("wave_rol").is_some() {
+        return Ok(Some((l + 1) % 64));
     }
     let control: Vec<&str> = ins
         .fields

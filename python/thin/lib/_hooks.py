@@ -24,16 +24,23 @@ def granule() -> int:
     return int(hook("lane_granule"))
 
 
+def _cache_fields(default_key: str, raw: str) -> dict:
+    """Named choices (`SCOPE_*`, `TH_*`) use `default_key`; bare flags map to `True`."""
+    if raw.isupper():
+        return {default_key: raw}
+    return {flag: True for flag in raw.split()}
+
+
 def coherent() -> dict:
     """The cache fields of an access coherent across workgroups."""
-    return {"scope": hook("coherent")}
+    return _cache_fields("scope", hook("coherent"))
 
 
 def system() -> dict:
     """The cache fields of an access to memory other devices map."""
-    return {"scope": hook("system")}
+    return _cache_fields("scope", hook("system"))
 
 
 def returning() -> dict:
     """The cache fields of an atomic that returns its old value."""
-    return {"th": hook("atomic_return")}
+    return _cache_fields("th", hook("atomic_return"))

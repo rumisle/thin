@@ -272,6 +272,10 @@ pub struct Clocks {
     pub cycles: Option<(u32, u32)>,
     /// The `s_sendmsg_rtn` message that returns the constant clock.
     pub realtime: Option<u32>,
+    /// Whether `s_memtime` reads the cycle counter.
+    pub memtime: bool,
+    /// Whether `s_memrealtime` reads the constant clock.
+    pub memrealtime: bool,
 }
 
 impl Clocks {
@@ -285,6 +289,18 @@ impl Clocks {
                 }
                 ClockRead::Pair { op, imm: Some(m) } if op.starts_with("s_sendmsg_rtn") => {
                     c.realtime = Some(m);
+                }
+                ClockRead::Pair {
+                    op: "s_memtime",
+                    imm: None,
+                } => {
+                    c.memtime = true;
+                }
+                ClockRead::Pair {
+                    op: "s_memrealtime",
+                    imm: None,
+                } => {
+                    c.memrealtime = true;
                 }
                 _ => {}
             }

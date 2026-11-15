@@ -1,7 +1,7 @@
 //! The printer: the one place an operand, a modifier or a field becomes
 //! text, and register spelling.
 
-use thin_target::{Pseudo, WaitText, LINE_FIELDS};
+use thin_target::{is_line_field, Pseudo, WaitText};
 
 use crate::{pyfmt, Error, FieldValue, ImmValue, Instr, Operand};
 
@@ -67,7 +67,7 @@ pub fn line(i: &Instr, regs: &[String]) -> Result<String, Error> {
     let mut fields: Vec<_> = i
         .fields()
         .iter()
-        .filter(|(id, v)| (id.0 as usize) < LINE_FIELDS && !v.is_none())
+        .filter(|(id, v)| is_line_field(id.0 as usize) && !v.is_none())
         .collect();
     fields.sort_by_key(|(id, _)| *id);
     for (id, v) in fields {
@@ -110,7 +110,10 @@ fn operand<'a>(
 /// false is not spelled.
 fn suffix(key: &str, v: &FieldValue) -> Result<Option<String>, Error> {
     Ok(Some(match (key, v) {
-        (_, FieldValue::Bool(false)) => return Ok(None),
+        (_, FieldValue::Bool(false)) | ("omod", FieldValue::Int(0)) => return Ok(None),
+        ("omod", FieldValue::Int(1)) => "mul:2".into(),
+        ("omod", FieldValue::Int(2)) => "mul:4".into(),
+        ("omod", FieldValue::Int(3)) => "div:2".into(),
         ("dpp", v) => v.py_str(),
         // The bound control bit, as llvm-mc spells it on gfx12.
         ("bound_ctrl", FieldValue::Bool(true)) => "bound_ctrl:1".into(),

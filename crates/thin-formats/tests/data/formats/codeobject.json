@@ -186,6 +186,16 @@
    },
    {
     "e_flags": 76,
+    "read_e_flags": 76,
+    "target": "gfx942"
+   },
+   {
+    "e_flags": 1356,
+    "read_e_flags": 1356,
+    "target": "gfx942"
+   },
+   {
+    "e_flags": 63,
     "refused": "CodeObjectError"
    },
    {

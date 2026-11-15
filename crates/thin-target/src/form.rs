@@ -253,11 +253,11 @@ impl Form {
     }
 }
 
-/// The operation an op's encodings share: one trailing `_e64` or `_dpp`
-/// removed, the first that matches.
+/// The operation an op's encodings share: one trailing `_e64`, `_dpp` or
+/// `_sdwa` removed, the first that matches.
 pub fn base(op: &str) -> &str {
     let op = op.strip_suffix("+rtn").unwrap_or(op);
-    ["_e64", "_dpp"]
+    ["_e64", "_dpp", "_sdwa"]
         .iter()
         .find_map(|s| op.strip_suffix(s))
         .unwrap_or(op)
@@ -266,12 +266,21 @@ pub fn base(op: &str) -> &str {
 /// A memory form's bytes per lane, from its name.
 pub fn mem_bytes(name: &str) -> u32 {
     let last = name.rsplit('_').next().unwrap_or(name);
+    if name.len() <= last.len() {
+        return 4;
+    }
     let sized = last
         .strip_prefix(['b', 'i', 'u', 'f'])
         .and_then(|n| n.parse::<u32>().ok())
         .filter(|n| [8, 16, 32, 64, 96, 128].contains(n));
     match (sized, last) {
-        (Some(n), _) if name.len() > last.len() => n / 8,
+        (Some(n), _) => n / 8,
+        (_, "byte" | "ubyte" | "sbyte") => 1,
+        (_, "short" | "ushort" | "sshort") => 2,
+        (_, "dword") => 4,
+        (_, "dwordx2" | "x2") => 8,
+        (_, "dwordx3") => 12,
+        (_, "dwordx4") => 16,
         _ => 4,
     }
 }
@@ -281,10 +290,15 @@ pub fn reads_dst(name: &str) -> bool {
     let Some(rest) = name.strip_prefix("v_") else {
         return false;
     };
-    if ["fmac_", "pk_fmac_"].iter().any(|p| rest.starts_with(p)) {
+    if ["fmac_", "pk_fmac_", "smfmac_", "cvt_pkaccum_"]
+        .iter()
+        .any(|p| rest.starts_with(p))
+    {
         return true;
     }
-    rest.strip_prefix("dot").is_some_and(|d| d.contains("acc_"))
+    rest.strip_prefix("dot").is_some_and(|d| {
+        d.contains("acc_") || d.starts_with("2c_") || d.starts_with("4c_") || d.starts_with("8c_")
+    })
 }
 
 #[cfg(test)]

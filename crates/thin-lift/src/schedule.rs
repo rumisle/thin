@@ -55,7 +55,9 @@ impl std::error::Error for ScheduleError {}
 /// Whether an instruction belongs to the schedule removed by this step.
 /// All `s_wait_*` instructions are included, not just memory counters.
 pub fn is_scheduling(instruction: &Instruction) -> bool {
-    instruction.mnemonic.starts_with("s_wait_") || instruction.mnemonic == "s_delay_alu"
+    instruction.mnemonic == "s_waitcnt"
+        || instruction.mnemonic.starts_with("s_wait_")
+        || instruction.mnemonic == "s_delay_alu"
 }
 
 /// Separates decoded instructions from their schedule without changing

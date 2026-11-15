@@ -134,9 +134,20 @@ impl<'a> Engine<'a> {
         }
     }
 
+    /// Named physical registers other than `exec` and `scc` as extents (`'p'`).
+    fn phys_extents(list: &[usize]) -> impl Iterator<Item = Extent> + '_ {
+        list.iter()
+            .copied()
+            .filter(|&p| !matches!(thin_target::PHYS[p].name, "exec" | "scc"))
+            .map(|p| ('p', p as u32, 1))
+    }
+
     /// The extents of an instruction's defs.
     fn defs(&self, i: &Instr) -> Vec<Extent> {
-        i.defs().map(|r| extent(self.s, r)).collect()
+        i.defs()
+            .map(|r| extent(self.s, r))
+            .chain(Self::phys_extents(i.writes()))
+            .collect()
     }
 
     /// Operand 3 as a register: an instruction's SrcC.
@@ -148,7 +159,11 @@ impl<'a> Engine<'a> {
     fn depends(&self, dep: Dep, prev: &Instr, cur: &Instr) -> bool {
         let w = self.defs(prev);
         let hits = |e: Extent| w.iter().any(|&x| overlap(x, e));
-        let uses: Vec<(&Reg, Extent)> = cur.uses().map(|r| (r, extent(self.s, r))).collect();
+        let uses: Vec<(Option<&Reg>, Extent)> = cur
+            .uses()
+            .map(|r| (Some(r), extent(self.s, r)))
+            .chain(Self::phys_extents(cur.reads()).map(|e| (None, e)))
+            .collect();
         let cur_defs = self.defs(cur);
         let src_c = self.src_c(cur);
         match dep {
@@ -164,8 +179,10 @@ impl<'a> Engine<'a> {
             Dep::WritesSrcC => self
                 .src_c(prev)
                 .is_some_and(|c| cur_defs.iter().any(|&d| overlap(d, extent(self.s, c)))),
-            Dep::ReadsAsSrcC => uses.iter().any(|u| Some(u.0) == src_c && hits(u.1)),
-            Dep::ReadsNotAsSrcC => uses.iter().any(|u| Some(u.0) != src_c && hits(u.1)),
+            Dep::ReadsAsSrcC => uses
+                .iter()
+                .any(|u| u.0 == src_c && src_c.is_some() && hits(u.1)),
+            Dep::ReadsNotAsSrcC => uses.iter().any(|u| u.0 != src_c && hits(u.1)),
             Dep::WritesWideData => prev
                 .uses()
                 .filter(|r| r.n > 2)

@@ -63,16 +63,20 @@ pub struct Cache {
     pub th: String,
     /// The scope, `SCOPE_*`.
     pub scope: String,
+    /// Boolean cache flags (`sc0`, `sc1`, `nt`, `glc`).
+    pub flags: Vec<String>,
 }
 
 impl Cache {
     /// The fields it sets.
     pub fn fields(&self) -> Vec<(String, FArg)> {
-        [("th", &self.th), ("scope", &self.scope)]
+        let mut out: Vec<(String, FArg)> = [("th", &self.th), ("scope", &self.scope)]
             .into_iter()
             .filter(|(_, v)| !v.is_empty())
             .map(|(k, v)| (k.to_owned(), FArg::Str(v.clone())))
-            .collect()
+            .collect();
+        out.extend(self.flags.iter().map(|f| (f.clone(), FArg::Bool(true))));
+        out
     }
 }
 

@@ -619,12 +619,18 @@ pub fn dpp16_control(text: &str) -> Result<u16, String> {
         };
         return Ok(a | b << 2 | c << 4 | d << 6);
     }
-    let (base, low) = match key {
-        "row_shl" => (0x100, 1),
-        "row_shr" => (0x110, 1),
-        "row_ror" => (0x120, 1),
-        "row_share" => (0x150, 0),
-        "row_xmask" => (0x160, 0),
+    let (base, low) = match (key, arg) {
+        ("wave_shl", "1") => return Ok(0x130),
+        ("wave_rol", "1") => return Ok(0x134),
+        ("wave_shr", "1") => return Ok(0x138),
+        ("wave_ror", "1") => return Ok(0x13C),
+        ("row_bcast", "15") => return Ok(0x142),
+        ("row_bcast", "31") => return Ok(0x143),
+        ("row_shl", _) => (0x100, 1),
+        ("row_shr", _) => (0x110, 1),
+        ("row_ror", _) => (0x120, 1),
+        ("row_share" | "row_newbcast", _) => (0x150, 0),
+        ("row_xmask", _) => (0x160, 0),
         _ => return Err(bad()),
     };
     let k = int_value(arg)

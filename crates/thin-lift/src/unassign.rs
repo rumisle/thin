@@ -588,11 +588,13 @@ pub fn unassign(
     for (file, lo, hi, why) in described {
         bases.push(lo);
         files.push(file);
+        let n = hi - lo + 1;
+        let a64 = s.target().file(file).map_or(1, |f| f.align64.max(1));
         infos.push(ValueInfo {
             file,
-            n: hi - lo + 1,
+            n,
             pin: (!why.is_empty()).then_some(lo),
-            align: 1,
+            align: if n >= 2 { a64 } else { 1 },
             index: infos.len() as u32,
             ..ValueInfo::default()
         });
@@ -717,11 +719,14 @@ pub fn place(program: &Program, bases: &[Option<u32>]) -> Result<Program, Progra
         .map(|(v, b)| b.ok_or_else(|| error("placement", format!("value {v} is not placed"))))
         .collect::<Result<Vec<u32>, _>>()?;
     let s = &program.snapshot;
-    let physical = ['v', 's']
+    let physical = s
+        .target()
+        .definition()
+        .files
         .iter()
-        .map(|&file| ValueInfo {
-            file,
-            n: s.target().hooks().reg_count(file),
+        .map(|f| ValueInfo {
+            file: f.letter,
+            n: s.target().hooks().reg_count(f.letter),
             phys: Some(0),
             pin: Some(0),
             align: 1,

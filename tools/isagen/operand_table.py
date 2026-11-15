@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 import xml.etree.ElementTree as ET
 
-from tools.isagen.isa_tables import default_encoding
 from tools.isagen.targets import TargetRules
 
 IMPLICIT = {
@@ -85,6 +84,9 @@ class _Table:
             uses.add(self.register("exec"))
         if en.startswith(rules.flat) and "_lds_" not in mnemonic:
             uses.discard("m0")
+        elif en.startswith(rules.flat) and "_load_lds_" in mnemonic and roles and roles[0] == "w":
+            roles, widths, slots = roles[1:], widths[1:], slots[1:]
+            uses.add("m0")
         if roles and (self.tied.match(mnemonic) or mnemonic.endswith("_dpp")):
             roles[0] = "rw"
         if roles and mnemonic.startswith("v_permlane") and mnemonic.endswith("_swap_b32"):
@@ -130,13 +132,20 @@ class _Table:
 def generate(isa: ET.Element, rules: TargetRules) -> list:
     """The rows keyed (mnemonic, count), sorted by that key."""
     table = _Table(rules)
+    drop = set(rules.drop)
     for instruction in isa.iterfind("Instructions/Instruction"):
-        name = _text(instruction, "InstructionName").lower()
-        encodings = list(instruction.iterfind("InstructionEncodings/InstructionEncoding"))
+        raw = _text(instruction, "InstructionName").lower()
+        name = rules.renames.get(raw, raw)
+        encodings = [
+            e
+            for e in instruction.iterfind("InstructionEncodings/InstructionEncoding")
+            if (raw, _text(e, "EncodingName")) not in drop
+        ]
         names = [_text(e, "EncodingName") for e in encodings]
         short = any(n in SHORT for n in names)
         for encoding, en in zip(encodings, names, strict=True):
-            if en.startswith(rules.skip) or not default_encoding(encoding):
+            cond = _text(encoding, "EncodingCondition")
+            if en.startswith(rules.skip) or cond not in ("default", "has_dpp", "has_sdwa"):
                 continue
             table.add(name, encoding, short)
     for mnemonic, count in rules.hand:

@@ -62,7 +62,8 @@ class Laps:
     def __init__(self, names, wgsize, keep="last", records=None, on=True):
         """Declares the laps a round takes, in order."""
         names = list(names)
-        records = _row() if records is None else records
+        row = _row()
+        records = row if records is None else records
         _check(names, wgsize, keep, records)
         self.names, self.wgsize, self.keep, self.records, self.on = (
             names,
@@ -71,7 +72,9 @@ class Laps:
             records,
             on,
         )
-        self.waves = wgsize // _hooks.granule()
+        self.row = row
+        self.real_mhz = int(_hooks.hook("real_clock_mhz")) if on else 0
+        self.waves = wgsize // row
         self.rows = 1 if keep == "sum" else 1 + len(names)
 
     def args(self) -> dict:
@@ -80,7 +83,7 @@ class Laps:
 
     def sizes(self, workgroups) -> dict:
         """The records' bytes for `workgroups` workgroups (none when off)."""
-        return {"laps": workgroups * self.waves * self.rows * 4 * _row()} if self.on else {}
+        return {"laps": workgroups * self.waves * self.rows * 4 * self.row} if self.on else {}
 
     def begin(self, b, k):
         """Starts the clock in a body; the off object when off."""
@@ -223,7 +226,7 @@ class LapsBody:
         lane4 = self.V.u32(k.lane * 4, name="laps_lane4")
         rows = [head] + ([] if d.keep == "sum" else [self.recs[n] for n in d.names])
         for j, row in enumerate(rows):
-            at = self.S.ptr(laps + (row0 + j) * (4 * _row()), name="laps_at")
+            at = self.S.ptr(laps + (row0 + j) * (4 * d.row), name="laps_at")
             b.emit(O.global_store(lane4, row, at))
 
 
@@ -258,13 +261,13 @@ class Timeline:
 
     def __init__(self, decl: Laps, words, workgroups):
         """Reads the records of `workgroups` workgroups."""
-        want = workgroups * decl.waves * decl.rows * _row()
+        want = workgroups * decl.waves * decl.rows * decl.row
         if words.size < want:
             raise ValueError(
                 f"{words.size * 4} bytes of records, {workgroups} workgroups need {want * 4}"
             )
         self.decl, self.workgroups = decl, workgroups
-        rows = words[:want].reshape(workgroups, decl.waves, decl.rows, _row()).astype(int)
+        rows = words[:want].reshape(workgroups, decl.waves, decl.rows, decl.row).astype(int)
         self._rows = rows
         self.rounds = [
             [int(rows[g, w, 0, 0]) for w in range(decl.waves)] for g in range(workgroups)
@@ -309,8 +312,7 @@ class Timeline:
     def _ticks(head) -> int:
         return ((int(head[5]) | int(head[6]) << 32) - (int(head[1]) | int(head[2]) << 32)) % 2**64
 
-    @staticmethod
-    def _mhz(head) -> float:
+    def _mhz(self, head) -> float | None:
         def wide(lo):
             return int(head[lo]) | int(head[lo + 1]) << 32
 
@@ -318,7 +320,7 @@ class Timeline:
         real = (wide(5) - wide(1)) % 2**64
         if not core or not real:
             return None  # an empty span measures no clock
-        return core / real * int(_hooks.hook("real_clock_mhz"))
+        return core / real * self.decl.real_mhz
 
     def _kept(self, row, rounds) -> list:
         records = self.decl.records

@@ -5,9 +5,10 @@ use std::sync::Arc;
 use thin_ir::{Attr, FieldId, FieldValue, Imm, ImmValue, Instr, Operand, Reg, Snapshot};
 use thin_target::{phys_named, FieldKind, Form, Pseudo, Target, WaitText};
 
-/// The value numbers of the two files.
+/// The value numbers of the three files.
 const V: i32 = 0;
 const S: i32 = 1;
+const A: i32 = 2;
 
 /// A free-list snapshot of parsed instructions with gathered wait requests.
 pub fn snapshot(t: &'static Target, instrs: Vec<Arc<Instr>>) -> Snapshot {
@@ -37,6 +38,7 @@ pub fn register(t: &str) -> Option<Reg> {
     let (file, value) = match t.as_bytes().first()? {
         b'v' => ('v', V),
         b's' => ('s', S),
+        b'a' => ('a', A),
         _ => return None,
     };
     let rest = &t[1..];

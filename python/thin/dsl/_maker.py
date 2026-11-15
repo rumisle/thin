@@ -116,11 +116,27 @@ def _tag(tag):
     return tuple(tag) if tag else None
 
 
+def _cache(th, scope, sc0=False, sc1=False, nt=False, glc=False) -> tuple:
+    flags = [k for k, on in (("sc0", sc0), ("sc1", sc1), ("nt", nt), ("glc", glc)) if on]
+    return (th, scope, flags)
+
+
 def _opts(offset, cache, comment, tag, bytes, signed, ordered) -> tuple:
     exact = bytes is None or (isinstance(bytes, int) and not isinstance(bytes, bool))
     b, written = (bytes, None) if exact else (None, repr(bytes))
-    th, scope = cache
-    return (val(offset), th or "", scope or "", comment, _tag(tag), b, written, signed, ordered)
+    th, scope, flags = cache if len(cache) == 3 else (*cache, [])
+    return (
+        val(offset),
+        th or "",
+        scope or "",
+        flags,
+        comment,
+        _tag(tag),
+        b,
+        written,
+        signed,
+        ordered,
+    )
 
 
 class Made:
@@ -223,17 +239,17 @@ class Maker:
         )
         return _out(b, result)
 
-    def s_load(self, dst, base, offset=0, *, th=None, scope=None, comment="", tag=()):
+    def s_load(
+        self, dst, base, offset=0, *, th=None, scope=None, glc=False, comment="", tag=()
+    ):
         """A scalar load."""
-        return self._family(
-            "s_load", dst, [base, offset], _opts(0, (th, scope), comment, tag, None, False, "")
-        )
+        o = _opts(0, _cache(th, scope, glc=glc), comment, tag, None, False, "")
+        return self._family("s_load", dst, [base, offset], o)
 
-    def s_store(self, data, base, offset=0, *, th=None, scope=None, comment=""):
+    def s_store(self, data, base, offset=0, *, th=None, scope=None, glc=False, comment=""):
         """A scalar store."""
-        return self._family(
-            "s_store", data, [base, offset], _opts(0, (th, scope), comment, (), None, False, "")
-        )
+        o = _opts(0, _cache(th, scope, glc=glc), comment, (), None, False, "")
+        return self._family("s_store", data, [base, offset], o)
 
     def global_load(
         self,
@@ -244,13 +260,17 @@ class Maker:
         offset=0,
         th=None,
         scope=None,
+        sc0=False,
+        sc1=False,
+        nt=False,
         comment="",
         tag=(),
         bytes=None,
         signed=False,
     ):
         """A global load."""
-        o = _opts(offset, (th, scope), comment, tag, bytes, signed, "")
+        c = _cache(th, scope, sc0=sc0, sc1=sc1, nt=nt)
+        o = _opts(offset, c, comment, tag, bytes, signed, "")
         return self._family("global_load", dst, [addr, base], o)
 
     def global_store(
@@ -262,12 +282,16 @@ class Maker:
         offset=0,
         th=None,
         scope=None,
+        sc0=False,
+        sc1=False,
+        nt=False,
         comment="",
         tag=(),
         bytes=None,
     ):
         """A global store."""
-        o = _opts(offset, (th, scope), comment, tag, bytes, False, "")
+        c = _cache(th, scope, sc0=sc0, sc1=sc1, nt=nt)
+        o = _opts(offset, c, comment, tag, bytes, False, "")
         return self._family("global_store", data, [addr, base], o)
 
     def buffer_load(
@@ -280,13 +304,17 @@ class Maker:
         offset=0,
         th=None,
         scope=None,
+        sc0=False,
+        sc1=False,
+        nt=False,
         comment="",
         tag=(),
         bytes=None,
         signed=False,
     ):
         """A buffer load."""
-        o = _opts(offset, (th, scope), comment, tag, bytes, signed, "")
+        c = _cache(th, scope, sc0=sc0, sc1=sc1, nt=nt)
+        o = _opts(offset, c, comment, tag, bytes, signed, "")
         return self._family("buffer_load", dst, [voffset, desc, soffset], o)
 
     def buffer_store(
@@ -299,12 +327,16 @@ class Maker:
         offset=0,
         th=None,
         scope=None,
+        sc0=False,
+        sc1=False,
+        nt=False,
         comment="",
         tag=(),
         bytes=None,
     ):
         """A buffer store."""
-        o = _opts(offset, (th, scope), comment, tag, bytes, False, "")
+        c = _cache(th, scope, sc0=sc0, sc1=sc1, nt=nt)
+        o = _opts(offset, c, comment, tag, bytes, False, "")
         return self._family("buffer_store", data, [voffset, desc, soffset], o)
 
     def ds_read(

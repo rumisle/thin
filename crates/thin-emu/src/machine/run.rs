@@ -819,6 +819,16 @@ fn semantics(
             }
             return Ok(None);
         }
+        "s.memtime" if e.facts.clocks.memtime => {
+            *e.clock += 100;
+            w.swrite64(&ins.operands[0], *e.clock)?;
+            return Ok(None);
+        }
+        "s.memrealtime" if e.facts.clocks.memrealtime => {
+            *e.clock += 100;
+            w.swrite64(&ins.operands[0], *e.clock / 20)?;
+            return Ok(None);
+        }
         _ => {}
     }
     if let Some(name) = &ins.matrix {

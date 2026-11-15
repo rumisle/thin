@@ -150,8 +150,14 @@ impl FormRules {
         f |= when(starts(name, self.waits), Flags::WAITCNT);
         let memory = f.any(Flags::VMEM | Flags::DS | Flags::SMEM);
         f |= when(memory && has("atomic"), Flags::ATOMIC);
-        f |= when(memory && has("store"), Flags::STORE);
-        f |= when(memory && has("load"), Flags::LOAD);
+        f |= when(
+            memory && (has("store") || starts(name, &["ds_write", "ds_cmpst"])),
+            Flags::STORE,
+        );
+        f |= when(
+            memory && (has("load") || starts(name, &["ds_read"])),
+            Flags::LOAD,
+        );
         let fp = ["_f32", "_bf16", "_f16", "_f64"].iter().any(|s| has(s));
         let fp_atomic = starts(name, &["buffer_atomic", "global_atomic"]) && fp;
         f |= when(f.has(Flags::ATOMIC) && fp_atomic, Flags::FP_ATOMIC);
@@ -286,8 +292,15 @@ impl FormRules {
                     .copied()
             })
             .flatten();
-        let vmem = ["ENC_VBUFFER", "ENC_VFLAT", "ENC_VGLOBAL", "ENC_VSCRATCH"];
-        let buffer = row.encoding == "ENC_VBUFFER";
+        let vmem = [
+            "ENC_VBUFFER",
+            "ENC_MUBUF",
+            "ENC_VFLAT",
+            "ENC_VGLOBAL",
+            "ENC_VSCRATCH",
+            "ENC_FLAT",
+        ];
+        let buffer = row.encoding == "ENC_VBUFFER" || row.encoding == "ENC_MUBUF";
         let address = if buffer { 1 } else { usize::from(writes) };
         let signs = (self.signs)(op);
         let mut slots = Vec::with_capacity(row.slots.len());
@@ -303,9 +316,15 @@ impl FormRules {
                 && *size == 64
                 && starts(&row.encoding, &vmem)
                 && k == address;
-            let literal = !["_NOLIT", "OPR_SRC_SIMPLE", "OPR_SRC_VGPR", "_LANESEL"]
-                .iter()
-                .any(|s| xml_type.contains(s));
+            let literal = ![
+                "_NOLIT",
+                "OPR_SRC_SIMPLE",
+                "OPR_SRC_VGPR",
+                "_ACCVGPR",
+                "_LANESEL",
+            ]
+            .iter()
+            .any(|s| xml_type.contains(s));
             slots.push(Slot {
                 kind,
                 dwords: (size / 32).max(1),
