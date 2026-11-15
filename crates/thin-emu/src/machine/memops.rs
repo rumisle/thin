@@ -348,18 +348,37 @@ fn bufs_of(lanes: &[Option<(usize, u64)>]) -> Vec<usize> {
 pub fn vmem(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, EmuError> {
     let mut parts: Vec<&str> = canon.split('.').collect();
     let ops = &ins.operands;
-    let d16 = d16_load(&mut parts);
+    let is_lds = has(ins, "lds");
+    let d16 = if is_lds { None } else { d16_load(&mut parts) };
     let old = match d16 {
         Some(_) => Some(w.vread(&ops[0], 0)?),
         None => None,
     };
     match parts.as_slice() {
+        ["global", "load", "lds", last] => {
+            let Some((n, signed)) = width(last).filter(|(n, _)| *n <= 4) else {
+                return Ok(false);
+            };
+            let addrs = global_addrs(w, ins, &ops[0], ops.get(1))?;
+            load_lds(e, w, ins, &addrs, n, signed, None)?;
+        }
         ["global", "load", last] => {
             let Some((n, signed)) = width(last) else {
                 return Ok(false);
             };
             let addrs = global_addrs(w, ins, &ops[1], ops.get(2))?;
             load(e, w, ins, &addrs, n, signed, None, &ops[0])?;
+        }
+        ["buffer", "load", last] if is_lds => {
+            let Some((n, signed)) = width(last).filter(|(n, _)| *n <= 4) else {
+                return Ok(false);
+            };
+            let (base, num, offs) = buffer_addrs(w, ins, &ops[0], &ops[1], ops.get(2))?;
+            let mut addrs = [0u64; MAX_W];
+            for l in 0..w.w {
+                addrs[l] = base.wrapping_add(offs[l]);
+            }
+            load_lds(e, w, ins, &addrs, n, signed, Some((num, offs)))?;
         }
         ["buffer", "load", last] => {
             let Some((n, signed)) = width(last) else {
@@ -567,6 +586,138 @@ fn load(
     let count = active(exec, wn).count() as u64;
     e.reports.stats.vmem_load_bytes += count * u64::from(n);
     e.vm_issue(w, false, Vec::new());
+    Ok(())
+}
+
+/// A VMEM-to-LDS DMA (`buffer_load_* ... lds` or `global_load_lds_*`):
+/// reads `n` (1, 2, or 4) bytes per active lane from global/buffer memory,
+/// zero- or sign-extends sub-dword values to 32 bits, writes 4 bytes per
+/// active lane to `LDS[m0 + 4*lane .. +4]`, and counts on `vmcnt`.
+#[allow(clippy::too_many_arguments)]
+fn load_lds(
+    e: &mut Exec<'_>,
+    w: &mut Wave,
+    ins: &Ins,
+    addrs: &[u64],
+    n: u32,
+    signed: bool,
+    range: Option<(u64, [u64; MAX_W])>,
+) -> Result<(), EmuError> {
+    let wn = w.w;
+    let exec = w.exec;
+    let pc = e.pc;
+    if exec != 0 && w.m0 == POISON {
+        return Err(fault(format!(
+            "wave {} {}: m0 holds a register no instruction wrote (on the GPU: what the last kernel left)",
+            w.wid, ins.text
+        )));
+    }
+    let m0_base = u64::from(w.m0);
+    if exec != 0 && m0_base % 4 != 0 {
+        return Err(fault(format!(
+            "wave {} {}: LDS DMA m0 offset {m0_base:#x} is not 4-byte aligned",
+            w.wid, ins.text
+        )));
+    }
+    let lds_size = e.lds.size() as u64;
+    for l in active(exec, wn) {
+        let dst = m0_base + (l as u64) * 4;
+        if dst + 4 > lds_size {
+            return Err(fault(format!(
+                "wave {} {}: LDS write out of range (max {}, LDS {})",
+                w.wid,
+                ins.text,
+                dst + 4,
+                lds_size
+            )));
+        }
+    }
+    let mut vals = [0u32; MAX_W];
+    let mut tags = [[0 as Tag; 4]; MAX_W];
+    let in_range = |l: usize| -> bool {
+        match &range {
+            Some((num, offs)) => offs[l] + u64::from(n) <= *num,
+            None => true,
+        }
+    };
+    let mut lanes: Vec<Option<(usize, u64)>> = vec![None; wn];
+    for l in active(exec, wn) {
+        if in_range(l) {
+            lanes[l] = Some(e.mem.access(addrs[l], u64::from(n), false)?);
+        }
+    }
+    let bufs = bufs_of(&lanes);
+    if range.is_none() {
+        e.check_ipc(ins, &bufs, Some(false))?;
+    }
+    for &b in &bufs {
+        let mut offs: Vec<u64> = Vec::new();
+        for l in 0..wn {
+            if let Some((bb, o)) = lanes[l] {
+                if bb == b {
+                    for k in 0..u64::from(n) {
+                        offs.push(o + k);
+                    }
+                }
+            }
+        }
+        let uncached = e.mem.bufs[b].uncached();
+        let lvl = level(e, ins, false, uncached);
+        let site = e.site(w);
+        let size = e.mem.bufs[b].data.len();
+        let name = e.mem.bufs[b].name.clone();
+        if let (false, Some(s)) = (uncached, &mut e.mem.scope) {
+            s.load(b, size, &name, &offs, lvl, site, &ins.text)?;
+        }
+        e.mem.count(
+            b,
+            offs.first().copied().unwrap_or(0),
+            offs.len() as u64,
+            0,
+            e.rank,
+        );
+        let (data, t) = e.read_global(w, ins, b, &offs);
+        let mut k = 0;
+        for l in 0..wn {
+            if let Some((bb, _)) = lanes[l] {
+                if bb != b {
+                    continue;
+                }
+                for byte in 0..n as usize {
+                    vals[l] |= u32::from(data[k]) << (8 * byte);
+                    tags[l][byte] = t[k];
+                    k += 1;
+                }
+                if n < 4 && signed {
+                    let bits = 8 * n;
+                    let v = vals[l];
+                    vals[l] = (((v << (32 - bits)) as i32) >> (32 - bits)) as u32;
+                }
+            }
+        }
+    }
+    let lds_bytes: Vec<u32> = active(exec, wn)
+        .flat_map(|l| {
+            let a = m0_base + (l as u64) * 4;
+            (0..4).map(move |k| (a + k) as u32)
+        })
+        .collect();
+    e.lds
+        .check_write(w.wid, e.epoch, pc, &lds_bytes, false, e.texts, &ins.text)?;
+    for l in active(exec, wn) {
+        let base_j = (m0_base + (l as u64) * 4) as usize;
+        let le = vals[l].to_le_bytes();
+        for k in 0..4 {
+            e.lds.data[base_j + k] = le[k];
+            e.lds.tags[base_j + k] = tags[l][k];
+        }
+    }
+    let count = active(exec, wn).count() as u64;
+    e.reports.stats.vmem_load_bytes += count * u64::from(n);
+    e.reports.stats.lds_write_bytes += lds_bytes.len() as u64;
+    w.progress += 1;
+    let seq = e.vm_issue(w, false, Vec::new());
+    e.lds.record_vm_write(w.wid, e.epoch, pc, seq, lds_bytes);
     Ok(())
 }
 

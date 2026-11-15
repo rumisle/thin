@@ -50,6 +50,9 @@ OWNER: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
 def _builder(xs):
     for x in xs:
+        layout = getattr(x, "_l", None)
+        if layout is not None:
+            return layout.b
         native = getattr(x, "_typed", None)
         if native is not None:
             return BUILDERS.get(native.builder)
@@ -233,15 +236,14 @@ class Maker:
 
     def _family(self, family, data, xs, opts):
         b = _builder([data, *xs])
-        d = native_reg(as_reg(data))
+        address = getattr(data, "_address", None)
+        d = ("a", address()) if address is not None else ("r", native_reg(as_reg(data)))
         result = _native.maker_family(
             target().name, b and b._n, family, d, [val(x) for x in xs], opts
         )
         return _out(b, result)
 
-    def s_load(
-        self, dst, base, offset=0, *, th=None, scope=None, glc=False, comment="", tag=()
-    ):
+    def s_load(self, dst, base, offset=0, *, th=None, scope=None, glc=False, comment="", tag=()):
         """A scalar load."""
         o = _opts(0, _cache(th, scope, glc=glc), comment, tag, None, False, "")
         return self._family("s_load", dst, [base, offset], o)

@@ -1150,9 +1150,9 @@ def test_gfx942_dsl_high_level_mfma_agpr_and_vgpr(tmp_path):
                         "out": out_s,
                     },
                 ).emulate()
-                got_s = _unpack_cdna3_output(out_s.reshape(64, 4), 1, 16, 16, 32).view(
-                    np.float32
-                )[0]
+                got_s = _unpack_cdna3_output(out_s.reshape(64, 4), 1, 16, 16, 32).view(np.float32)[
+                    0
+                ]
                 assert np.array_equal(got_s, exp_sparse)
 
             # 3. Binary64 `f64_16x16x4_f64` with `neg=(1, 0, 0)` and `O.mfma`:
@@ -1294,6 +1294,347 @@ def test_gfx942_pass_aware_mfma_hazards() -> None:
             check_probe("f32_32x32x2_f32", 1, ["s_nop 15", "s_nop 1"])
     finally:
         thin.use_store(before_s)
+
+
+def test_gfx942_lds_dma_widths_m0_dedup_oob_and_predication() -> None:
+    """Buffer/global -> LDS DMA handles u8/i8/u16/i16/b32, offset, OOB, EXEC, and DropM0."""
+    import thin
+    from thin.target import targeting
+
+    with targeting("gfx942"):
+
+        def make_dma_widths():
+            from thin import KernelDef
+            from thin.dsl import Args, O, ptr, u32
+
+            def body(b, k):
+                V, S = b.v, b.s  # noqa: N806
+                src_g, src_b, n_bytes, out = k.load()
+                desc = S.u32(n=4, name="desc")
+                b.emit(O.op("s_mov_b32", desc[0], src_b.lo))
+                b.emit(O.op("s_and_b32", desc[1], src_b.hi, 0xFFFF))
+                b.emit(O.op("s_mov_b32", desc[2], n_bytes))
+                b.emit(O.op("s_mov_b32", desc[3], 0x00020000))
+                tile = b.lds().region("tile", nbytes=8 * 256, align=16)
+                lane = V.u32(k.tid, name="lane")
+
+                # 1. Global DMA: u8, i8, u16, i16, b32 (with source-only `offset=`)
+                b.emit(O.global_load(tile + 0, lane, src_g, bytes=1, offset=4))
+                # Same constant LDS base (tile + 256) twice with different source offsets:
+                # second `s_mov_b32 m0` should be dropped by `Pass::DropM0`!
+                b.emit(O.global_load(tile + 256, lane, src_g, bytes=1, signed=True, offset=8))
+                b.emit(O.global_load(tile + 256, lane, src_g, bytes=1, signed=True, offset=16))
+                b.emit(O.global_load(tile + 512, V.u32(lane * 2), src_g, bytes=2, offset=32))
+                b.emit(
+                    O.global_load(
+                        tile + 768, V.u32(lane * 2), src_g, bytes=2, signed=True, offset=64
+                    )
+                )
+                # Predicated global b32 DMA: pre-fill LDS slot, wait, then overwrite odd lanes
+                b.emit(O.ds_write(tile + 1024 + lane * 4, V.u32(0xCAFE0000 + lane)))
+                b.wait(tile, "prefill done")
+                with b.lanes((lane & 1) == 1):
+                    b.emit(O.global_load(tile + 1024, V.u32(lane * 4), src_g, offset=128))
+
+                # 2. Buffer DMA: b32 with OOB lanes zeroed, and offset > 4095 staged into `soffset`
+                b.emit(O.buffer_load(tile + 1280, V.u32(lane * 4), desc, 0, offset=16))
+                b.emit(O.buffer_load(tile + 1536, lane, desc, 0, bytes=1, signed=True, offset=4100))
+
+                # Wait on `tile` lowers to `vmcnt(0)` because DMAs track on VM counter.
+                b.wait(tile, "all DMAs landed")
+
+                for slot in range(7):
+                    val = V.u32()
+                    b.emit(O.ds_read(val, tile + slot * 256 + lane * 4))
+                    b.wait(val, f"read slot {slot}")
+                    b.emit(O.global_store(V.u32((slot * 64 + lane) * 4), val, out))
+
+            return KernelDef(
+                "dma_widths",
+                Args(src_g=ptr, src_b=ptr, n_bytes=u32, out=ptr),
+                body,
+                wgsize=64,
+                max_grid=(1,),
+            )
+
+        kern = thin.compile(make_dma_widths)
+        asm_lines = [
+            ln.strip().split("//")[0].split(";")[0].strip()
+            for ln in kern.asm.splitlines()
+            if ln.startswith("\t") and not ln.strip().startswith((".", ";", "//"))
+        ]
+        # Verify DropM0 deduplicated the second `s_mov_b32 m0, 0x100` (256)
+        m0_256 = [ln for ln in asm_lines if ln in ("s_mov_b32 m0, 256", "s_mov_b32 m0, 0x100")]
+        assert len(m0_256) == 1, f"expected DropM0 to keep one m0=256 write, got {m0_256}"
+        # Every surviving `s_mov_b32 m0, ...` has >= 1 wait state (either `s_nop 0` or an
+        # intervening instruction like `s_mov_b32 s0, ...`) before the next DMA instruction.
+        for idx, ln in enumerate(asm_lines):
+            if ln.startswith("s_mov_b32 m0,"):
+                nxt = asm_lines[idx + 1]
+                assert not nxt.startswith(("global_load_lds_", "buffer_load_")), (
+                    f"back-to-back m0 -> DMA without wait state: {ln} -> {nxt}"
+                )
+
+        rng = np.random.default_rng(94206)
+        raw_g = rng.integers(0, 256, size=1024, dtype=np.uint8)
+        raw_b = rng.integers(0, 256, size=4200, dtype=np.uint8)
+        out = np.zeros((7, 64), dtype=np.uint32)
+        kern.bind(
+            (1,),
+            {"src_g": raw_g, "src_b": raw_b, "n_bytes": 4132, "out": out.reshape(-1)},
+        ).emulate()
+
+        # Slot 0: global u8 from raw_g[4 .. 4+64], zero-extended to u32
+        np.testing.assert_array_equal(out[0], raw_g[4 : 4 + 64].astype(np.uint32))
+        # Slot 1: second global i8 from raw_g[16 .. 16+64], sign-extended to i32 -> u32
+        np.testing.assert_array_equal(
+            out[1].view(np.int32), raw_g[16 : 16 + 64].view(np.int8).astype(np.int32)
+        )
+        # Slot 2: global u16 from raw_g[32 .. 32+128], zero-extended to u32
+        np.testing.assert_array_equal(
+            out[2], raw_g[32 : 32 + 128].view(np.uint16).astype(np.uint32)
+        )
+        # Slot 3: global i16 from raw_g[64 .. 64+128], sign-extended to i32
+        np.testing.assert_array_equal(
+            out[3].view(np.int32), raw_g[64 : 64 + 128].view(np.int16).astype(np.int32)
+        )
+        # Slot 4: predicated global b32 on odd lanes, prefill on even lanes
+        g_u32 = raw_g[128 : 128 + 256].view(np.uint32)
+        prefill = 0xCAFE0000 + np.arange(64, dtype=np.uint32)
+        expected_slot4 = np.where((np.arange(64) & 1) == 1, g_u32, prefill)
+        np.testing.assert_array_equal(out[4], expected_slot4)
+        # Slot 5: buffer b32 at offset 16 (all in-bounds since 16 + 256 <= 4132)
+        np.testing.assert_array_equal(out[5], raw_b[16 : 16 + 256].view(np.uint32))
+        # Slot 6: buffer i8 at offset 4100 (n_bytes=4132) -> lanes 0..31 valid, 32..63 OOB zeroed
+        inb = raw_b[4100 : 4100 + 32].view(np.int8).astype(np.int32)
+        expected_slot6 = np.concatenate([inb, np.zeros(32, dtype=np.int32)])
+        np.testing.assert_array_equal(out[6].view(np.int32), expected_slot6)
+
+
+def test_gfx942_lds_dma_multiwave_safety_hazards_and_gemm_provenance() -> None:
+    """Multi-wave DMA safety checks (static + dynamic) and DMA -> LDS -> MFMA GEMM provenance."""
+    import thin
+    from thin import Refused
+    from thin.emu import Cluster, EmuError, Memory, gemm
+    from thin.ir import MemError
+    from thin.target import targeting
+
+    with targeting("gfx942"):
+        # 1. Multi-wave wave-strided DMA (`tile + k.wave * 256`) compiles and runs race-free.
+        def make_multiwave_ok():
+            from thin import KernelDef
+            from thin.dsl import Args, O, ptr
+
+            def body(b, k):
+                V = b.v  # noqa: N806
+                src, out = k.load()
+                tile = b.lds().region("tile", nbytes=4 * 256, align=16)
+                lane = V.u32(k.tid & 63, name="lane")
+                g_off = V.u32(k.tid * 4, name="g_off")
+                b.emit(O.global_load(tile + k.wave * 256, g_off, src))
+                b.wait(tile, "wave DMA landed")
+                b.barrier("cross-wave swap")
+                partner = (k.wave ^ 1) * 256
+                val = V.u32()
+                b.emit(O.ds_read(val, tile + partner + lane * 4))
+                b.wait(val, "read partner")
+                b.emit(O.global_store(g_off, val, out))
+
+            return KernelDef("dma_mw_ok", Args(src=ptr, out=ptr), body, wgsize=256, max_grid=(1,))
+
+        kern_mw = thin.compile(make_multiwave_ok)
+        src_mw = np.arange(256, dtype=np.uint32) + 100
+        out_mw = np.zeros(256, dtype=np.uint32)
+        kern_mw.bind((1,), {"src": src_mw, "out": out_mw}).emulate()
+        expected_mw = src_mw.reshape(4, 64)[[1, 0, 3, 2]].reshape(256)
+        np.testing.assert_array_equal(out_mw, expected_mw)
+
+        # 2. Multi-wave overlapping DMA (`tile + 0`) is statically refused by LDS race analysis.
+        def make_multiwave_race():
+            from thin import KernelDef
+            from thin.dsl import Args, O, ptr
+
+            def body(b, k):
+                src, _ = k.load()
+                tile = b.lds().region("tile", nbytes=256, align=16)
+                b.emit(O.global_load(tile, b.v.u32(k.tid * 4), src))
+                b.wait(tile, "landed")
+                b.barrier("done")
+
+            return KernelDef("dma_mw_race", Args(src=ptr, out=ptr), body, wgsize=128, max_grid=(1,))
+
+        with pytest.raises(MemError, match="may touch the same bytes"):
+            thin.compile(make_multiwave_race)
+
+        # 3. Unwaited DMA before `b.barrier()` is statically refused by LDS protocol checker.
+        def make_unwaited_dma():
+            from thin import KernelDef
+            from thin.dsl import Args, O, ptr
+
+            def body(b, k):
+                src, out = k.load()
+                tile = b.lds().region("tile", nbytes=512, align=16)
+                lane = b.v.u32(k.tid & 63)
+                b.emit(O.global_load(tile + k.wave * 256, b.v.u32(k.tid * 4), src))
+                # Missing `b.wait(tile)` before barrier!
+                b.barrier("unsafe barrier")
+                val = b.v.u32()
+                b.emit(O.ds_read(val, tile + ((k.wave ^ 1) * 256) + lane * 4))
+                b.wait(val, "read")
+                b.emit(O.global_store(b.v.u32(k.tid * 4), val, out))
+
+            return KernelDef(
+                "dma_unwaited", Args(src=ptr, out=ptr), body, wgsize=128, max_grid=(1,)
+            )
+
+        with pytest.raises(MemError):
+            thin.compile(make_unwaited_dma)
+
+        # 4. Dynamic `thin.emu` check: waiting ONLY on `lgkmcnt(0)` (not `vmcnt(0)`)
+        # faults in `thin.emu` when another wave reads that LDS region after the barrier!
+        bad_asm = """\
+\ts_load_dwordx2 s[4:5], s[0:1], 0x0
+\ts_waitcnt lgkmcnt(0)
+\tv_lshlrev_b32 v1, 2, v0
+\tv_lshrrev_b32 v2, 6, v0
+\tv_readfirstlane_b32 s6, v2
+\ts_lshl_b32 m0, s6, 8
+\ts_nop 0
+\tglobal_load_lds_dword v1, s[4:5]
+\ts_waitcnt lgkmcnt(0)
+\ts_barrier
+\ts_xor_b32 s7, s6, 1
+\ts_lshl_b32 s7, s7, 8
+\tv_and_b32 v3, 63, v0
+\tv_lshlrev_b32 v3, 2, v3
+\tv_add_u32 v3, s7, v3
+\tds_read_b32 v4, v3
+\ts_waitcnt lgkmcnt(0)
+\ts_endpgm
+"""
+        mem_bad = Memory()
+        buf_src = mem_bad.alloc("src", 512)
+        ka_bad = mem_bad.alloc("ka", 8, tagged=False)
+        ka_bad.write(0, np.array([buf_src.base], dtype=np.uint64).tobytes())
+        with pytest.raises(EmuError, match="LDS"):
+            Cluster(
+                bad_asm,
+                {"wgsize": 128, "vgpr": 8, "agpr": 0, "lds": 512, "user_sgprs": 2},
+                mem_bad,
+                [ka_bad],
+                grid=(1,),
+            ).run()
+
+        # 5. End-to-end Global->LDS DMA + `ds_read_b64` + `b.mfma("f32_16x16x16_f16", ...)`
+        # passes both numerical reference AND `gemm.Problem` + `GemmHooks` provenance!
+        def make_dma_gemm():
+            from thin import KernelDef
+            from thin.dsl import Args, O, ptr
+
+            def body(b, k):
+                V = b.v  # noqa: N806
+                a_ptr, b_ptr, c_ptr = k.load()
+                lds = b.lds()
+                lds_a = lds.region("lds_a", nbytes=512, align=16)
+                lds_b = lds.region("lds_b", nbytes=512, align=16)
+                lane = V.u32(k.tid, name="lane")
+                # 16x16 f16 = 256 elements = 512 bytes -> two 64-lane b32 DMAs (256B each)
+                b.emit(O.global_load(lds_a + 0, V.u32(lane * 4), a_ptr))
+                b.emit(O.global_load(lds_a + 256, V.u32(lane * 4), a_ptr, offset=256))
+                b.emit(O.global_load(lds_b + 0, V.u32(lane * 4), b_ptr))
+                b.emit(O.global_load(lds_b + 256, V.u32(lane * 4), b_ptr, offset=256))
+                b.wait(lds_a, lds_b, "tiles in LDS")
+
+                idx = lane & 15
+                grp = lane >> 4
+                off_ab = V.u32(idx * 32 + grp * 8, name="off_ab")
+                frag_a = V.u32(n=2, name="frag_a")
+                frag_b = V.u32(n=2, name="frag_b")
+                b.emit(O.ds_read(frag_a, lds_a + off_ab))
+                b.emit(O.ds_read(frag_b, lds_b + off_ab))
+                b.wait(frag_a, frag_b, "frags ready")
+
+                acc = b.mfma("f32_16x16x16_f16", frag_a, frag_b, 0, acc="a")
+                v_c = b.read_acc(acc)
+                for j in range(4):
+                    row = grp * 4 + j
+                    c_off = V.u32((row * 16 + idx) * 4)
+                    b.emit(O.global_store(c_off, v_c[j], c_ptr))
+
+            return KernelDef(
+                "dma_mfma_16x16x16",
+                Args(a=ptr, b=ptr, c=ptr),
+                body,
+                wgsize=64,
+                max_grid=(1,),
+            )
+
+        kern_gemm = thin.compile(make_dma_gemm)
+        rng = np.random.default_rng(94299)
+        mat_a = rng.standard_normal((16, 16)).astype(np.float16)
+        mat_b_kn = rng.standard_normal((16, 16)).astype(np.float16)
+        mat_b_col = np.ascontiguousarray(mat_b_kn.T)
+        mat_c = np.zeros((16, 16), dtype=np.float32)
+
+        kern_gemm.bind(
+            (1,),
+            {"a": mat_a.reshape(-1), "b": mat_b_col.reshape(-1), "c": mat_c.reshape(-1)},
+        ).emulate()
+        ref = mat_a.astype(np.float32) @ mat_b_kn.astype(np.float32)
+        np.testing.assert_allclose(mat_c, ref, rtol=1e-3, atol=1e-3)
+
+        # Also check GEMM byte-tag provenance across Global->LDS DMA -> ds_read_b64 -> MFMA!
+        mem_g = Memory()
+        buf_a = mem_g.alloc("A", 512)
+        buf_b = mem_g.alloc("B", 512)
+        buf_d = mem_g.alloc("D", 1024)
+        ka_g = mem_g.alloc("ka", 24, tagged=False)
+        ka_g.write(0, np.array([buf_a.base, buf_b.base, buf_d.base], dtype=np.uint64).tobytes())
+        prob = gemm.Problem(
+            {
+                "A": gemm.rowmajor("A", 32, elem_bytes=2),
+                "B": gemm.rowmajor("B", 32, elem_bytes=2),
+                "D": gemm.rowmajor_d(64, elem_bytes=4),
+            },
+            K=16,
+            d_rows=np.arange(16),
+            d_cols=np.arange(16),
+            fail_fast=False,
+        )
+        hooks = gemm.GemmHooks(prob, mem_g)
+        Cluster(
+            kern_gemm.asm,
+            {
+                "wgsize": 64,
+                "vgpr": kern_gemm.manifest.vgpr,
+                "agpr": kern_gemm.manifest.agpr,
+                "lds": kern_gemm.manifest.lds,
+                "user_sgprs": 2,
+            },
+            mem_g,
+            [ka_g],
+            grid=(1,),
+            hooks=hooks,
+        ).run()
+        assert prob.errors == []
+        assert len(prob.stores) == 256
+
+    # 6. Target without VMEM->LDS DMA (`gfx1201`) refuses `O.global_load(tile, ...)` cleanly.
+    with targeting("gfx1201"):
+
+        def make_rdna4_dma():
+            from thin import KernelDef
+            from thin.dsl import Args, O, ptr
+
+            def body(b, k):
+                (src,) = k.load()
+                tile = b.lds().region("tile", nbytes=128, align=16)
+                b.emit(O.global_load(tile, b.v.u32(k.tid * 4), src))
+
+            return KernelDef("no_dma", Args(src=ptr), body, wgsize=32, max_grid=(1,))
+
+        with pytest.raises((Refused, ValueError), match="has no global-to-LDS DMA"):
+            thin.compile(make_rdna4_dma)
 
 
 def test_gfx942_cdna3_scalar_exec_partial_and_setreg_hazards() -> None:

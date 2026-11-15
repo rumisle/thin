@@ -1658,11 +1658,12 @@ impl Cx<'_, '_> {
         let lds = self.take(LDS);
         let acc = self.take(ACC) != 0;
         if lds != 0 {
-            if !self.info.mnemonic.starts_with("buffer_load_") || acc {
+            if !super::encoder::is_mubuf_lds_op(self.info.mnemonic) || acc {
                 return Err(self.err(
                     Why::Field,
                     Some("lds"),
-                    "lds=1 is valid on buffer_load_* without acc only".into(),
+                    "lds=1 is valid on single-dword/sub-dword buffer_load_* without acc only"
+                        .into(),
                 ));
             }
         } else {

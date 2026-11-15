@@ -107,7 +107,7 @@ fn counter(flags: Flags, _name: &str, _writes: bool) -> Option<usize> {
 }
 
 /// Canonical dotted-op spellings on gfx942 where replacing `.` with `_` does not apply.
-pub static SPELLINGS: [(&str, &str); 215] = [
+pub static SPELLINGS: [(&str, &str); 225] = [
     ("v.cvt.pk.rtz.f16.f32", "v_cvt_pkrtz_f16_f32"),
     // Scalar memory
     ("s.load.b32", "s_load_dword"),
@@ -141,6 +141,11 @@ pub static SPELLINGS: [(&str, &str); 215] = [
     ("global.load.d16.hi.i8", "global_load_sbyte_d16_hi"),
     ("global.load.d16.b16", "global_load_short_d16"),
     ("global.load.d16.hi.b16", "global_load_short_d16_hi"),
+    ("global.load.lds.u8", "global_load_lds_ubyte"),
+    ("global.load.lds.i8", "global_load_lds_sbyte"),
+    ("global.load.lds.u16", "global_load_lds_ushort"),
+    ("global.load.lds.i16", "global_load_lds_sshort"),
+    ("global.load.lds.b32", "global_load_lds_dword"),
     ("global.store.b8", "global_store_byte"),
     ("global.store.d16.hi.b8", "global_store_byte_d16_hi"),
     ("global.store.b16", "global_store_short"),
@@ -187,6 +192,11 @@ pub static SPELLINGS: [(&str, &str); 215] = [
     ("scratch.load.d16.hi.i8", "scratch_load_sbyte_d16_hi"),
     ("scratch.load.d16.b16", "scratch_load_short_d16"),
     ("scratch.load.d16.hi.b16", "scratch_load_short_d16_hi"),
+    ("scratch.load.lds.u8", "scratch_load_lds_ubyte"),
+    ("scratch.load.lds.i8", "scratch_load_lds_sbyte"),
+    ("scratch.load.lds.u16", "scratch_load_lds_ushort"),
+    ("scratch.load.lds.i16", "scratch_load_lds_sshort"),
+    ("scratch.load.lds.b32", "scratch_load_lds_dword"),
     ("scratch.store.b8", "scratch_store_byte"),
     ("scratch.store.d16.hi.b8", "scratch_store_byte_d16_hi"),
     ("scratch.store.b16", "scratch_store_short"),
@@ -942,7 +952,7 @@ mod tests {
             .map(|f| (&f.op, f.arity, f.returning))
             .collect();
         assert_eq!(keys.len(), forms.len());
-        assert_eq!(forms.len(), 1961);
+        assert_eq!(forms.len(), 1944);
     }
 
     #[test]

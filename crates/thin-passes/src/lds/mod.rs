@@ -531,7 +531,10 @@ impl Lds<'_> {
     /// an access in flight at a barrier against the accesses after
     /// it.
     fn protocol(&self, lives: &Lives, ep: &Epochs) -> Result<(), Diag> {
-        let ds = |k: usize| self.s.instrs()[k].form().kind == Kind::Ds;
+        let lds_op = |k: usize| {
+            let f = self.s.instrs()[k].form();
+            f.kind == Kind::Ds || f.flags.has(Flags::LDS_MEM)
+        };
         let overlap = |x: usize, y: usize| {
             let ((a, b), (c, d)) = (self.bytes(x), self.bytes(y));
             a < d && c < b
@@ -549,7 +552,8 @@ impl Lds<'_> {
                     .copied()
                     .filter(|k2| ep.members[e].contains(k2));
                 for k2 in after {
-                    let skip = !(ds(k1) || ds(k2)) || self.ordered(k2) || self.commute(k1, k2);
+                    let skip =
+                        !(lds_op(k1) || lds_op(k2)) || self.ordered(k2) || self.commute(k1, k2);
                     if skip || !(self.writes(k1) || self.writes(k2)) || !overlap(k1, k2) {
                         continue;
                     }

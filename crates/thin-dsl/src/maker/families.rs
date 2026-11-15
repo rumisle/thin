@@ -5,7 +5,7 @@ use thin_ir::{Datum, Instr, Reg, Tag};
 use super::{op, Arg, Ctx, FArg, Made, Notes, Stage};
 use crate::error::{value, Result};
 use crate::expr::node::Tree;
-use crate::lds::{Address, Split, SplitKind};
+use crate::lds::{Address, Dma, DmaKind, Split, SplitKind};
 
 /// The staging placeholder's value number.
 pub const LIT: i32 = -1;
@@ -34,7 +34,7 @@ pub enum Val {
 }
 
 impl Val {
-    fn arg(&self) -> Arg {
+    pub(crate) fn arg(&self) -> Arg {
         match self {
             Val::None => Arg::None,
             Val::Reg(r) => Arg::Reg(*r, 0),
@@ -53,6 +53,8 @@ pub enum Family {
     Made(Made),
     /// A split object.
     Split(Box<Split>),
+    /// A VMEM-to-LDS DMA object.
+    Dma(Box<Dma>),
 }
 
 /// A memory op's cache fields: its temporal hint (`th`) and scope, each
@@ -291,19 +293,156 @@ pub fn buffer(
     buffer_op(c, &name, store, data, voffset, desc, soffset, o).map(Family::Made)
 }
 
+/// Width word for a 1-dword or sub-dword VMEM-to-LDS DMA.
+fn dma_width(fam: &str, o: &Opts) -> Result<String> {
+    match &o.bytes {
+        Some(Ok(b @ (1 | 2))) => {
+            let bits = b * 8;
+            Ok(if o.signed {
+                format!("i{bits}")
+            } else {
+                format!("u{bits}")
+            })
+        }
+        Some(Ok(b)) => value(format!(
+            "{fam}: bytes={b}: 1 or 2 (a whole dword: no bytes=)"
+        )),
+        Some(Err(r)) => value(format!(
+            "{fam}: bytes={r}: 1 or 2 (a whole dword: no bytes=)"
+        )),
+        None if o.signed => value(format!(
+            "{fam}: signed= is a 1- or 2-byte load's (bytes=1 or 2)"
+        )),
+        None => Ok("b32".into()),
+    }
+}
+
+/// `global_load(lds, addr, base=...)` into an LDS destination address.
+fn global_dma(c: &Ctx<'_>, lds: Address, addr: Val, base: Val, o: Opts) -> Result<Family> {
+    let w = dma_width("global_load", &o)?;
+    let op_name = format!("global.load.lds.{w}");
+    if c.t.spell(&op_name).is_none() {
+        return value(format!(
+            "global_load into LDS ({op_name}): {} has no global-to-LDS DMA",
+            c.t.name()
+        ));
+    }
+    let offset = o.offset.clone();
+    Ok(Family::Dma(Box::new(Dma::new(
+        DmaKind::Global { base },
+        op_name,
+        lds,
+        addr,
+        offset,
+        o,
+    ))))
+}
+
+/// `buffer_load(lds, voffset, desc, soffset=...)` into an LDS destination address.
+fn buffer_dma(
+    c: &Ctx<'_>,
+    lds: Address,
+    voffset: Val,
+    desc: Val,
+    soffset: Val,
+    o: Opts,
+) -> Result<Family> {
+    let w = dma_width("buffer_load", &o)?;
+    let op_name = format!("buffer.load.{w}");
+    let supported =
+        c.t.spell(&op_name)
+            .and_then(|m| c.t.form(&m, 3, false))
+            .is_some();
+    if !supported {
+        return value(format!(
+            "buffer_load into LDS ({op_name}): {} has no buffer-to-LDS DMA",
+            c.t.name()
+        ));
+    }
+    if !matches!(&desc, Val::Reg(r) if r.file == 's' && r.n == 4) {
+        return value("buffer_load: descriptor must be a 4-SGPR value");
+    }
+    let offset = o.offset.clone();
+    Ok(Family::Dma(Box::new(Dma::new(
+        DmaKind::Buffer { desc, soffset },
+        op_name,
+        lds,
+        voffset,
+        offset,
+        o,
+    ))))
+}
+
 /// A memory family by name: `s_load`, `s_store`, `global_load`,
 /// `global_store`, `buffer_load`, `buffer_store`, `ds_read`, `ds_write`;
 /// `xs` its operands after the data in the table's order (a scalar's and
 /// an LDS access's offset last).
-pub fn family(c: &Ctx<'_>, name: &str, data: &Reg, xs: Vec<Val>, o: Opts) -> Result<Family> {
+pub fn family(c: &Ctx<'_>, name: &str, data: Val, xs: Vec<Val>, o: Opts) -> Result<Family> {
     let store = name.ends_with("store") || name == "ds_write";
     let at = |k: usize| xs.get(k).cloned().unwrap_or(Val::None);
-    match name {
-        "s_load" | "s_store" => scalar(c, store, data, at(0), Opts { offset: at(1), ..o }),
-        "global_load" | "global_store" => global(c, store, data, at(0), at(1), o),
-        "buffer_load" | "buffer_store" => buffer(c, store, data, at(0), at(1), at(2), o),
-        _ => ds(c, store, data, at(0), Opts { offset: at(1), ..o }),
+    match data {
+        Val::Addr(lds) => match name {
+            "global_load" => global_dma(c, lds, at(0), at(1), o),
+            "buffer_load" => buffer_dma(c, lds, at(0), at(1), at(2), o),
+            _ => value(format!(
+                "{name}: destination/data is an LDS address, which only buffer_load and global_load DMA into"
+            )),
+        },
+        Val::Reg(ref data) => match name {
+            "s_load" | "s_store" => scalar(c, store, data, at(0), Opts { offset: at(1), ..o }),
+            "global_load" | "global_store" => global(c, store, data, at(0), at(1), o),
+            "buffer_load" | "buffer_store" => buffer(c, store, data, at(0), at(1), at(2), o),
+            _ => ds(c, store, data, at(0), Opts { offset: at(1), ..o }),
+        },
+        _ => value(format!("{name}: expected a register or an LDS address")),
     }
+}
+
+/// The 3-operand buffer-to-LDS DMA instruction with its offset staging.
+pub fn buffer_dma_op(
+    c: &Ctx<'_>,
+    name: &str,
+    voffset: Val,
+    desc: Val,
+    soffset: Val,
+    o: Opts,
+) -> Result<Made> {
+    let offen = !matches!(voffset, Val::None);
+    let off = match &o.offset {
+        Val::Int(v) => *v,
+        _ => 0,
+    };
+    let mut n = notes(&o);
+    let mut soff = soffset.arg();
+    let mut fields: Vec<(String, FArg)> = Vec::new();
+    if offen {
+        fields.push(("offen".into(), FArg::Bool(true)));
+    }
+    let range = c.t.offset_range(thin_target::Mem::Buffer).unwrap_or(0..=0);
+    if range.contains(&off) {
+        if off != 0 {
+            fields.push(("offset".into(), FArg::Int(off)));
+        }
+    } else {
+        n.stage = Some(match &soffset {
+            Val::Reg(r) => Stage::Add(*r, off),
+            Val::Int(s) => Stage::Mov(off + s),
+            _ => {
+                return value(format!(
+                    "{name}: offset {off} past {}: soffset must be a register or a constant",
+                    range.end()
+                ))
+            }
+        });
+        soff = Arg::Reg(lit(), 0);
+    }
+    fields.extend(o.cache.fields());
+    fields.push(("lds".into(), FArg::Bool(true)));
+    let vo = match voffset {
+        Val::None => Arg::Str("off".into()),
+        v => v.arg(),
+    };
+    op(c, name, vec![vo, desc.arg(), soff], fields, n)
 }
 
 /// The buffer instruction with its offset staging.

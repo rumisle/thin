@@ -131,6 +131,11 @@ fn mem_fields(
     fields: &[(String, FArg)],
 ) -> Result<()> {
     let set = |f: &str| field(fields, f).is_some_and(FArg::set);
+    if mem == Mem::Buffer && args.len() == 3 && !set("lds") && name.starts_with("buffer_load_") {
+        return value(format!(
+            "{name}: 3 operands (the buffer-to-LDS DMA form) requires lds=True"
+        ));
+    }
     if mem == Mem::Buffer && !(set("offen") && set("idxen")) {
         let resource = args
             .iter()

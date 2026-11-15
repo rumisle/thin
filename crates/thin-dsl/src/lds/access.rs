@@ -506,6 +506,311 @@ impl Builder {
             Family::Made(Made::Instr(i)) => self.emit(*i, abl),
             Family::Made(Made::Lds(a)) => self.emit_access(*a, abl),
             Family::Split(s) => self.emit_split(*s, abl),
+            Family::Dma(d) => self.emit_dma(*d, abl),
         }
+    }
+}
+
+/// Which VMEM family an LDS DMA came from.
+#[derive(Clone, Debug)]
+pub enum DmaKind {
+    /// `global_load(lds, addr, base=...)`.
+    Global {
+        /// Scalar base SGPR pair or `Val::None`.
+        base: Val,
+    },
+    /// `buffer_load(lds, voffset, desc, soffset=...)`.
+    Buffer {
+        /// Buffer resource descriptor (4 SGPRs).
+        desc: Val,
+        /// Scalar byte offset.
+        soffset: Val,
+    },
+}
+
+/// A VMEM-to-LDS DMA deferred until emission so `M0`, address splitting,
+/// `LdsAccess`, and `vmcnt` region tracking are emitted together.
+#[derive(Clone, Debug)]
+pub struct Dma {
+    kind: DmaKind,
+    op_name: String,
+    lds: Address,
+    addr: Val,
+    offset: Val,
+    opts: Opts,
+}
+
+impl Dma {
+    /// Creates a deferred VMEM-to-LDS DMA.
+    pub fn new(
+        kind: DmaKind,
+        op_name: String,
+        lds: Address,
+        addr: Val,
+        offset: Val,
+        opts: Opts,
+    ) -> Dma {
+        Dma {
+            kind,
+            op_name,
+            lds,
+            addr,
+            offset,
+            opts,
+        }
+    }
+}
+
+fn has_lane_value(t: &Tree) -> bool {
+    value_of(t).is_some_and(|v| matches!(v.file, 'v' | 'a')) || t.args.iter().any(has_lane_value)
+}
+
+fn reg_of_val(v: &Val) -> Option<Reg> {
+    match v {
+        Val::Reg(r) => Some(*r),
+        _ => None,
+    }
+}
+
+impl Builder {
+    /// Emits an M0 setup followed by a global- or buffer-to-LDS DMA.
+    pub fn emit_dma(&mut self, d: Dma, abl: &[String]) -> Result<Option<u64>> {
+        self.own_layout(&d.lds)?;
+        self.frozen_layout()?;
+        let base = self.layout.as_ref().expect("a layout").regions[d.lds.region].base;
+        let (lds_var, lds_c) = split(&d.lds.off);
+        let lds_text = d.lds.text();
+        if lds_var.as_ref().is_some_and(has_lane_value) {
+            return mem(format!(
+                "{lds_text}: an LDS DMA destination is wave-uniform (set in M0; each lane writes M0 + 4*lane), \
+                 not lane-varying"
+            ));
+        }
+        let m0_const = i128::from(base) + lds_c;
+        if lds_var.is_none() {
+            if m0_const < 0 {
+                return mem(format!("{lds_text}: negative LDS byte offset {m0_const}"));
+            }
+            if m0_const % 4 != 0 {
+                return mem(format!(
+                    "{lds_text}: LDS DMA destination offset {m0_const} is not 4-byte aligned"
+                ));
+            }
+        }
+        if self.ablated(abl) {
+            if let Some(tag) = &d.opts.tag {
+                self.requests.issue_tag(tag.clone());
+            }
+            return Ok(None);
+        }
+        self.emit_dma_m0(&lds_text, lds_var.clone(), m0_const, abl)?;
+        let mut i = match d.kind.clone() {
+            DmaKind::Global { base } => self.make_global_dma(&d, &lds_text, base)?,
+            DmaKind::Buffer { desc, soffset } => {
+                self.make_buffer_dma(&d, &lds_text, desc, soffset)?
+            }
+        };
+        let what = format!("{} {lds_text}", i.form().op);
+        i = i.with_attr(Attr::LdsAccess(access_object(
+            self,
+            d.lds.region,
+            &what,
+            lds_var.is_some(),
+            m0_const,
+            &d.opts.ordered,
+        )))?;
+        let counted = i.form().counter;
+        let id = self.emit(i, abl)?;
+        if let (Some(id), Some(ctr)) = (id, counted) {
+            if self.rows.last().map(|r| r.id) == Some(id) {
+                self.record_region_op(d.lds.region, ctr);
+            }
+        }
+        Ok(id)
+    }
+
+    fn emit_dma_m0(
+        &mut self,
+        lds_text: &str,
+        lds_var: Option<Tree>,
+        m0_const: i128,
+        abl: &[String],
+    ) -> Result<()> {
+        let m0 = Arg::Phys(thin_target::phys_named("m0").expect("m0"), 0);
+        let comment = format!("m0 = {lds_text}");
+        let i = match lds_var {
+            None => {
+                let mov = self.make_plain(
+                    "s.mov.b32",
+                    vec![m0, Arg::Str(format!("0x{m0_const:x}"))],
+                    &comment,
+                )?;
+                mov.with_attr(Attr::M0Set(m0_const))?
+            }
+            Some(var) => {
+                let sreg = match value_of(&var)
+                    .filter(|v| v.file == 's' && v.n == 1 && v.width() == 1 && v.ty.is_int())
+                {
+                    Some(v) => v.reg(),
+                    None => {
+                        let tree_text = top(&var);
+                        let tree = match var.ty {
+                            Some(Ty::I32) => crate::expr::funcs::cast(Ty::U32, var)?,
+                            _ => var,
+                        };
+                        let m = Make {
+                            n: Some(1),
+                            n_repr: "1".into(),
+                            name: Some("m0off".into()),
+                            where_: self.where_text.clone(),
+                            ..Make::default()
+                        };
+                        let r = self.make_value('s', Ty::U32, m)?;
+                        self.assign(&r, tree, Some(format!("m0off = {tree_text}")))?;
+                        r.reg()
+                    }
+                };
+                if m0_const == 0 {
+                    self.make_plain("s.mov.b32", vec![m0, Arg::Reg(sreg, 0)], &comment)?
+                } else if m0_const > 0 {
+                    self.make_plain(
+                        "s.add.u32",
+                        vec![m0, Arg::Reg(sreg, 0), Arg::Str(format!("0x{m0_const:x}"))],
+                        &comment,
+                    )?
+                } else {
+                    let abs = -m0_const;
+                    self.make_plain(
+                        "s.sub.u32",
+                        vec![m0, Arg::Reg(sreg, 0), Arg::Str(format!("0x{abs:x}"))],
+                        &comment,
+                    )?
+                }
+            }
+        };
+        self.emit(i, abl)?;
+        Ok(())
+    }
+
+    fn make_global_dma(&mut self, d: &Dma, lds_text: &str, base: Val) -> Result<thin_ir::Instr> {
+        let pointer = matches!(&d.addr, Val::Reg(r) if r.file == 's' && r.n == 2);
+        let do_split = matches!(d.addr, Val::Tree(_))
+            || pointer && matches!(base, Val::None)
+            || matches!(base, Val::Reg(_)) && matches!(d.addr, Val::Int(_));
+        if do_split {
+            let (ptr, label, addr) = match reg_of_val(&base) {
+                Some(b) => (b, None, off_of(&d.addr).expect("a global address")),
+                None if matches!(&d.addr, Val::Reg(r) if r.file == 's') => {
+                    let Val::Reg(r) = &d.addr else {
+                        unreachable!("a register address")
+                    };
+                    (*r, None, Off::Int(0))
+                }
+                None => {
+                    let Val::Tree(t) = &d.addr else {
+                        unreachable!("a tree address")
+                    };
+                    match pointer_sum(t) {
+                        Some((p, off)) => (p.reg(), p.label.as_deref().map(str::to_owned), off),
+                        None => {
+                            return value(format!(
+                                "{}: a global address is a scalar pointer plus u32 terms",
+                                top(t)
+                            ))
+                        }
+                    }
+                }
+            };
+            let off = match &d.offset {
+                Val::Int(0) => addr,
+                o => sum(vec![addr, off_of(o).unwrap_or(Off::Int(0))]),
+            };
+            let (var, c) = split(&off);
+            let (reg, c) = addr_reg(self, Mem::Global, var, c)?;
+            let src_comment = self.split_comment(label.as_deref(), &off, &d.opts.comment);
+            let comment = format!("{lds_text} <- {src_comment}");
+            let mut fields = Vec::new();
+            if c != 0 {
+                fields.push(("offset".to_owned(), FArg::Int(c)));
+            }
+            fields.extend(d.opts.cache.fields());
+            let notes = Notes {
+                comment,
+                tag: d.opts.tag.clone(),
+                ..Notes::default()
+            };
+            return self.make(&d.op_name, vec![reg.arg(), Arg::Reg(ptr, 0)], fields, notes);
+        }
+        let saddr = match base {
+            Val::None => Arg::Str("off".into()),
+            b => b.arg(),
+        };
+        let mut fields = match &d.offset {
+            Val::Int(0) | Val::None => Vec::new(),
+            Val::Int(v) => vec![("offset".to_owned(), FArg::Int(*v))],
+            _ => Vec::new(),
+        };
+        fields.extend(d.opts.cache.fields());
+        let comment = if d.opts.comment.is_empty() {
+            lds_text.to_owned()
+        } else {
+            format!("{lds_text}: {}", d.opts.comment)
+        };
+        let notes = Notes {
+            comment,
+            tag: d.opts.tag.clone(),
+            ..Notes::default()
+        };
+        self.make(&d.op_name, vec![d.addr.arg(), saddr], fields, notes)
+    }
+
+    fn make_buffer_dma(
+        &mut self,
+        d: &Dma,
+        lds_text: &str,
+        desc: Val,
+        soffset: Val,
+    ) -> Result<thin_ir::Instr> {
+        let (voff, opts) = if matches!(d.addr, Val::Tree(_) | Val::Int(_)) {
+            let addr = off_of(&d.addr).expect("a buffer offset");
+            let off = match &d.offset {
+                Val::Int(0) => addr,
+                o => sum(vec![addr, off_of(o).unwrap_or(Off::Int(0))]),
+            };
+            let (var, c) = split(&off);
+            let (reg, c) = addr_reg(self, Mem::Buffer, var, c)?;
+            let reg = match reg {
+                Opd::Reg(v, _) => v.reg(),
+                _ => unreachable!("a register"),
+            };
+            let src_comment = self.split_comment(None, &off, &d.opts.comment);
+            let opts = Opts {
+                offset: Val::Int(c),
+                comment: format!("{lds_text} <- {src_comment}"),
+                ..d.opts.clone()
+            };
+            (Val::Reg(reg), opts)
+        } else {
+            let comment = if d.opts.comment.is_empty() {
+                lds_text.to_owned()
+            } else {
+                format!("{lds_text}: {}", d.opts.comment)
+            };
+            let opts = Opts {
+                comment,
+                ..d.opts.clone()
+            };
+            (d.addr.clone(), opts)
+        };
+        let c = crate::maker::Ctx {
+            t: self.t,
+            values: &self.values,
+        };
+        let made =
+            crate::maker::families::buffer_dma_op(&c, &d.op_name, voff, desc, soffset, opts)?;
+        let Made::Instr(i) = made else {
+            unreachable!("a buffer DMA op")
+        };
+        Ok(*i)
     }
 }

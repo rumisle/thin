@@ -37,8 +37,8 @@ class TargetRules:
     """XML instruction names replaced by their assembler spellings."""
     drop: tuple[tuple[str, str], ...] = field(default=())
     """(instruction, encoding) pairs present in the XML that the target lacks."""
-    lds_dma: bool = False
-    """Whether a buffer load of 4 operands also has a DMA-into-LDS form."""
+    lds_dma: tuple[str, ...] = field(default=())
+    """Buffer-load mnemonics that also have a 3-operand DMA-into-LDS form."""
     saddr_default: int = 124
     """Default 7-bit saddr field value (124 = null on RDNA4, 127 = off on CDNA3)."""
     soffset_default: int = 124
@@ -105,7 +105,14 @@ TARGETS = {
             ("v_swap_b32", "ENC_VOP3"),
             ("v_accvgpr_mov_b32", "ENC_VOP3"),
         ),
-        lds_dma=True,
+        lds_dma=(
+            "buffer_load_dword",
+            "buffer_load_format_x",
+            "buffer_load_sbyte",
+            "buffer_load_sshort",
+            "buffer_load_ubyte",
+            "buffer_load_ushort",
+        ),
         saddr_default=127,
         soffset_default=0,
     ),

@@ -297,8 +297,12 @@ impl Builder {
                 .ins
                 .clone();
             if i.defs().next().is_none() {
-                names.extend(i.attrs().places.iter().map(|n| n.to_string()));
-                if i.attrs().places.is_empty() && last_writer.is_none_or(|l| k > l) {
+                let mut placed: Vec<String> =
+                    i.attrs().places.iter().map(|n| n.to_string()).collect();
+                if let Some(acc) = &i.attrs().lds_access {
+                    placed.extend(crate::lds::tags_of(self, acc.region));
+                }
+                if placed.is_empty() && last_writer.is_none_or(|l| k > l) {
                     return err(
                         Class::Schedule,
                         format!(
@@ -309,6 +313,7 @@ impl Builder {
                         ),
                     );
                 }
+                names.extend(placed);
             }
             for r in i.defs() {
                 if !regs.contains(r) {

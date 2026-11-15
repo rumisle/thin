@@ -6,7 +6,7 @@ use crate::{Cause, EmuError};
 /// An LDS op of one wave not yet covered.
 #[derive(Clone, Debug)]
 pub struct LdsOp {
-    /// Its ds sequence number.
+    /// Its sequence number on its completion counter (`ds` or `vm`).
     pub seq: u64,
     /// The bytes it touched.
     pub bytes: Vec<u32>,
@@ -16,6 +16,8 @@ pub struct LdsOp {
     pub epoch: i64,
     /// An atomic.
     pub atomic: bool,
+    /// Retired by `vmcnt` (a VMEM-to-LDS DMA) rather than `lgkmcnt`/`dscnt`.
+    pub vm: bool,
 }
 
 /// One wave's LDS ops in flight.
@@ -38,8 +40,10 @@ pub struct Lds {
     pub writer: Vec<i8>,
     /// The last write's epoch.
     pub epoch: Vec<i64>,
-    /// 2·seq (+1 for an atomic) of an uncovered ds write, or −1.
+    /// 2·seq (+1 for an atomic) of an uncovered ds/vm write, or −1.
     pub wq: Vec<i64>,
+    /// Whether the uncovered write in `wq` counts on `vm` (DMA) rather than `ds`.
+    pub wvm: Vec<bool>,
     /// The waves with an uncovered read.
     pub rmask: Vec<u32>,
     /// The waves whose reads were covered in epoch `rcov_ep`.
@@ -93,6 +97,7 @@ impl Lds {
             writer: vec![-1; size],
             epoch: vec![0; size],
             wq: vec![-1; size],
+            wvm: vec![false; size],
             rmask: vec![0; size],
             rcov: vec![0; size],
             rcov_ep: vec![-1; size],
@@ -146,8 +151,9 @@ impl Lds {
             let j = j as usize;
             let a = self.writer[j];
             if self.wq[j] >= 0 && a >= 0 && a as usize != w && self.epoch[j] != e {
+                let wait_kind = if self.wvm[j] { "vm wait" } else { "ds wait" };
                 return Err(fault(format!(
-                    "wave {w} {wtext}: reads LDS byte {j} of wave {a}'s `{}` still in flight: it did not wait for it (ds wait) before the barrier - a barrier waits for no LDS op",
+                    "wave {w} {wtext}: reads LDS byte {j} of wave {a}'s `{}` still in flight: it did not wait for it ({wait_kind}) before the barrier - a barrier waits for no LDS op",
                     text(texts, self.wcpc[j])
                 )));
             }
@@ -175,6 +181,7 @@ impl Lds {
             pc,
             epoch: e,
             atomic: false,
+            vm: false,
         });
     }
 
@@ -233,8 +240,9 @@ impl Lds {
             if self.wq[j] >= 0 && a >= 0 && a as usize != w && self.epoch[j] != e {
                 let theirs_atomic = self.wq[j] & 1 == 1;
                 if !(atomic && theirs_atomic) {
+                    let wait_kind = if self.wvm[j] { "vm wait" } else { "ds wait" };
                     return Err(fault(format!(
-                        "wave {w} {wtext}: writes LDS byte {j} that wave {a}'s `{}` writes, still in flight at a barrier since (not covered by its ds wait): the two writes may land in either order",
+                        "wave {w} {wtext}: writes LDS byte {j} that wave {a}'s `{}` writes, still in flight at a barrier since (not covered by its {wait_kind}): the two writes may land in either order",
                         text(texts, self.wcpc[j])
                     )));
                 }
@@ -270,11 +278,31 @@ impl Lds {
         bytes: Vec<u32>,
         atomic: bool,
     ) {
+        self.record_write_on(w, e, pc, seq, bytes, atomic, false);
+    }
+
+    /// A VMEM-to-LDS DMA write's state after its data and tags are written.
+    pub fn record_vm_write(&mut self, w: usize, e: i64, pc: usize, seq: u64, bytes: Vec<u32>) {
+        self.record_write_on(w, e, pc, seq, bytes, false, true);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn record_write_on(
+        &mut self,
+        w: usize,
+        e: i64,
+        pc: usize,
+        seq: u64,
+        bytes: Vec<u32>,
+        atomic: bool,
+        vm: bool,
+    ) {
         let q = 2 * seq as i64 + i64::from(atomic);
         for &j in &bytes {
             let j = j as usize;
             self.epoch[j] = e;
             self.wq[j] = q;
+            self.wvm[j] = vm;
         }
         self.waves[w].writes.push(LdsOp {
             seq,
@@ -282,6 +310,7 @@ impl Lds {
             pc,
             epoch: e,
             atomic,
+            vm,
         });
     }
 
@@ -310,13 +339,23 @@ impl Lds {
             }
         }
         self.waves[w].reads = keep;
+        self.cover_writes(w, e, done, false);
+    }
+
+    /// The vm cover of wave `w` in epoch `e` of its VMEM-to-LDS DMAs below `done`.
+    pub fn vm_cover(&mut self, w: usize, e: i64, done: u64) {
+        self.cover_writes(w, e, done, true);
+    }
+
+    fn cover_writes(&mut self, w: usize, e: i64, done: u64, vm: bool) {
         let writes = std::mem::take(&mut self.waves[w].writes);
-        let (cov, keep): (Vec<LdsOp>, Vec<LdsOp>) = writes.into_iter().partition(|x| x.seq < done);
+        let (cov, keep): (Vec<LdsOp>, Vec<LdsOp>) =
+            writes.into_iter().partition(|x| x.vm == vm && x.seq < done);
         for x in &cov {
             let q = 2 * x.seq as i64 + i64::from(x.atomic);
             for &j in &x.bytes {
                 let j = j as usize;
-                if self.wq[j] == q && self.writer[j] == w as i8 {
+                if self.wq[j] == q && self.wvm[j] == vm && self.writer[j] == w as i8 {
                     self.epoch[j] = e;
                     self.wcx[j] = if x.epoch != e {
                         1 + u8::from(x.atomic)
@@ -325,6 +364,7 @@ impl Lds {
                     };
                     self.wcpc[j] = x.pc as i32;
                     self.wq[j] = -1;
+                    self.wvm[j] = false;
                 }
             }
         }
@@ -340,6 +380,7 @@ impl Lds {
             }
         }
         self.ds_cover(w, e, u64::MAX);
+        self.vm_cover(w, e, u64::MAX);
     }
 
     /// The LDS fence at a barrier release into epoch `e2`.
@@ -358,8 +399,9 @@ impl Lds {
             let ops = &self.waves[*w];
             let first = ops.reads.first().or(ops.writes.first());
             if let Some(op) = first {
+                let kind_text = if op.vm { "an LDS DMA" } else { "an LDS op" };
                 return Err(fault(format!(
-                    "wave {w}: `{}` (an LDS op) in flight at the LDS fence",
+                    "wave {w}: `{}` ({kind_text}) in flight at the LDS fence",
                     texts.get(op.pc).map_or("", String::as_str)
                 )));
             }

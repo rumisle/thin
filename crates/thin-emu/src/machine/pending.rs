@@ -128,6 +128,9 @@ pub fn landing(facts: &Facts, ins: &Ins) -> Option<(usize, bool, (char, u32, u32
             (role::DS, false)
         }
         "vmem" => {
+            if c.contains(".load.lds.") || ins.field("lds").is_some() {
+                return None;
+            }
             let load = c.contains(".load");
             let atomic = c.contains(".atomic")
                 && ins.operands.len() >= 4

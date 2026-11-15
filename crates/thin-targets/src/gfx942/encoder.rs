@@ -1325,6 +1325,18 @@ fn flat_family(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Ref
     cache_flags(word, line)
 }
 
+pub(super) fn is_mubuf_lds_op(mnemonic: &str) -> bool {
+    matches!(
+        mnemonic,
+        "buffer_load_ubyte"
+            | "buffer_load_sbyte"
+            | "buffer_load_ushort"
+            | "buffer_load_sshort"
+            | "buffer_load_dword"
+            | "buffer_load_format_x"
+    )
+}
+
 /// `MUBUF` buffer loads, stores, atomics, LDS DMA, and cache maintenance (`buffer_wbl2`, `buffer_inv`).
 fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     let ops = &line.operands;
@@ -1341,7 +1353,10 @@ fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     let idxen = flag_modifier(line, "idxen")?;
     let offen = flag_modifier(line, "offen")?;
     let (vdata_opt, vaddr_op, rsrc_op, soff_op) = match (lds != 0, ops.as_slice()) {
-        (true, [va, rs, so]) if mnemonic.starts_with("buffer_load_") => (None, va, rs, so),
+        (true, [va, rs, so]) if is_mubuf_lds_op(mnemonic) => (None, va, rs, so),
+        (true, _) if !is_mubuf_lds_op(mnemonic) => {
+            return Err(format!("{mnemonic}: lds is not supported on gfx942"));
+        }
         (false, [vd, va, rs, so]) => (Some(vd), va, rs, so),
         _ => return Err(format!("{} operands", ops.len())),
     };

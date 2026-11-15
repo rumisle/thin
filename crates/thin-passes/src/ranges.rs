@@ -700,9 +700,10 @@ impl<'a> Ranges<'a> {
             (1..i.ops().len()).map(|n| self.operand(st, i, n)).collect();
         let m0 = phys_named("m0").expect("m0").number;
         if i.phys(0).is_some_and(|p| p.number == m0) {
-            let result = (["s.mov.b32", "s.add.u32"].contains(&f.canon.as_str()))
-                .then(|| transfer(&f.canon, &ops, k))
-                .flatten();
+            let result = (["s.mov.b32", "s.add.u32", "s.add.i32", "s.sub.u32"]
+                .contains(&f.canon.as_str()))
+            .then(|| transfer(&f.canon, &ops, k))
+            .flatten();
             match result {
                 Some(iv) => st.insert(Key::Named(m0), Entry::Iv(iv)),
                 None => st.remove(&Key::Named(m0)),
@@ -885,7 +886,7 @@ impl Ranges<'_> {
             return Some(usize::from(has_defs));
         }
         if f.mem == Some(Mem::Buffer) && truthy("offen") {
-            return Some(1);
+            return Some(usize::from(!f.flags.has(Flags::LDS_MEM)));
         }
         (f.kind == Kind::Ds && !f.flags.has(Flags::CROSS_LANE)).then_some(usize::from(has_defs))
     }
@@ -936,15 +937,65 @@ impl Ranges<'_> {
                 }
             }
         }
-        let Some(a) = self.address(i) else {
-            return Ok(());
-        };
+        let f = i.form();
+        let vmem_lds = f.kind == Kind::Vmem && f.flags.has(Flags::LDS_MEM);
         let region = i
             .attrs()
             .lds_access
             .as_ref()
             .and_then(|acc| self.s.region(acc.region).map(|r| (acc, r)));
-        self.offset(st, i, k, a, region.map(|r| (r.0.field, r.1)), report)
+        if let Some(a) = self.address(i) {
+            let ds_reg = (!vmem_lds)
+                .then_some(region)
+                .flatten()
+                .map(|r| (r.0.field, r.1));
+            self.offset(st, i, k, a, ds_reg, report)?;
+        }
+        if let (true, Some((_, reg))) = (vmem_lds, region) {
+            self.dma_lds(st, k, reg, report)?;
+        }
+        Ok(())
+    }
+
+    /// An M0-addressed VMEM-to-LDS DMA's destination range inside its LDS region.
+    fn dma_lds(
+        &self,
+        st: &State,
+        k: usize,
+        reg: &thin_ir::Region,
+        report: &mut Report,
+    ) -> Result<(), Diag> {
+        let m0 = phys_named("m0").expect("m0").number;
+        let Some(iv) = Ranges::iv(st, Key::Named(m0)) else {
+            report.unknown += 1;
+            return Ok(());
+        };
+        if let Some(w) = iv.wrap {
+            let mut msg = Ranges::quoted(k);
+            msg.push(Part::Text("its M0 offset may wrap past 32 bits - `".into()));
+            msg.extend([
+                Part::Instr(w),
+                Part::Text(format!("` (instruction {w}) {}", iv.why)),
+            ]);
+            return Err(Ranges::refusal(msg));
+        }
+        if iv.lo < 0 || iv.hi >= P32 {
+            let mut msg = Ranges::quoted(k);
+            msg.push(Part::Text(format!(
+                "its M0 offset may be {} .. {}, outside 0 .. 2^32 - 1",
+                iv.lo, iv.hi
+            )));
+            msg.extend(computed(iv));
+            return Err(Ranges::refusal(msg));
+        }
+        let wave = u64::from(self.s.target().definition().wave);
+        let lanes = match self.launch.tid {
+            Some((lo, hi)) => (hi - lo + 1).max(0),
+            None if self.launch.wgsize > 0 => i128::from(self.launch.wgsize.min(wave)),
+            None => i128::from(wave),
+        };
+        let bytes = (iv.lo, iv.hi + 4 * lanes);
+        self.inside(k, report, bytes, iv, reg)
     }
 
     /// An address offset's checks.

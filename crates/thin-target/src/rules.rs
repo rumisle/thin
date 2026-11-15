@@ -178,6 +178,7 @@ impl FormRules {
         f |= when(starts(name, self.wave_varying), Flags::WAVE_VARYING);
         let not_lds = ["ds_bpermute", "ds_permute", "ds_swizzle", "ds_nop"];
         f |= when(f.has(Flags::DS) && !starts(name, &not_lds), Flags::LDS_MEM);
+        f |= when(f.has(Flags::VMEM) && has("_load_lds_"), Flags::LDS_MEM);
         f |= when(reads_dst(name), Flags::READS_DST);
         let accumulates = starts(name, &["v_fmac", "v_fma_mix"]);
         f |= when(accumulates, Flags::ACCUMULATE);
@@ -243,7 +244,10 @@ impl FormRules {
         let returning = row.mnemonic.ends_with("+rtn");
         let op = row.mnemonic.trim_end_matches("+rtn");
         let writes = row.roles.first().is_some_and(|r| r.contains('w'));
-        let flags = self.flags(op)?;
+        let mut flags = self.flags(op)?;
+        if row.encoding.ends_with(" lds") {
+            flags |= Flags::LDS_MEM;
+        }
         let kind = self.kind(op, flags, waits);
         let mut form = Form::plain(id as i32, op, kind, flags);
         form.name = row.mnemonic.clone();

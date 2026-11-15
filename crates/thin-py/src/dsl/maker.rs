@@ -145,7 +145,7 @@ fn maker_family(
     target: &str,
     b: Option<PyRef<'_, DslBuilder>>,
     family: &str,
-    data: (i32, char, u32, u32),
+    data: Bound<'_, PyTuple>,
     xs: Vec<Bound<'_, PyTuple>>,
     o: OptsIn<'_>,
 ) -> PyResult<Out> {
@@ -155,9 +155,9 @@ fn maker_family(
         values: values(&b),
     };
     let v = xs.iter().map(val).collect::<PyResult<Vec<_>>>()?;
-    let data = reg(data);
+    let data = val(&data)?;
     let o = opts(o)?;
-    Ok(out(target, ok(families::family(&c, family, &data, v, o))?))
+    Ok(out(target, ok(families::family(&c, family, data, v, o))?))
 }
 
 /// Adds the maker.

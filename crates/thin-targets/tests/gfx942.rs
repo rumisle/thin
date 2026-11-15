@@ -680,3 +680,65 @@ fn cdna3_all_46_matrix_forms_match_isa_dwords_and_f64_neg_roundtrips() {
         "f64 MFMA should reject blgp modifier"
     );
 }
+
+#[test]
+fn cdna3_lds_dma_encoding_flags_and_m0_hazard_match_llvm_mc() {
+    let t = thin_targets::get(ARCH).unwrap();
+    let dma_lines = [
+        "buffer_load_ubyte v0, s[8:11], s12 offen offset:16 lds",
+        "buffer_load_sbyte v0, s[8:11], 0 offen lds",
+        "buffer_load_ushort v0, s[8:11], s12 offen offset:32 lds",
+        "buffer_load_sshort off, s[8:11], s12 offset:64 lds",
+        "buffer_load_dword v0, s[8:11], 0 offen offset:128 lds",
+        "buffer_load_format_x v0, s[8:11], 0 offen lds",
+        "global_load_lds_ubyte v0, s[4:5] offset:16",
+        "global_load_lds_sbyte v[0:1], off offset:-8",
+        "global_load_lds_ushort v0, s[4:5] offset:32",
+        "global_load_lds_sshort v0, s[4:5] sc0",
+        "global_load_lds_dword v0, s[4:5] offset:256 sc0",
+    ];
+    if llvm_mc_available() {
+        let want = llvm_mc_bytes(&dma_lines);
+        for (line, expected) in dma_lines.iter().zip(want) {
+            let Encoded::Bytes(bytes) = t.hooks().encode(line).expect(line) else {
+                panic!("expected Bytes encoding");
+            };
+            assert_eq!(bytes, expected, "encode mismatch on `{line}`");
+            let decoded = thin_targets::decode(ARCH, &bytes).expect("decode");
+            assert_eq!(decoded.len(), 1);
+            let reencoded =
+                thin_targets::encode_one(ARCH, &decoded[0]).expect("re-encode decoded DMA");
+            assert_eq!(reencoded, expected, "roundtrip mismatch on `{line}`");
+        }
+    }
+
+    // CDNA3 rejects `lds` on multi-dword and d16 buffer_load forms.
+    for bad in [
+        "buffer_load_dwordx2 v0, s[8:11], 0 offen lds",
+        "buffer_load_dwordx3 v0, s[8:11], 0 offen lds",
+        "buffer_load_dwordx4 v0, s[8:11], 0 offen lds",
+        "buffer_load_ubyte_d16 v0, s[8:11], 0 offen lds",
+    ] {
+        assert!(
+            t.hooks().encode(bad).is_err(),
+            "expected `{bad}` to be rejected on gfx942"
+        );
+    }
+
+    // Check form flags (`VMEM | LOAD | LDS_MEM`, counter `vmcnt` = Some(0), reads `m0`).
+    let m0_num = thin_target::phys_named("m0").unwrap().number;
+    for (op, arity) in [
+        ("buffer_load_dword", 3),
+        ("buffer_load_ubyte", 3),
+        ("buffer_load_sshort", 3),
+        ("global_load_lds_dword", 2),
+        ("global_load_lds_sbyte", 2),
+    ] {
+        let f = t.form(op, arity, false).expect(op);
+        assert!(f.flags.has(thin_target::Flags::VMEM), "{op} VMEM");
+        assert!(f.flags.has(thin_target::Flags::LOAD), "{op} LOAD");
+        assert!(f.flags.has(thin_target::Flags::LDS_MEM), "{op} LDS_MEM");
+        assert_eq!(f.counter, Some(0), "{op} counter vmcnt");
+        assert!(f.implicit_uses.contains(&m0_num), "{op} reads m0");
+    }
+}

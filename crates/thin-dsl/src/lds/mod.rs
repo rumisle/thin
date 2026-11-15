@@ -4,7 +4,7 @@ mod access;
 mod addr;
 pub mod layout;
 
-pub use access::{access, wait_region, Access, Split, SplitKind};
+pub use access::{access, wait_region, Access, Dma, DmaKind, Split, SplitKind};
 pub use addr::{split, sum, Address, Off, Pointer};
 pub use layout::{elem_of_name, elem_of_type, Layout, Region, RegionArgs, Xor};
 

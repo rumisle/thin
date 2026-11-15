@@ -116,7 +116,7 @@ class _Table:
             self.put(m + "+rtn", row(["rw", *roles[1:]], widths, slots))
         else:
             self.put(m, row(roles, widths, slots))
-        dma = rules.lds_dma and en.startswith("ENC_MUBUF") and m.startswith("buffer_load_")
+        dma = en.startswith("ENC_MUBUF") and m in rules.lds_dma
         if dma and len(slots) == 4:
             lds = row(
                 ["r", "r", "r"],

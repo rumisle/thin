@@ -938,6 +938,9 @@ fn wait(e: &mut Exec<'_>, w: &mut Wave, counter: usize, n: u64) {
         e.lds_cover(w, done);
         return;
     }
+    if counter == role::LOAD && w.wid < e.lds.waves.len() {
+        e.lds.vm_cover(w.wid, e.epoch, done);
+    }
     let (cov, keep): (Vec<_>, Vec<_>) = std::mem::take(&mut w.vm_ops)
         .into_iter()
         .partition(|o| o.counter == counter && o.seq < done);
