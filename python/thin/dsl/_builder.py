@@ -10,7 +10,7 @@ from thin.codegen import current
 from thin.dsl._args import Entry
 from thin.dsl._expr import Tree, leaf
 from thin.dsl._lds import Layout
-from thin.dsl._maker import _LIT, OWNER, Counter, native_reg
+from thin.dsl._maker import _LIT, OWNER, Counter, _mfma_opts, native_reg, operand
 from thin.dsl._values import BUILDERS, RegFile, TypedValue, as_reg, capture, typed
 from thin.ir import B32, LOCS, ExecRegion, Instr, Loop, Program, Value, VReg, _Row
 from thin.target import PHYS, Phys, target
@@ -650,6 +650,142 @@ class Builder:
         _native.lds_make(self._n, budget)
         self.layout = Layout(self)
         return self.layout
+
+    # --- Matrix / MFMA accumulators and operations -------------------------
+
+    def mfma_acc(
+        self,
+        form: str,
+        init=0,
+        *,
+        acc: str | None = None,
+        agpr: bool | None = None,
+        name: str | None = None,
+        at: int | None = None,
+        same_as=None,
+    ) -> TypedValue:
+        """Allocates a matrix accumulator for ``form`` in ``'a'`` (AGPR) or ``'v'`` (VGPR)."""
+        self._at()
+        y = None
+        if same_as is not None:
+            y = getattr(same_as, "_typed", None)
+            if y is None:
+                raise ValueError(f"same_as={same_as!r}: a whole TypedValue")
+        x = None if init is None else leaf(init)
+        out = typed(_native.builder_mfma_acc(self._n, form, acc, agpr, name, at, y, x))
+        if at is not None or same_as is not None:
+            self._sync_values(links=True)
+        return out
+
+    def mfma(
+        self,
+        form: str,
+        a,
+        b,
+        c=0,
+        *,
+        dst=None,
+        acc: str | None = None,
+        agpr: bool | None = None,
+        name: str | None = None,
+        cbsz: int = 0,
+        abid: int = 0,
+        blgp: int = 0,
+        neg=None,
+        comment: str = "",
+        tag=(),
+        abl=(),
+    ) -> TypedValue:
+        """Emits a dense MFMA instruction and returns the destination accumulator."""
+        self._at()
+        c_acc = _maybe_acc_in(c)
+        c_arg = None if c is None else operand(c)
+        dst_in = None if dst is None else _acc_in(dst)
+        cfg = (c_arg, c_acc, dst_in, acc, agpr, name, list(abl))
+        opts = _mfma_opts(cbsz, abid, blgp, neg, comment, tag, ())
+        return typed(_native.builder_mfma(self._n, form, operand(a), operand(b), cfg, opts))
+
+    def smfmac(
+        self,
+        form: str,
+        a,
+        b,
+        idx,
+        c,
+        *,
+        acc: str | None = None,
+        agpr: bool | None = None,
+        cbsz: int = 0,
+        abid: int = 0,
+        comment: str = "",
+        tag=(),
+        abl=(),
+    ) -> TypedValue:
+        """Emits a sparse 4:2 SMFMAC instruction updating ``c`` in-place."""
+        self._at()
+        opts = _mfma_opts(cbsz, abid, 0, None, comment, tag, ())
+        return typed(
+            _native.builder_smfmac(
+                self._n,
+                form,
+                operand(a),
+                operand(b),
+                operand(idx),
+                _acc_in(c),
+                acc,
+                agpr,
+                list(abl),
+                opts,
+            )
+        )
+
+    def read_acc(
+        self,
+        src,
+        *,
+        dst=None,
+        copy: bool = False,
+        name: str | None = None,
+    ) -> TypedValue:
+        """Returns ``src`` in VGPRs, emitting ``v_accvgpr_read_b32`` when ``src`` is in AGPRs."""
+        self._at()
+        dst_in = None if dst is None else _acc_in(dst)
+        return typed(_native.builder_read_acc(self._n, _acc_in(src), dst_in, copy, name))
+
+    def write_acc(
+        self,
+        src,
+        *,
+        dst=None,
+        acc: str | None = None,
+        agpr: bool | None = None,
+        copy: bool = False,
+        name: str | None = None,
+    ) -> TypedValue:
+        """Writes ``src`` into an ``'a'`` (AGPR) or ``'v'`` (VGPR) accumulator."""
+        self._at()
+        dst_in = None if dst is None else _acc_in(dst)
+        return typed(
+            _native.builder_write_acc(self._n, _acc_in(src), dst_in, acc, agpr, copy, name)
+        )
+
+
+def _acc_in(x) -> tuple:
+    if isinstance(x, TypedValue):
+        return ("t", x._typed)
+    r = as_reg(x)
+    if isinstance(r, VReg):
+        return ("r", native_reg(r))
+    raise TypeError(f"{x!r}: expected an accumulator TypedValue or VReg")
+
+
+def _maybe_acc_in(x) -> tuple | None:
+    if isinstance(x, TypedValue):
+        return ("t", x._typed)
+    r = as_reg(x)
+    if isinstance(r, VReg):
+        return ("r", native_reg(r))
+    return None
 
 
 def _claim(x) -> tuple:

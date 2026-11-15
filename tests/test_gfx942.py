@@ -1003,3 +1003,261 @@ def test_gfx942_gemm_provenance_checker_agpr_vgpr_and_faults():
     prob_32 = run_gemm_check(asm_32, k_total=8, m_dim=32, elem_b=2)
     assert prob_32.errors == []
     assert len(prob_32.stores) == 1024
+
+
+def test_gfx942_dsl_high_level_mfma_agpr_and_vgpr(tmp_path):
+    """High-level DSL `b.mfma`, `b.mfma_acc`, `b.smfmac`, `b.read_acc`, `b.write_acc`."""
+    import numpy as np
+    import pytest
+
+    import thin
+    from thin.dsl import Builder
+    from thin.target import targeting
+
+    rng = np.random.default_rng(20261116)
+
+    # 1. Same 2-tile K=32 f16 GEMM kernel compiled with AGPR (`acc="a"`) vs VGPR (`acc="v"`):
+    def make_gemm_def(acc_file: str):
+        from thin import KernelDef
+        from thin.dsl import Args, O, ptr
+
+        def body(b, k):
+            V = b.v  # noqa: N806
+            a0_ptr, b0_ptr, a1_ptr, b1_ptr, out_ptr = k.load()
+            lane = V.u32(k.tid, name="lane")
+            in_off = V.u32(lane * 8, name="in_off")
+            out_off = V.u32(lane * 16, name="out_off")
+
+            a0, b0 = V.u32(n=2, name="a0"), V.u32(n=2, name="b0")
+            a1, b1 = V.u32(n=2, name="a1"), V.u32(n=2, name="b1")
+            b.emit(O.global_load(a0, in_off, a0_ptr))
+            b.emit(O.global_load(b0, in_off, b0_ptr))
+            b.emit(O.global_load(a1, in_off, a1_ptr))
+            b.emit(O.global_load(b1, in_off, b1_ptr))
+            b.wait(a0, b0, a1, b1, comment="tiles landed")
+
+            # Tile 0 allocates & zeroes accumulator (`c=0`), Tile 1 accumulates in-place:
+            acc = b.mfma("f32_16x16x16_f16", a0, b0, acc=acc_file, name="acc")
+            b.mfma("f32_16x16x16_f16", a1, b1, acc)
+
+            v_out = b.read_acc(acc)
+            b.emit(O.global_store(out_off, v_out, out_ptr))
+
+        return KernelDef(
+            f"dsl_mfma_{acc_file}",
+            Args(a0=ptr, b0=ptr, a1=ptr, b1=ptr, out=ptr),
+            body,
+            wgsize=64,
+            max_grid=(1,),
+        )
+
+    a0_m = rng.integers(-3, 4, (1, 16, 16)).astype(np.float16)
+    b0_m = rng.integers(-3, 4, (1, 16, 16)).astype(np.float16)
+    a1_m = rng.integers(-3, 4, (1, 16, 16)).astype(np.float16)
+    b1_m = rng.integers(-3, 4, (1, 16, 16)).astype(np.float16)
+    expected = a0_m[0].astype(np.float32) @ b0_m[0].astype(np.float32) + a1_m[0].astype(
+        np.float32
+    ) @ b1_m[0].astype(np.float32)
+
+    a0_buf = _pack_cdna3_input(a0_m.view(np.uint16), 16).reshape(-1)
+    b0_buf = _pack_cdna3_input(np.swapaxes(b0_m, 1, 2).view(np.uint16), 16).reshape(-1)
+    a1_buf = _pack_cdna3_input(a1_m.view(np.uint16), 16).reshape(-1)
+    b1_buf = _pack_cdna3_input(np.swapaxes(b1_m, 1, 2).view(np.uint16), 16).reshape(-1)
+
+    before_s = thin.use_store(None)
+    try:
+        with targeting("gfx942"):
+            k_a = thin.compile(make_gemm_def, acc_file="a")
+            k_v = thin.compile(make_gemm_def, acc_file="v")
+
+            assert k_a.manifest.agpr == 4
+            assert "v_accvgpr_read_b32" in k_a.asm
+            assert k_v.manifest.agpr == 0
+            assert "v_accvgpr_read_b32" not in k_v.asm
+
+            for kern in (k_a, k_v):
+                out = np.zeros(64 * 4, dtype=np.uint32)
+                kern.bind(
+                    (1,),
+                    {"a0": a0_buf, "b0": b0_buf, "a1": a1_buf, "b1": b1_buf, "out": out},
+                ).emulate()
+                got = _unpack_cdna3_output(out.reshape(64, 4), 1, 16, 16, 32).view(np.float32)[0]
+                assert np.array_equal(got, expected)
+
+            # 2. Sparse 4:2 `b.smfmac` + `b.mfma_acc` + `b.write_acc` across AGPR and VGPR:
+            def make_smfmac_def(use_agpr: bool):
+                from thin import KernelDef
+                from thin.dsl import Args, O, ptr
+
+                def body(b, k):
+                    V = b.v  # noqa: N806
+                    a_ptr, b_ptr, idx_ptr, c_ptr, out_ptr = k.load()
+                    lane = V.u32(k.tid, name="lane")
+                    a_in = V.u32(n=2, name="a_in")
+                    b_in = V.u32(n=4, name="b_in")
+                    idx_in = V.u32(name="idx_in")
+                    c_in = V.f32(n=4, name="c_in")
+                    b.emit(O.global_load(a_in, V.u32(lane * 8), a_ptr))
+                    b.emit(O.global_load(b_in, V.u32(lane * 16), b_ptr))
+                    b.emit(O.global_load(idx_in, V.u32(lane * 4), idx_ptr))
+                    b.emit(O.global_load(c_in, V.u32(lane * 16), c_ptr))
+                    b.wait(a_in, b_in, idx_in, c_in, comment="inputs landed")
+
+                    acc = b.mfma_acc(
+                        "smfmac_f32_16x16x32_f16", init=None, agpr=use_agpr, name="acc"
+                    )
+                    b.write_acc(c_in, dst=acc)
+                    b.smfmac("f32_16x16x32_f16", a_in, b_in, idx_in, acc, agpr=use_agpr)
+                    b.emit(O.global_store(V.u32(lane * 16), b.read_acc(acc), out_ptr))
+
+                return KernelDef(
+                    f"dsl_smfmac_{int(use_agpr)}",
+                    Args(a=ptr, b=ptr, idx=ptr, c=ptr, out=ptr),
+                    body,
+                    wgsize=64,
+                    max_grid=(1,),
+                )
+
+            a_comp = rng.integers(-2, 3, (1, 16, 16)).astype(np.float16)
+            b_dense = rng.integers(-2, 3, (1, 32, 16)).astype(np.float16)
+            c_init = rng.integers(-5, 6, (1, 16, 16)).astype(np.float32)
+            # Every 4-element group selects indices (0, 2) -> nibble 0x8 -> 0x8888 per 16-bit set:
+            a_exp = np.zeros((16, 32), dtype=np.float32)
+            for g in range(8):
+                a_exp[:, 4 * g + 0] = a_comp[0, :, 2 * g + 0]
+                a_exp[:, 4 * g + 2] = a_comp[0, :, 2 * g + 1]
+            exp_sparse = a_exp @ b_dense[0].astype(np.float32) + c_init[0]
+
+            a_sbuf = _pack_cdna3_input(a_comp.view(np.uint16), 16).reshape(-1)
+            b_sbuf = _pack_cdna3_input(np.swapaxes(b_dense, 1, 2).view(np.uint16), 16).reshape(-1)
+            idx_sbuf = np.full(64, 0x88888888, dtype=np.uint32)
+            c_sbuf = np.zeros((64, 4), dtype=np.uint32)
+            for lane in range(64):
+                col, grp = lane % 16, lane // 16
+                c_sbuf[lane] = c_init[0, 4 * grp : 4 * grp + 4, col].view(np.uint32)
+
+            for use_agpr in (True, False):
+                ks = thin.compile(make_smfmac_def, use_agpr=use_agpr)
+                assert (ks.manifest.agpr > 0) == use_agpr
+                out_s = np.zeros(64 * 4, dtype=np.uint32)
+                ks.bind(
+                    (1,),
+                    {
+                        "a": a_sbuf,
+                        "b": b_sbuf,
+                        "idx": idx_sbuf,
+                        "c": c_sbuf.reshape(-1),
+                        "out": out_s,
+                    },
+                ).emulate()
+                got_s = _unpack_cdna3_output(out_s.reshape(64, 4), 1, 16, 16, 32).view(
+                    np.float32
+                )[0]
+                assert np.array_equal(got_s, exp_sparse)
+
+            # 3. Binary64 `f64_16x16x4_f64` with `neg=(1, 0, 0)` and `O.mfma`:
+            def make_f64_def():
+                from thin import KernelDef
+                from thin.dsl import Args, O, ptr
+
+                def body(b, k):
+                    V = b.v  # noqa: N806
+                    a_ptr, b_ptr, out_ptr = k.load()
+                    lane = V.u32(k.tid, name="lane")
+                    ma, mb = V.u64(name="ma"), V.u64(name="mb")
+                    b.emit(O.global_load(ma, V.u32(lane * 8), a_ptr))
+                    b.emit(O.global_load(mb, V.u32(lane * 8), b_ptr))
+                    b.wait(ma, mb, comment="f64 inputs")
+                    acc = b.mfma_acc("f64_16x16x4_f64", init=None, acc="a", name="acc64")
+                    b.emit(O.mfma("f64_16x16x4_f64", acc, ma, mb, 0, neg=(1, 0, 0)))
+                    v_acc = b.read_acc(acc, name="v_acc64")
+                    for elem in range(4):
+                        b.emit(
+                            O.global_store(
+                                V.u32(lane * 32), v_acc[elem], out_ptr, offset=8 * elem or None
+                            )
+                        )
+
+                return KernelDef(
+                    "dsl_mfma_f64",
+                    Args(a=ptr, b=ptr, out=ptr),
+                    body,
+                    wgsize=64,
+                    max_grid=(1,),
+                )
+
+            kf64 = thin.compile(make_f64_def)
+            a64 = rng.integers(-4, 5, (1, 16, 4)).astype(np.float64) * 0.5
+            b64 = rng.integers(-4, 5, (1, 4, 16)).astype(np.float64) * 0.25
+            out64 = np.zeros(64 * 8, dtype=np.uint32)
+            kf64.bind(
+                (1,),
+                {
+                    "a": _pack_cdna3_input(a64.view(np.uint64), 64).reshape(-1),
+                    "b": _pack_cdna3_input(np.swapaxes(b64, 1, 2).view(np.uint64), 64).reshape(-1),
+                    "out": out64,
+                },
+            ).emulate()
+            got64 = _unpack_cdna3_output(out64.reshape(64, 8), 1, 16, 16, 64).view(np.float64)[0]
+            assert np.array_equal(got64, (-a64[0]) @ b64[0])
+
+            # 4. Validation refusals:
+            b_err = Builder()
+            va2 = b_err.v.u32(n=2, name="va2")
+            va3 = b_err.v.u32(n=3, name="va3")
+            with pytest.raises(ValueError, match="disagree"):
+                b_err.mfma_acc("f32_16x16x16_f16", acc="a", agpr=False)
+            with pytest.raises(ValueError, match="form takes 2"):
+                b_err.mfma("f32_16x16x16_f16", va3, va2)
+            with pytest.raises(ValueError, match="does not take blgp"):
+                b_err.mfma("f32_16x16x16_f16", va2, va2, blgp=1)
+            with pytest.raises(ValueError, match="does not take neg"):
+                b_err.mfma("f32_16x16x16_f16", va2, va2, neg=(1, 0, 0))
+            with pytest.raises(ValueError, match="use smfmac"):
+                b_err.mfma("smfmac_f32_16x16x32_f16", va2, va2)
+
+        # Target without AGPRs rejects `acc="a"` cleanly:
+        with targeting("gfx1201"):
+            b_rdna = Builder()
+            with pytest.raises(ValueError, match="has no a registers"):
+                b_rdna.mfma_acc("v_wmma_f32_16x16x16_f16", acc="a")
+            acc_rdna = b_rdna.mfma_acc("v_wmma_f32_16x16x16_f16")
+            assert acc_rdna.file == "v" and acc_rdna.width == 8
+    finally:
+        thin.use_store(before_s)
+
+
+def test_gfx942_dsl_mfma_validation_and_bounds() -> None:
+    """DSL rejects C/D file mismatch and bad cbsz, and accepts valid sparse cbsz+abid."""
+    import pytest
+
+    from thin.dsl import Builder, O
+    from thin.target import targeting
+
+    with targeting("gfx942"):
+        b = Builder()
+        va = b.v.u32(n=2)
+        vb = b.v.u32(n=2)
+        vc = b.v.f32(n=4)
+        ac = b.a.f32(n=4)
+
+        # Mixing AGPR dst and VGPR src2 (or vice versa) is rejected immediately:
+        with pytest.raises(ValueError, match="same register file"):
+            b.mfma("f32_16x16x16_f16", va, vb, vc, dst=ac)
+        with pytest.raises(ValueError, match="same register file"):
+            b.emit(O.op("v_mfma_f32_16x16x16_f16", ac, va, vb, vc))
+
+        # 2-block `32x32x4_2b_f16` allows cbsz=1 but rejects cbsz=2:
+        acc32 = b.a.f32(n=32)
+        b.mfma("f32_32x32x4_2b_f16", va, vb, acc32, dst=acc32, cbsz=1, abid=1)
+        with pytest.raises(ValueError, match=r"cbsz 2 out of range \(0\.\.=1\)"):
+            b.mfma("f32_32x32x4_2b_f16", va, vb, acc32, dst=acc32, cbsz=2)
+
+        # Sparse `v_smfmac_*` allows cbsz in 0..=3 + abid, and requires VGPR idx:
+        vb4 = b.v.u32(n=4)
+        vidx = b.v.u32()
+        aidx = b.a.u32()
+        b.smfmac("f32_16x16x32_f16", va, vb4, vidx, ac, cbsz=2, abid=1)
+        b.smfmac("f32_16x16x64_fp8_fp8", va, vb4, vidx, ac, cbsz=3, abid=1)
+        with pytest.raises(ValueError, match="sparse index takes 'v'"):
+            b.smfmac("f32_16x16x32_f16", va, vb4, aidx, ac)

@@ -82,6 +82,24 @@ pub(super) fn before_form(
         }
         mem_fields(c, name, mem, args, fields)?;
     }
+    if let Some(mf) = t.matrix_form(name) {
+        if !mf.sparse && mf.wave == 64 {
+            if let (Some(Arg::Reg(rd, _)), Some(Arg::Reg(rc, _))) = (args.first(), args.get(3)) {
+                if matches!(rd.file, 'a' | 'v')
+                    && matches!(rc.file, 'a' | 'v')
+                    && rd.file != rc.file
+                {
+                    return value(format!(
+                        "{name}: dst {} ('{}') and src2 (C) {} ('{}') must use the same register file ('a' or 'v')",
+                        c.repr(rd),
+                        rd.file,
+                        c.repr(rc),
+                        rc.file
+                    ));
+                }
+            }
+        }
+    }
     if !t.definition().operands.vop3_literal {
         vop3_literal(c, name, args)?;
     }

@@ -2,6 +2,7 @@
 
 mod checks;
 pub mod families;
+pub mod matrix;
 pub mod num;
 
 use std::sync::Arc;

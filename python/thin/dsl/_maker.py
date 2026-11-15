@@ -351,6 +351,82 @@ class Maker:
         o = _opts(0, (None, None), comment, tag, bytes, False, ordered)
         return self._family("ds_write", data, [addr, offset], o)
 
+    def mfma(
+        self,
+        form: str,
+        dst,
+        a,
+        b,
+        c=None,
+        *,
+        cbsz: int = 0,
+        abid: int = 0,
+        blgp: int = 0,
+        neg=None,
+        comment: str = "",
+        tag=(),
+        abl=(),
+    ):
+        """Makes a dense MFMA instruction (``c=None`` accumulates in-place into ``dst``)."""
+        b_ctx = _builder([dst, a, b, c])
+        c_op = None if c is None else operand(c)
+        opts = _mfma_opts(cbsz, abid, blgp, neg, comment, tag, abl)
+        result = _native.maker_mfma(
+            target().name,
+            b_ctx and b_ctx._n,
+            form,
+            operand(dst),
+            operand(a),
+            operand(b),
+            c_op,
+            opts,
+        )
+        return _out(b_ctx, result)
+
+    def smfmac(
+        self,
+        form: str,
+        dst,
+        a,
+        b,
+        idx,
+        *,
+        cbsz: int = 0,
+        abid: int = 0,
+        comment: str = "",
+        tag=(),
+        abl=(),
+    ):
+        """Makes a sparse 4:2 SMFMAC instruction updating ``dst`` in-place."""
+        b_ctx = _builder([dst, a, b, idx])
+        opts = _mfma_opts(cbsz, abid, 0, None, comment, tag, abl)
+        result = _native.maker_smfmac(
+            target().name,
+            b_ctx and b_ctx._n,
+            form,
+            operand(dst),
+            operand(a),
+            operand(b),
+            operand(idx),
+            opts,
+        )
+        return _out(b_ctx, result)
+
+
+def _mfma_opts(cbsz, abid, blgp, neg, comment, tag, abl) -> tuple:
+    if isinstance(cbsz, bool) or not isinstance(cbsz, int):
+        raise TypeError(f"cbsz={cbsz!r}: an int")
+    if isinstance(abid, bool) or not isinstance(abid, int):
+        raise TypeError(f"abid={abid!r}: an int")
+    if isinstance(blgp, bool) or not isinstance(blgp, int):
+        raise TypeError(f"blgp={blgp!r}: an int")
+    neg_list = None
+    if neg is not None:
+        if not isinstance(neg, (list, tuple)):
+            raise TypeError(f"neg={neg!r}: a 3-element tuple or list")
+        neg_list = [int(x) for x in neg]
+    return (cbsz, abid, blgp, neg_list, comment, _tag(tag), list(abl))
+
 
 def _stage(stage):
     if not stage:

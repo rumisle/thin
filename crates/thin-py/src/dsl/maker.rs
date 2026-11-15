@@ -35,14 +35,14 @@ pub(crate) fn regs_of(i: &thin_ir::Instr) -> Vec<Option<(i32, u32, u32)>> {
     i.ops().iter().map(one).collect()
 }
 
-fn out(t: &'static Target, f: Family) -> Out {
+pub(super) fn out(t: &'static Target, f: Family) -> Out {
     match f {
         Family::Made(Made::Instr(i)) => (Some(Ins::of(t, Arc::new(*i.clone()))), regs_of(&i), None),
         f => (None, Vec::new(), Some(DslMade { f })),
     }
 }
 
-fn values<'a>(b: &'a Option<PyRef<'_, DslBuilder>>) -> &'a [ValueRec] {
+pub(super) fn values<'a>(b: &'a Option<PyRef<'_, DslBuilder>>) -> &'a [ValueRec] {
     b.as_ref().map_or(&[], |b| &b.b.values)
 }
 

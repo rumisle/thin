@@ -3,6 +3,7 @@
 mod claims;
 mod emit;
 mod make;
+mod matrix;
 mod path;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -21,6 +22,7 @@ use crate::waits::Requests;
 
 pub use claims::ClaimReg;
 pub use make::Make;
+pub use matrix::AccIn;
 pub use path::{State, StateOp};
 
 /// A row of the stream: an instruction, its identity and its location.

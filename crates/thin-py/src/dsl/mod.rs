@@ -9,6 +9,7 @@ mod convert;
 mod kernel;
 mod lds;
 mod maker;
+mod matrix;
 mod stmts;
 mod trees;
 mod typed;
@@ -29,6 +30,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     trees::register(m)?;
     typed::register(m)?;
     maker::register(m)?;
+    matrix::register(m)?;
     lds::register(m)?;
     stmts::register(m)?;
     args::register(m)?;
