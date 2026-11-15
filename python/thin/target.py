@@ -21,6 +21,7 @@ __all__ = [
     "Field",
     "Flags",
     "Form",
+    "MatrixForm",
     "Phys",
     "Slot",
     "Target",
@@ -153,6 +154,39 @@ class Form:
         return f"Desc({self.name})"
 
 
+class MatrixForm:
+    """A hardware matrix-multiply-accumulate instruction's shape and operand layout."""
+
+    __slots__ = (
+        "a",
+        "b",
+        "blgp",
+        "blocks",
+        "cbsz_abid",
+        "d",
+        "dwords",
+        "k",
+        "m",
+        "mnemonic",
+        "n",
+        "passes",
+        "provisional",
+        "sparse",
+        "wave",
+    )
+
+    def __init__(self, mnemonic: str, row):
+        a, b, d, dims, flags, dw = row
+        self.mnemonic = mnemonic
+        self.a, self.b, self.d = a, b, d
+        self.m, self.n, self.k, self.blocks, self.wave, self.passes = dims
+        self.sparse, self.cbsz_abid, self.blgp, self.provisional = flags
+        self.dwords = MappingProxyType({"a": dw[0], "b": dw[1], "c": dw[2], "d": dw[3]})
+
+    def __repr__(self) -> str:
+        return f"MatrixForm({self.mnemonic}, {self.m}x{self.n}x{self.k})"
+
+
 class Target:
     """One target's view: its record, its forms and its queries."""
 
@@ -180,6 +214,11 @@ class Target:
     def allocated_vgprs(self, vgpr: int, agpr: int) -> int:
         """The vector registers allocated for (vgpr, agpr)."""
         return _native.allocated_vgprs(self.name, vgpr, agpr)
+
+    def matrix_form(self, mnemonic: str) -> MatrixForm | None:
+        """The matrix form of a mnemonic, or None if not modelled."""
+        row = _native.target_matrix_form(self.name, mnemonic)
+        return None if row is None else MatrixForm(mnemonic, row)
 
     def spell(self, op: str) -> str:
         """The mnemonic of a dotted op; ValueError when the target has none."""

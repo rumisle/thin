@@ -476,6 +476,11 @@ impl Target {
         let granule = self.file('v').map_or(1, |f| f.granule.max(1));
         total.div_ceil(granule) * granule
     }
+
+    /// The matrix form of a mnemonic, if modelled on this target.
+    pub fn matrix_form(&self, mnemonic: &str) -> Option<crate::MatrixForm> {
+        self.def.hooks.matrix_form(mnemonic)
+    }
 }
 
 fn canon_in(spellings: &[(&str, &str)], mnemonic: &str) -> String {
@@ -525,6 +530,36 @@ fn check_waits(def: &Definition) -> Result<(), Error> {
                 "counter {}'s field {} is no wait instruction's",
                 counter.name, counter.field
             ));
+        }
+    }
+    for form in &def.forms {
+        if let Some(mf) = def.hooks.matrix_form(&form.name) {
+            if mf.wave != def.wave {
+                return fail(format!(
+                    "{}: matrix form wave {} != target wave {}",
+                    form.name, mf.wave, def.wave
+                ));
+            }
+            if form.slots.len() == 4 {
+                let want = [
+                    mf.dwords('d'),
+                    mf.dwords('a'),
+                    mf.dwords('b'),
+                    mf.dwords('c'),
+                ];
+                let got = [
+                    form.slots[0].dwords,
+                    form.slots[1].dwords,
+                    form.slots[2].dwords,
+                    form.slots[3].dwords,
+                ];
+                if got != want {
+                    return fail(format!(
+                        "{}: matrix form dwords {want:?} != ISA slots {got:?}",
+                        form.name
+                    ));
+                }
+            }
         }
     }
     Ok(())

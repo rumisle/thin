@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use super::facts::Facts;
 use super::POISON;
-use crate::tags::{Lane, Tag};
+use crate::tags::{AccState, Lane, Tables, Tag, ACC_MARK};
 use crate::{Base, Cause, EmuError, Operand};
 
 /// The most lanes a wave has.
@@ -91,6 +91,8 @@ pub struct Wave {
     pub a: Vec<u32>,
     /// Their tags.
     pub at: FileTags,
+    /// Per-register GEMM provenance accumulator entries (`a` then `v`).
+    pub acc: AccState,
     /// Scalar registers.
     pub s: Vec<u32>,
     /// EXEC.
@@ -176,6 +178,7 @@ impl Wave {
             vt: vec![None; nv],
             a: vec![POISON; na * w],
             at: vec![None; na],
+            acc: AccState::new(na + nv, w),
             s: vec![POISON; facts.ns],
             exec: facts.all_lanes(),
             vcc: if w == 64 {
@@ -222,6 +225,63 @@ impl Wave {
     /// The number of VGPRs.
     pub fn nv(&self) -> usize {
         self.vt.len()
+    }
+
+    /// The `AccState` entry index for `(file, reg)`: `a` at `0..na`, `v` at `na..na+nv`.
+    pub fn acc_index(&self, file: &str, reg: usize) -> Option<usize> {
+        match file {
+            "a" => (reg < self.at.len()).then_some(reg),
+            "v" => (reg < self.vt.len()).then_some(self.at.len() + reg),
+            _ => None,
+        }
+    }
+
+    /// Whether register `(file, reg)` currently carries `ACC_MARK` (`-1`).
+    pub fn is_acc_marked(&self, file: &str, reg: usize) -> bool {
+        self.vfile(file)
+            .and_then(|(_, ftags)| ftags.get(reg))
+            .and_then(|slot| slot.as_ref())
+            .is_some_and(|lanes| lanes.iter().any(|l| l.contains(&ACC_MARK)))
+    }
+
+    /// Materializes `ACC_MARK` in register `(file, reg)` into concrete `Record` tags.
+    pub fn materialize_reg(&mut self, tables: &mut Tables, file: &str, reg: usize) {
+        if !self.is_acc_marked(file, reg) {
+            return;
+        }
+        let Some(idx) = self.acc_index(file, reg) else {
+            return;
+        };
+        let lanes = self.acc.materialize(tables, idx);
+        let any = lanes.iter().any(|l| *l != [0; 4]);
+        if let Some((_, ftags)) = self.vfile_mut(file) {
+            if let Some(slot) = ftags.get_mut(reg) {
+                *slot = any.then(|| lanes.into_boxed_slice());
+            }
+        }
+    }
+
+    /// Materializes any `ACC_MARK` registers referenced by an operand.
+    pub fn materialize_operand(&mut self, tables: &mut Tables, op: &Operand) {
+        if let Base::Reg(f, r, n) = &op.base {
+            if f == "v" || f == "a" {
+                for d in 0..*n {
+                    self.materialize_reg(tables, f, (*r + d) as usize);
+                }
+            }
+        }
+    }
+
+    /// Materializes every marked register in `file` (`"v"` or `"a"`).
+    pub fn materialize_file(&mut self, tables: &mut Tables, file: &str) {
+        let len = match file {
+            "v" => self.vt.len(),
+            "a" => self.at.len(),
+            _ => 0,
+        };
+        for reg in 0..len {
+            self.materialize_reg(tables, file, reg);
+        }
     }
 
     fn vfile(&self, file: &str) -> Option<(&Vec<u32>, &FileTags)> {

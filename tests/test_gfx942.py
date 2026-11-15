@@ -842,3 +842,164 @@ def test_gfx942_mfma_broadcast_modifiers_and_smfmac_sparse():
             a_expanded[i, 4 * g + p1] = float(a_comp[0, i, 2 * g + 1])
     want_sp = a_expanded @ b_dense[0].astype(np.float32) + 10.0
     assert np.array_equal(got_sp, want_sp)
+
+
+def test_gfx942_target_matrix_form_model():
+    from thin.target import Flags, target
+
+    t = target("gfx942")
+    matrix_forms = [f for f in t.forms() if f.flags & Flags.MATRIX]
+    assert len(matrix_forms) == 46
+    for f in matrix_forms:
+        mf = t.matrix_form(f.mnemonic)
+        assert mf is not None
+        assert mf.wave == 64
+        assert mf.sparse == f.mnemonic.startswith("v_smfmac_")
+        assert mf.dwords == {
+            "a": f.slots[1].dwords,
+            "b": f.slots[2].dwords,
+            "c": f.slots[3].dwords,
+            "d": f.slots[0].dwords,
+        }
+
+    f16_32 = t.matrix_form("v_mfma_f32_32x32x8_f16")
+    assert (f16_32.m, f16_32.n, f16_32.k, f16_32.blocks, f16_32.passes) == (32, 32, 8, 1, 8)
+    assert (f16_32.a, f16_32.b, f16_32.d) == ("f16", "f16", "f32")
+    assert not f16_32.cbsz_abid and not f16_32.blgp and not f16_32.sparse
+    f16_2b = t.matrix_form("v_mfma_f32_32x32x4_2b_f16")
+    assert f16_2b.cbsz_abid and f16_2b.blgp
+    assert t.matrix_form("v_mfma_f32_16x16x4_f32").blgp
+
+    fp8_16 = t.matrix_form("v_mfma_f32_16x16x32_fp8_bf8")
+    assert (fp8_16.m, fp8_16.n, fp8_16.k, fp8_16.passes) == (16, 16, 32, 4)
+    assert (fp8_16.a, fp8_16.b, fp8_16.d) == ("e4m3fnuz", "e5m2fnuz", "f32")
+    assert not fp8_16.cbsz_abid and not fp8_16.blgp
+
+    sp = t.matrix_form("v_smfmac_f32_16x16x32_f16")
+    assert (sp.m, sp.n, sp.k, sp.passes, sp.sparse) == (16, 16, 32, 4, True)
+    assert sp.dwords == {"a": 2, "b": 4, "c": 1, "d": 4}
+    assert t.matrix_form("v_add_f32") is None
+
+
+def test_gfx942_gemm_provenance_checker_agpr_vgpr_and_faults():
+    from thin.emu import Cluster, Memory, gemm
+    from thin.target import targeting
+
+    # 1. Multi-K-block (K=64, two 16x16x32_fp8_bf8 steps):
+    # Step 0 accumulates in VGPRs v[80:83], transfers via v_accvgpr_write_b32 -> a[0:3] (resume),
+    # Step 1 accumulates into a[0:3], moves via v_accvgpr_mov_b32 -> a[4:7], reads & stores D.
+    asm_k64 = """\
+\ts_load_dwordx4 s[4:7], s[0:1], 0x0
+\ts_load_dwordx2 s[8:9], s[0:1], 0x10
+\ts_waitcnt lgkmcnt(0)
+\t// lane = (q * 16) + row_or_col: q = v0 >> 4, idx = v0 & 15
+\tv_and_b32 v1, 15, v0
+\tv_lshrrev_b32 v2, 4, v0
+\t// A[idx, q*8 .. q*8+7] at byte offset idx*64 + q*8
+\tv_lshlrev_b32 v3, 6, v1
+\tv_lshl_add_u32 v3, v2, 3, v3
+\t// B is rowmajor("B", ld_bytes=64, elem_bytes=1): col=idx, k=q*8..q*8+7 -> offset idx*64 + q*8
+\tglobal_load_dwordx2 v[16:17], v3, s[4:5]
+\tglobal_load_dwordx2 v[20:21], v3, s[6:7]
+\tglobal_load_dwordx2 v[24:25], v3, s[4:5] offset:32
+\tglobal_load_dwordx2 v[28:29], v3, s[6:7] offset:32
+\ts_waitcnt vmcnt(0)
+\tv_mfma_f32_16x16x32_fp8_bf8 v[80:83], v[16:17], v[20:21], 0
+\tv_accvgpr_write_b32 a0, v80
+\tv_accvgpr_write_b32 a1, v81
+\tv_accvgpr_write_b32 a2, v82
+\tv_accvgpr_write_b32 a3, v83
+\tv_mfma_f32_16x16x32_fp8_bf8 a[0:3], v[24:25], v[28:29], a[0:3]
+\tv_accvgpr_mov_b32 a4, a0
+\tv_accvgpr_mov_b32 a5, a1
+\tv_accvgpr_mov_b32 a6, a2
+\tv_accvgpr_mov_b32 a7, a3
+\t// D[row, col]: lane l has col = l & 15, row_base = (l >> 4) * 4; row stride = 16*4 = 64B
+\tv_lshlrev_b32 v4, 8, v2
+\tv_lshl_add_u32 v4, v1, 2, v4
+\tv_accvgpr_read_b32 v32, a4
+\tv_accvgpr_read_b32 v33, a5
+\tv_accvgpr_read_b32 v34, a6
+\tv_accvgpr_read_b32 v35, a7
+\tglobal_store_dword v4, v32, s[8:9] offset:0
+\tglobal_store_dword v4, v33, s[8:9] offset:64
+\tglobal_store_dword v4, v34, s[8:9] offset:128
+\tglobal_store_dword v4, v35, s[8:9] offset:192
+\ts_endpgm
+"""
+
+    def run_gemm_check(asm_text: str, *, k_total: int = 64, m_dim: int = 16, elem_b: int = 1):
+        mem = Memory()
+        ld_ab = k_total * elem_b
+        ld_d = m_dim * 4
+        buf_a = mem.alloc("A", m_dim * ld_ab)
+        buf_b = mem.alloc("B", m_dim * ld_ab)
+        buf_d = mem.alloc("D", m_dim * ld_d)
+        ka = mem.alloc("ka", 24, tagged=False)
+        ka.write(0, np.array([buf_a.base, buf_b.base, buf_d.base], dtype=np.uint64).tobytes())
+        prob = gemm.Problem(
+            {
+                "A": gemm.rowmajor("A", ld_ab, elem_bytes=elem_b),
+                "B": gemm.rowmajor("B", ld_ab, elem_bytes=elem_b),
+                "D": gemm.rowmajor_d(ld_d, elem_bytes=4),
+            },
+            K=k_total,
+            d_rows=np.arange(m_dim),
+            d_cols=np.arange(m_dim),
+            fail_fast=False,
+        )
+        hooks = gemm.GemmHooks(prob, mem)
+        with targeting("gfx942"):
+            Cluster(
+                asm_text,
+                {"wgsize": 64, "vgpr": 96, "agpr": 32, "user_sgprs": 2},
+                mem,
+                [ka],
+                grid=(1,),
+                hooks=hooks,
+            ).run()
+        return prob
+
+    prob_ok = run_gemm_check(asm_k64, k_total=64, m_dim=16, elem_b=1)
+    assert prob_ok.errors == []
+    assert len(prob_ok.stores) == 256
+
+    # 2. Fault detection: adding k-block 0 twice reports duplicate k-block accumulation.
+    asm_dup = asm_k64.replace(
+        "v_mfma_f32_16x16x32_fp8_bf8 a[0:3], v[24:25], v[28:29], a[0:3]",
+        "v_mfma_f32_16x16x32_fp8_bf8 a[0:3], v[16:17], v[20:21], a[0:3]",
+    )
+    prob_dup = run_gemm_check(asm_dup, k_total=64, m_dim=16, elem_b=1)
+    assert any("adds k-blocks [0] a second time" in e for e in prob_dup.errors)
+
+    # 3. 32x32x8_f16 (16 AGPR dwords, 2-byte elements, K=8) provenance check across all 1024 cells:
+    asm_32 = (
+        """\
+\ts_load_dwordx4 s[4:7], s[0:1], 0x0
+\ts_load_dwordx2 s[8:9], s[0:1], 0x10
+\ts_waitcnt lgkmcnt(0)
+\t// lane = q*32 + idx: q = v0 >> 5, idx = v0 & 31
+\tv_and_b32 v1, 31, v0
+\tv_lshrrev_b32 v2, 5, v0
+\t// A/B ld_bytes = 8 * 2 = 16; each lane reads 4 f16s = 8B at idx*16 + q*8
+\tv_lshlrev_b32 v3, 4, v1
+\tv_lshl_add_u32 v3, v2, 3, v3
+\tglobal_load_dwordx2 v[16:17], v3, s[4:5]
+\tglobal_load_dwordx2 v[20:21], v3, s[6:7]
+\ts_waitcnt vmcnt(0)
+\tv_mfma_f32_32x32x8_f16 a[0:15], v[16:17], v[20:21], 0
+\t// D ld_bytes = 32 * 4 = 128B.
+\t// Output layout: row = ((dw // 4) * 2 + q) * 4 + (dw % 4), col = idx.
+\tv_lshlrev_b32 v4, 9, v2
+\tv_lshl_add_u32 v4, v1, 2, v4
+"""
+        + "".join(
+            f"\tv_accvgpr_read_b32 v32, a{dw}\n"
+            f"\tglobal_store_dword v4, v32, s[8:9] offset:{((dw // 4) * 8 + (dw % 4)) * 128}\n"
+            for dw in range(16)
+        )
+        + "\ts_endpgm\n"
+    )
+    prob_32 = run_gemm_check(asm_32, k_total=8, m_dim=32, elem_b=2)
+    assert prob_32.errors == []
+    assert len(prob_32.stores) == 1024

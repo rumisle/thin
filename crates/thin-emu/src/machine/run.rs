@@ -840,16 +840,47 @@ fn semantics(
                 super::wmma::wmma(w, ins, form)?;
                 Ok(None)
             }
-            Some(_) => Err(limit(format!(
-                "{}: the GEMM checker has no matrix form of {} ",
-                ins.text, e.facts.name
-            ))),
+            Some(form) => {
+                super::mfma::check_matrix(e, w, ins, form)?;
+                Ok(None)
+            }
             None => Err(limit(format!(
                 "{}: matrix op values are not modelled on {} ",
                 ins.text, e.facts.name
             ))),
         };
     }
+
+    if canon == "v.accvgpr.mov.b32" && w.exec == w.all() && ins.operands.len() >= 2 {
+        if let (Base::Reg(df, dr, _), Base::Reg(sf, sr, _)) =
+            (&ins.operands[0].base, &ins.operands[1].base)
+        {
+            if df == "a" && sf == "a" && w.is_acc_marked("a", *sr as usize) {
+                let s = w.vread(&ins.operands[1], 0)?;
+                if let (Some(di), Some(si)) = (
+                    w.acc_index("a", *dr as usize),
+                    w.acc_index("a", *sr as usize),
+                ) {
+                    if di != si {
+                        let cloned = w.acc.entry(si).clone();
+                        *w.acc.entry(di) = cloned;
+                    }
+                    let marks = vec![[crate::tags::ACC_MARK; 4]; w.w];
+                    w.vwrite(&ins.operands[0], 0, &s.v, Some(&marks), w.all())?;
+                    return Ok(None);
+                }
+            }
+        }
+    }
+
+    if canon.starts_with("v.movrel") {
+        w.materialize_file(e.tables, "v");
+    } else if !canon.starts_with("s.") {
+        for op in &ins.operands {
+            w.materialize_operand(e.tables, op);
+        }
+    }
+
     let handled = if canon.starts_with("s.") {
         match alu::salu(w, ins, canon) {
             Some(r) => {
@@ -862,6 +893,26 @@ fn semantics(
         match alu::valu(e, w, ins, canon) {
             Some(r) => {
                 r?;
+                if canon == "v.accvgpr.write.b32" && w.exec == w.all() {
+                    if let Some(dst_op) = ins.operands.first() {
+                        if let Base::Reg(f, r, _) = &dst_op.base {
+                            if let Some(acc_idx) = w.acc_index(f, *r as usize) {
+                                let dst_src = w.vread(dst_op, 0)?;
+                                let lanes = dst_src.tags(w.w);
+                                if lanes.iter().flatten().any(|&t| crate::tags::is_record(t)) {
+                                    let resumed = w
+                                        .acc
+                                        .resume(e.tables, acc_idx, lanes, &ins.text)
+                                        .map_err(alu::tag_error)?;
+                                    if resumed {
+                                        let marks = vec![[crate::tags::ACC_MARK; 4]; w.w];
+                                        w.vwrite(dst_op, 0, &dst_src.v, Some(&marks), w.all())?;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 true
             }
             None => false,

@@ -4,9 +4,11 @@
 
 use thin_target::{Elem, MatrixForm};
 
-use super::alu::{int_field, list_at};
+use super::alu::{int_field, list_at, tag_error};
 use super::numbers::{self as num, f16_value, f32_of, Small};
 use super::wave::{Wave, MAX_W};
+use super::Exec;
+use crate::tags::{self, is_record, MatrixOp, MatrixOperand, OperandFormat, Tag, ACC_MARK};
 use crate::{Base, Cause, EmuError, Ins};
 
 /// Largest dword count of any MFMA operand (`v_mfma_*_32x32x*_2b_*` uses 32).
@@ -537,6 +539,260 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
     let full_mask = w.all();
     for d in 0..d_dwords {
         w.vwrite(dst, d, &out[d as usize], None, full_mask)?;
+    }
+    Ok(())
+}
+
+/// Checks one dense single-block 32-bit-accumulating matrix op (`wave64` MFMA or
+/// `wave32` WMMA) against the active GEMM provenance checker (`!e.checker.products()`).
+pub fn check_matrix(
+    e: &mut Exec<'_>,
+    w: &mut Wave,
+    ins: &Ins,
+    form: &MatrixForm,
+) -> Result<(), EmuError> {
+    if w.w != form.wave as usize {
+        return Err(limit(format!(
+            "{}: a matrix form of {} lanes on a {}-lane wave",
+            ins.text, form.wave, w.w
+        )));
+    }
+    if form.sparse
+        || form.blocks != 1
+        || form.m != form.n
+        || form.d.bits() != 32
+        || form.a.bits() < 8
+        || form.b.bits() < 8
+    {
+        return Err(limit(format!(
+            "{}: the GEMM checker does not support this matrix form",
+            ins.text
+        )));
+    }
+    if int_field(ins, "cbsz", 0) != 0
+        || int_field(ins, "abid", 0) != 0
+        || int_field(ins, "blgp", 0) != 0
+        || ins.field("clamp").is_some()
+        || ins.field("neg").is_some()
+        || (0..3).any(|i| list_at(ins, "neg_lo", i, 0) != 0 || list_at(ins, "neg_hi", i, 0) != 0)
+    {
+        return Err(limit(format!(
+            "{}: the GEMM checker does not support broadcast/neg/clamp modifiers",
+            ins.text
+        )));
+    }
+
+    let wave = w.w;
+    let r = form.m as usize;
+    let k = form.k as usize;
+    let g = wave / r;
+    let elems = k / g;
+    let d_dwords = form.dwords('d') as usize;
+
+    let hwk: Vec<Vec<i64>> = (0..g)
+        .map(|q| (0..elems).map(|p| (q * elems + p) as i64).collect())
+        .collect();
+    let mut d_map = vec![vec![(0usize, 0usize); wave]; d_dwords];
+    for i in 0..r {
+        for j in 0..r {
+            let (dw, lane) = if wave == 64 {
+                output_loc(r, r, i, j, 0, 32)
+            } else {
+                (i % 8, j + 16 * (i / 8))
+            };
+            d_map[dw][lane] = (i, j);
+        }
+    }
+    let tag_form = tags::MatrixForm {
+        w: wave,
+        r,
+        k_hw: form.k as i64,
+        d_map,
+    };
+    let fmt_a = OperandFormat {
+        name: form.a.name().to_owned(),
+        bytes: (form.dwords('a') * 4) as usize,
+        elem_bytes: (form.a.bits() / 8) as usize,
+        hwk: hwk.clone(),
+    };
+    let fmt_b = OperandFormat {
+        name: form.b.name().to_owned(),
+        bytes: (form.dwords('b') * 4) as usize,
+        elem_bytes: (form.b.bits() / 8) as usize,
+        hwk,
+    };
+
+    // Materialize `ACC_MARK` on `src0`/`src1` if a prior GEMM accumulator is fed directly.
+    if let Some(op0) = ins.operands.get(1) {
+        w.materialize_operand(e.tables, op0);
+    }
+    if let Some(op1) = ins.operands.get(2) {
+        w.materialize_operand(e.tables, op1);
+    }
+
+    let read_byte_tags = |w: &Wave, k_op: usize, n_dw: u32| -> Result<Vec<Vec<Tag>>, EmuError> {
+        let op = ins
+            .operands
+            .get(k_op)
+            .ok_or_else(|| limit(format!("{}: operand {k_op} missing", ins.text)))?;
+        match &op.base {
+            Base::Reg(f, _, _) if f == "v" || f == "a" => {}
+            _ => {
+                return Err(limit(format!(
+                    "{}: operand {k_op} (`{}`) is not a matrix register operand",
+                    ins.text,
+                    op.spelling()
+                )))
+            }
+        }
+        let mut out = vec![Vec::with_capacity((n_dw * 4) as usize); wave];
+        for d in 0..n_dw {
+            let s = w.vread(op, d)?;
+            for (l, dst_lane) in out.iter_mut().enumerate() {
+                dst_lane.extend_from_slice(&s.tag(l));
+            }
+        }
+        Ok(out)
+    };
+
+    let s0_tags = read_byte_tags(w, 1, form.dwords('a'))?;
+    let s1_tags = read_byte_tags(w, 2, form.dwords('b'))?;
+
+    let dst = ins
+        .operands
+        .first()
+        .ok_or_else(|| limit(format!("{}: missing destination", ins.text)))?;
+    let (dst_file, dst_first) = match &dst.base {
+        Base::Reg(f, first, _) if f == "v" || f == "a" => (f.clone(), *first),
+        _ => {
+            return Err(limit(format!(
+                "{}: invalid destination `{}`",
+                ins.text,
+                dst.spelling()
+            )))
+        }
+    };
+    // Ensure dst range is within bounds, then get its base AccState entry.
+    if (dst_first as usize) + d_dwords
+        > if dst_file == "a" {
+            w.at.len()
+        } else {
+            w.vt.len()
+        }
+    {
+        return Err(limit(format!(
+            "{}: destination `{}` exceeds register file",
+            ins.text,
+            dst.spelling()
+        )));
+    }
+    let dst_entry = w.acc_index(&dst_file, dst_first as usize).ok_or_else(|| {
+        limit(format!(
+            "{}: invalid destination `{}`",
+            ins.text,
+            dst.spelling()
+        ))
+    })?;
+
+    let src2 = ins
+        .operands
+        .get(3)
+        .ok_or_else(|| limit(format!("{}: operand 3 missing", ins.text)))?;
+    let mut c_zero = false;
+    let mut marked = vec![false; d_dwords];
+    match &src2.base {
+        Base::Literal(0, _) => {
+            c_zero = true;
+        }
+        Base::Literal(_, _) => {
+            return Err(limit(format!(
+                "{}: non-zero literal C (`{}`) is not supported by the GEMM checker",
+                ins.text,
+                src2.spelling()
+            )));
+        }
+        Base::Reg(c_file, c_first, _) if c_file == "v" || c_file == "a" => {
+            if wave == 64 && c_file != &dst_file {
+                return Err(limit(format!(
+                    "{}: accumulator src2 (`{}`) must match destination register file `{dst_file}`",
+                    ins.text,
+                    src2.spelling()
+                )));
+            }
+            for (idx, m_flag) in marked.iter_mut().enumerate() {
+                let c_reg = (*c_first as usize) + idx;
+                let Some(c_acc_idx) = w.acc_index(c_file, c_reg) else {
+                    return Err(limit(format!(
+                        "{}: accumulator `{}` exceeds register file",
+                        ins.text,
+                        src2.spelling()
+                    )));
+                };
+                if w.is_acc_marked(c_file, c_reg) {
+                    if c_acc_idx != dst_entry + idx {
+                        let cloned = w.acc.entry(c_acc_idx).clone();
+                        *w.acc.entry(dst_entry + idx) = cloned;
+                    }
+                    *m_flag = true;
+                } else {
+                    let s = w.vread(src2, idx as u32)?;
+                    let lanes = s.tags(wave);
+                    if lanes.iter().flatten().any(|&t| t > 0) {
+                        return Err(EmuError {
+                            cause: Some(Cause::Fault),
+                            message: format!(
+                                "{}: accumulator C (`{}`) holds raw memory bytes",
+                                ins.text,
+                                src2.spelling()
+                            ),
+                        });
+                    }
+                    if lanes.iter().flatten().any(|&t| is_record(t)) {
+                        *m_flag = w
+                            .acc
+                            .resume(e.tables, dst_entry + idx, lanes, &ins.text)
+                            .map_err(tag_error)?;
+                    }
+                }
+            }
+        }
+        _ => {
+            return Err(limit(format!(
+                "{}: invalid accumulator operand `{}`",
+                ins.text,
+                src2.spelling()
+            )));
+        }
+    }
+
+    let dst_name = dst.spelling();
+    let mop = MatrixOp {
+        form: &tag_form,
+        text: &ins.text,
+        dst: &dst_name,
+        entry: dst_entry,
+        marked,
+        c_zero,
+        src: [
+            MatrixOperand {
+                tags: &s0_tags,
+                format: &fmt_a,
+            },
+            MatrixOperand {
+                tags: &s1_tags,
+                format: &fmt_b,
+            },
+        ],
+    };
+    e.checker
+        .matrix(e.tables, &mop, &mut w.acc)
+        .map_err(tag_error)?;
+
+    let zeros = [0u32; MAX_W];
+    let mark_lanes = [[ACC_MARK; 4]; MAX_W];
+    let full_mask = w.all();
+    for d in 0..d_dwords as u32 {
+        w.vwrite(dst, d, &zeros, Some(&mark_lanes[..wave]), full_mask)?;
     }
     Ok(())
 }
