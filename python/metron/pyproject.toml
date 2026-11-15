@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metron"
+version = "0.1.0"
+description = "Races of GPU kernels on the device: judging, shuffled rounds, statistics and verdicts"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "FSL-1.1-ALv2"
+authors = [{ name = "rumisle" }]
+# Not published yet: PyPI refuses any upload carrying this classifier, so
+# metron cannot be released by accident. Remove it to publish.
+classifiers = [
+    "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# The harness times on the device through torch; users bring their own
+# build (often a ROCm one), so it is never pinned.
+torch = ["torch>=2.3"]
+# The compiler adapter (metron.thin) and the own-kernel maker need thin.
+thin = ["thin>=0.1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/metron"]
+
+# In this repository's uv workspace, `thin` is the root project.
+[tool.uv.sources]
+thin = { workspace = true }

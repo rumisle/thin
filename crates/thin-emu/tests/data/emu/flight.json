@@ -1,0 +1,166 @@
+{
+ "notation": "Workgroup 0 (the producer, one wave of 32 lanes) runs to its end, then workgroup 1 (the consumer), as the single-machine runner does. Buffers d (data), f (flags), o (output) start at 0. Producer ops: data (each lane stores 7 at d[4 l], wave scope), wait (the store counter's wait, count 0), flag_atomic (lane 0..31 atomically add 1 at f[0], returning nothing), flag_store (store 1 at f[0] at agent scope), flag_plain (the same at wave scope), flag2_store (store 1 at f[4] at agent scope), value8 (later data stores 8), nop. Consumer ops: consume (load f[0] at agent scope, wait, load d[4 l] at wave scope, wait, store it at o[4 l]), consume_retry (as consume, but reload d until it reads 7), consume2 (as consume with f[4]). Every wave waits for all counters at its end. consumer_stored: the distinct values in o's first 32 dwords; fresh: the value the last data store wrote (anything else was served stale); events: the stale reads recorded.",
+ "cases": [
+  {
+   "name": "data, then an atomic flag, no wait",
+   "producer": [
+    "data",
+    "flag_atomic"
+   ],
+   "consumer": [
+    "consume"
+   ],
+   "consumer_stored": [
+    0
+   ],
+   "fresh": 7,
+   "events": 1
+  },
+  {
+   "name": "data, wait, atomic flag",
+   "producer": [
+    "data",
+    "wait",
+    "flag_atomic"
+   ],
+   "consumer": [
+    "consume"
+   ],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 7,
+   "events": 0
+  },
+  {
+   "name": "data, then an agent-scope store flag, no wait",
+   "producer": [
+    "data",
+    "flag_store"
+   ],
+   "consumer": [
+    "consume"
+   ],
+   "consumer_stored": [
+    0
+   ],
+   "fresh": 7,
+   "events": 1
+  },
+  {
+   "name": "data, wait, agent-scope store flag",
+   "producer": [
+    "data",
+    "wait",
+    "flag_store"
+   ],
+   "consumer": [
+    "consume"
+   ],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 7,
+   "events": 0
+  },
+  {
+   "name": "a wave-scope flag publishes nothing",
+   "producer": [
+    "data",
+    "flag_plain"
+   ],
+   "consumer": [
+    "consume"
+   ],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 7,
+   "events": 0
+  },
+  {
+   "name": "a reader that retries until it sees the data",
+   "producer": [
+    "data",
+    "flag_atomic"
+   ],
+   "consumer": [
+    "consume_retry"
+   ],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 7,
+   "events": 1
+  },
+  {
+   "name": "an idempotent rewrite serves nothing",
+   "producer": [
+    "data",
+    "wait",
+    "flag_atomic",
+    "data",
+    "flag2_store"
+   ],
+   "consumer": [
+    "consume2"
+   ],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 7,
+   "events": 0
+  },
+  {
+   "name": "a differing rewrite is served stale",
+   "producer": [
+    "data",
+    "wait",
+    "flag_atomic",
+    "value8",
+    "data",
+    "flag2_store"
+   ],
+   "consumer": [
+    "consume2"
+   ],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 8,
+   "events": 1
+  },
+  {
+   "name": "an idempotent rewrite over an unwaited write serves that one",
+   "producer": [
+    "data",
+    "nop",
+    "data",
+    "flag_atomic"
+   ],
+   "consumer": [
+    "consume"
+   ],
+   "consumer_stored": [
+    0
+   ],
+   "fresh": 7,
+   "events": 1
+  },
+  {
+   "name": "the producer's own workgroup reads fresh",
+   "producer": [
+    "data",
+    "flag_atomic",
+    "consume"
+   ],
+   "consumer": [],
+   "consumer_stored": [
+    7
+   ],
+   "fresh": 7,
+   "events": 0,
+   "grid": 1
+  }
+ ]
+}

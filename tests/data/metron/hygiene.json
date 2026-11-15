@@ -1,0 +1,171 @@
+{
+ "notation": "Native hygiene decisions on constants, sampled-slice perturbations and threshold sizes.",
+ "cases": [
+  {
+   "name": "zeros_f32",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     65536
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern zeros_f32, shape [65536].",
+   "flagged": true
+  },
+  {
+   "name": "ones_f32",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     65536
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern ones_f32, shape [65536].",
+   "flagged": true
+  },
+  {
+   "name": "arange_f32",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     65536
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern arange_f32, shape [65536].",
+   "flagged": false
+  },
+  {
+   "name": "small_zeros",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     16
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern small_zeros, shape [16].",
+   "flagged": false
+  },
+  {
+   "name": "just_under",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     16383
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern just_under, shape [16383].",
+   "flagged": false
+  },
+  {
+   "name": "just_at",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     16384
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern just_at, shape [16384].",
+   "flagged": true
+  },
+  {
+   "name": "one_off_outside_slices",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     65536
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern one_off_outside_slices, shape [65536].",
+   "flagged": true
+  },
+  {
+   "name": "one_off_in_last_slice",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     65536
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern one_off_in_last_slice, shape [65536].",
+   "flagged": false
+  },
+  {
+   "name": "one_off_first",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     65536
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern one_off_first, shape [65536].",
+   "flagged": false
+  },
+  {
+   "name": "bf16_sevens",
+   "tensor": {
+    "dtype": "bfloat16",
+    "shape": [
+     32768
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated bfloat16 pattern bf16_sevens, shape [32768].",
+   "flagged": true
+  },
+  {
+   "name": "u8_pattern",
+   "tensor": {
+    "dtype": "uint8",
+    "shape": [
+     131072
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated uint8 pattern u8_pattern, shape [131072].",
+   "flagged": false
+  },
+  {
+   "name": "u8_const",
+   "tensor": {
+    "dtype": "uint8",
+    "shape": [
+     131072
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated uint8 pattern u8_const, shape [131072].",
+   "flagged": true
+  },
+  {
+   "name": "matrix_const",
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     256,
+     256
+    ],
+    "device": "cpu"
+   },
+   "contents": "Generated float32 pattern matrix_const, shape [256, 256].",
+   "flagged": true
+  }
+ ],
+ "flags": [
+  "constant:zeros_f32",
+  "constant:ones_f32",
+  "constant:just_at",
+  "constant:one_off_outside_slices",
+  "constant:bf16_sevens",
+  "constant:u8_const",
+  "constant:matrix_const"
+ ]
+}

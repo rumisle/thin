@@ -1,0 +1,1840 @@
+{
+ "target": "gfx1201",
+ "transfer": [
+  {
+   "name": "interval transfer 00: s_mov_b32",
+   "op": "s_mov_b32",
+   "operands": [
+    [
+     11,
+     27
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 11,
+    "hi": 27,
+    "wrap": null,
+    "why": "",
+    "at": null
+   }
+  },
+  {
+   "name": "interval transfer 01: v_mov_b32",
+   "op": "v_mov_b32",
+   "operands": [
+    [
+     0,
+     4294967294
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 4294967294,
+    "wrap": null,
+    "why": "",
+    "at": null
+   }
+  },
+  {
+   "name": "interval transfer 02: v_readfirstlane_b32",
+   "op": "v_readfirstlane_b32",
+   "operands": [
+    [
+     19,
+     19
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 19,
+    "hi": 19,
+    "wrap": null,
+    "why": "",
+    "at": null
+   }
+  },
+  {
+   "name": "interval transfer 03: s_cselect_b32",
+   "op": "s_cselect_b32",
+   "operands": [
+    [
+     7,
+     7
+    ],
+    [
+     3,
+     3
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 3,
+    "hi": 7,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 04: v_cndmask_b32",
+   "op": "v_cndmask_b32",
+   "operands": [
+    [
+     6,
+     22
+    ],
+    [
+     -9,
+     2
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": -9,
+    "hi": 22,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 05: s_add_co_u32",
+   "op": "s_add_co_u32",
+   "operands": [
+    [
+     3,
+     73
+    ],
+    [
+     9,
+     9
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 12,
+    "hi": 82,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 06: v_add_nc_u32",
+   "op": "v_add_nc_u32",
+   "operands": [
+    [
+     0,
+     4294967294
+    ],
+    [
+     2,
+     2
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 2,
+    "hi": 4294967296,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 07: v_add_nc_u32",
+   "op": "v_add_nc_u32",
+   "operands": [
+    [
+     -1073741824,
+     -3
+    ],
+    [
+     1073741824,
+     1073741824
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 1073741821,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 08: v_add_nc_u32",
+   "op": "v_add_nc_u32",
+   "operands": [
+    [
+     0,
+     4294967295
+    ],
+    [
+     1,
+     4294967295
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 0,
+    "hi": 4294967295,
+    "wrap": 6,
+    "why": "computes [0, 4294967295] + [1, 4294967295]: 1 .. 8589934590, every u32 value",
+    "at": null
+   }
+  },
+  {
+   "name": "interval transfer 09: s_sub_co_u32",
+   "op": "s_sub_co_u32",
+   "operands": [
+    [
+     17,
+     41
+    ],
+    [
+     2,
+     29
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": -12,
+    "hi": 39,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 10: v_sub_nc_u32",
+   "op": "v_sub_nc_u32",
+   "operands": [
+    [
+     0,
+     31
+    ],
+    [
+     32,
+     32
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": -32,
+    "hi": -1,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 11: v_subrev_nc_u32",
+   "op": "v_subrev_nc_u32",
+   "operands": [
+    [
+     3,
+     5
+    ],
+    [
+     20,
+     20
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 15,
+    "hi": 17,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 12: s_lshl_b32",
+   "op": "s_lshl_b32",
+   "operands": [
+    [
+     1,
+     63
+    ],
+    [
+     3,
+     3
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 8,
+    "hi": 504,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 13: v_lshlrev_b32",
+   "op": "v_lshlrev_b32",
+   "operands": [
+    [
+     3,
+     3
+    ],
+    [
+     1,
+     63
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 8,
+    "hi": 504,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 14: v_lshlrev_b32",
+   "op": "v_lshlrev_b32",
+   "operands": [
+    [
+     1,
+     3
+    ],
+    [
+     2,
+     127
+    ]
+   ],
+   "k": 6,
+   "result": null
+  },
+  {
+   "name": "interval transfer 15: v_lshlrev_b32",
+   "op": "v_lshlrev_b32",
+   "operands": [
+    [
+     33,
+     33
+    ],
+    [
+     0,
+     127
+    ]
+   ],
+   "k": 4,
+   "result": null
+  },
+  {
+   "name": "interval transfer 16: v_lshlrev_b32",
+   "op": "v_lshlrev_b32",
+   "operands": [
+    [
+     30,
+     30
+    ],
+    [
+     1,
+     5
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 4294967295,
+    "wrap": 5,
+    "why": "computes [1, 5] << 30: 1073741824 .. 5368709120, every u32 value",
+    "at": null
+   }
+  },
+  {
+   "name": "interval transfer 17: s_lshl2_add_u32",
+   "op": "s_lshl2_add_u32",
+   "operands": [
+    [
+     2,
+     21
+    ],
+    [
+     73,
+     73
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 81,
+    "hi": 157,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 18: v_lshl_add_u32",
+   "op": "v_lshl_add_u32",
+   "operands": [
+    [
+     1,
+     13
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     11,
+     11
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 19,
+    "hi": 115,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 19: v_add_lshl_u32",
+   "op": "v_add_lshl_u32",
+   "operands": [
+    [
+     2,
+     17
+    ],
+    [
+     2,
+     2
+    ],
+    [
+     4,
+     4
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 64,
+    "hi": 304,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 20: s_mul_i32",
+   "op": "s_mul_i32",
+   "operands": [
+    [
+     -7,
+     2
+    ],
+    [
+     3,
+     8
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": -56,
+    "hi": 16,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 21: v_mul_lo_u32",
+   "op": "v_mul_lo_u32",
+   "operands": [
+    [
+     0,
+     2097152
+    ],
+    [
+     0,
+     4096
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 0,
+    "hi": 4294967295,
+    "wrap": 4,
+    "why": "computes [0, 2097152] * [0, 4096]: 0 .. 8589934592, every u32 value",
+    "at": null
+   }
+  },
+  {
+   "name": "interval transfer 22: v_mul_u32_u24",
+   "op": "v_mul_u32_u24",
+   "operands": [
+    [
+     0,
+     71
+    ],
+    [
+     0,
+     513
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 36423,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 23: v_mad_u32_u24",
+   "op": "v_mad_u32_u24",
+   "operands": [
+    [
+     0,
+     71
+    ],
+    [
+     0,
+     513
+    ],
+    [
+     9,
+     9
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 9,
+    "hi": 36432,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 24: v_mul_u32_u24",
+   "op": "v_mul_u32_u24",
+   "operands": [
+    [
+     -2,
+     1
+    ],
+    [
+     7,
+     7
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 0,
+    "hi": 4294967295,
+    "wrap": 4,
+    "why": "reads [-2, 1], across a multiple of 2^32 (its u32 value lost)",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 25: s_lshr_b32",
+   "op": "s_lshr_b32",
+   "operands": [
+    [
+     0,
+     4095
+    ],
+    [
+     1,
+     4
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 2047,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 26: v_lshrrev_b32",
+   "op": "v_lshrrev_b32",
+   "operands": [
+    [
+     1,
+     3
+    ],
+    [
+     24,
+     4000
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 3,
+    "hi": 2000,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 27: v_lshrrev_b32",
+   "op": "v_lshrrev_b32",
+   "operands": [
+    [
+     0,
+     3
+    ],
+    [
+     -3,
+     4000
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 0,
+    "hi": 4294967295,
+    "wrap": 4,
+    "why": "reads [-3, 4000], across a multiple of 2^32 (its u32 value lost)",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 28: s_and_b32",
+   "op": "s_and_b32",
+   "operands": [
+    [
+     0,
+     2047
+    ],
+    null
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 2047,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 29: v_and_b32",
+   "op": "v_and_b32",
+   "operands": [
+    [
+     15,
+     15
+    ],
+    [
+     0,
+     2047
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 0,
+    "hi": 15,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 30: v_and_b32",
+   "op": "v_and_b32",
+   "operands": [
+    null,
+    null
+   ],
+   "k": 4,
+   "result": null
+  },
+  {
+   "name": "interval transfer 31: s_or_b32",
+   "op": "s_or_b32",
+   "operands": [
+    [
+     0,
+     9
+    ],
+    [
+     0,
+     34
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 63,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 32: v_xor_b32",
+   "op": "v_xor_b32",
+   "operands": [
+    [
+     0,
+     15
+    ],
+    [
+     0,
+     6
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 0,
+    "hi": 15,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 33: v_lshl_or_b32",
+   "op": "v_lshl_or_b32",
+   "operands": [
+    [
+     0,
+     5
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     0,
+     31
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 0,
+    "hi": 63,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 34: v_lshl_or_b32",
+   "op": "v_lshl_or_b32",
+   "operands": [
+    [
+     0,
+     0
+    ],
+    [
+     36,
+     36
+    ],
+    [
+     0,
+     9
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 15,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 35: v_lshl_or_b32",
+   "op": "v_lshl_or_b32",
+   "operands": [
+    [
+     1,
+     1
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     0,
+     1
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 0,
+    "hi": 2147483647,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 36: s_min_u32",
+   "op": "s_min_u32",
+   "operands": [
+    [
+     2,
+     201
+    ],
+    [
+     7,
+     93
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 2,
+    "hi": 93,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 37: v_max_u32",
+   "op": "v_max_u32",
+   "operands": [
+    [
+     2,
+     201
+    ],
+    [
+     7,
+     93
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 7,
+    "hi": 201,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 38: v_bfe_u32",
+   "op": "v_bfe_u32",
+   "operands": [
+    [
+     22136,
+     22136
+    ],
+    [
+     3,
+     3
+    ],
+    [
+     6,
+     6
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 15,
+    "hi": 15,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 39: v_bfe_u32",
+   "op": "v_bfe_u32",
+   "operands": [
+    [
+     0,
+     2000
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     4,
+     4
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 0,
+    "hi": 15,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 40: v_bfe_u32",
+   "op": "v_bfe_u32",
+   "operands": [
+    [
+     0,
+     2000
+    ],
+    null,
+    [
+     0,
+     6
+    ]
+   ],
+   "k": 5,
+   "result": {
+    "lo": 0,
+    "hi": 63,
+    "wrap": null,
+    "why": "",
+    "at": 5
+   }
+  },
+  {
+   "name": "interval transfer 41: s_bfe_u32",
+   "op": "s_bfe_u32",
+   "operands": [
+    [
+     44043,
+     44043
+    ],
+    [
+     524294,
+     524294
+    ]
+   ],
+   "k": 6,
+   "result": {
+    "lo": 176,
+    "hi": 176,
+    "wrap": null,
+    "why": "",
+    "at": 6
+   }
+  },
+  {
+   "name": "interval transfer 42: s_bfe_u32",
+   "op": "s_bfe_u32",
+   "operands": [
+    [
+     0,
+     2000
+    ],
+    [
+     327690,
+     327690
+    ]
+   ],
+   "k": 4,
+   "result": {
+    "lo": 0,
+    "hi": 31,
+    "wrap": null,
+    "why": "",
+    "at": 4
+   }
+  },
+  {
+   "name": "interval transfer 43: v_add_f32",
+   "op": "v_add_f32",
+   "operands": [
+    [
+     0,
+     2
+    ],
+    [
+     0,
+     3
+    ]
+   ],
+   "k": 5,
+   "result": null
+  },
+  {
+   "name": "interval transfer 44: v_add_nc_u32",
+   "op": "v_add_nc_u32",
+   "operands": [
+    [
+     2,
+     7
+    ],
+    null
+   ],
+   "k": 6,
+   "result": null
+  }
+ ],
+ "notation": "independent interval vectors and launch facts; all transfer/report/error results are native",
+ "cases": [
+  {
+   "name": "grid bounded vector address proves both DS operations",
+   "input": [
+    "s_load_b128 s[12:15], s[0:1], 0",
+    "s_load_b32 s9, s[0:1], 20",
+    "v_lshl_add_u32 v6, ttmp9, 7, v0",
+    "s_wait_kmcnt 0",
+    "v_cmp_gt_u32 vcc_lo, s9, v6",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_lshlrev_b32 v7, 2, v6",
+    "ds_load_b32 v8, v7",
+    "s_wait_dscnt 0",
+    "ds_store_b32 v7, v8",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      8,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      20,
+      4,
+      true,
+      1,
+      300000,
+      false
+     ]
+    ],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [
+     2048
+    ],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 2,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "same vector address remains unproven without a grid bound",
+   "input": [
+    "s_load_b128 s[12:15], s[0:1], 0",
+    "s_load_b32 s9, s[0:1], 20",
+    "v_lshl_add_u32 v6, ttmp9, 7, v0",
+    "s_wait_kmcnt 0",
+    "v_cmp_gt_u32 vcc_lo, s9, v6",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_lshlrev_b32 v7, 2, v6",
+    "ds_load_b32 v8, v7",
+    "s_wait_dscnt 0",
+    "ds_store_b32 v7, v8",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      8,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      20,
+      4,
+      true,
+      1,
+      300000,
+      false
+     ]
+    ],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 0,
+    "unproven": 2,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "oversized grid makes the scaled address reject wrapping",
+   "input": [
+    "s_load_b128 s[12:15], s[0:1], 0",
+    "s_load_b32 s9, s[0:1], 20",
+    "v_lshl_add_u32 v6, ttmp9, 7, v0",
+    "s_wait_kmcnt 0",
+    "v_cmp_gt_u32 vcc_lo, s9, v6",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_lshlrev_b32 v7, 2, v6",
+    "ds_load_b32 v8, v7",
+    "s_wait_dscnt 0",
+    "ds_store_b32 v7, v8",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      8,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      20,
+      4,
+      true,
+      1,
+      300000,
+      false
+     ]
+    ],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [
+     33554432
+    ],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`ds_load_b32 v8, v7` (instruction 7): its address offset may wrap past 32 bits - `v_lshlrev_b32 v7, 2, v6` (instruction 6) computes [0, 4294967295] << 2: 0 .. 17179869180, every u32 value"
+  },
+  {
+   "name": "lane mask narrows addresses and restoration recovers entry facts",
+   "input": [
+    "v_cmp_gt_u32 vcc_lo, 96, v0",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_lshlrev_b32 v10, 1, v0",
+    "ds_load_b32 v11, v10",
+    "s_mov_b32 exec_lo, -1",
+    "s_wait_dscnt 0",
+    "ds_load_b32 v12, v10",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 2147483648,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 2,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "SGPR comparison mask narrows just like VCC",
+   "input": [
+    "v_cmp_gt_u32 s17, 96, v0",
+    "s_and_saveexec_b32 s18, s17",
+    "v_lshlrev_b32 v10, 1, v0",
+    "ds_load_b32 v11, v10",
+    "s_mov_b32 exec_lo, s18",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 2147483648,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "restoring EXEC before address construction loses narrowed bound",
+   "input": [
+    "v_cmp_gt_u32 vcc_lo, 96, v0",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "s_mov_b32 exec_lo, -1",
+    "v_lshlrev_b32 v10, 3, v0",
+    "ds_load_b32 v11, v10",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 2147483648,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`ds_load_b32 v11, v10` (instruction 4): its address offset may wrap past 32 bits - `v_lshlrev_b32 v10, 3, v0` (instruction 3) computes [0, 2147483647] << 3: 0 .. 17179869176, every u32 value"
+  },
+  {
+   "name": "scalar versus lane comparison constrains the scalar inside region",
+   "input": [
+    "s_load_b32 s19, s[0:1], 20",
+    "s_wait_kmcnt 0",
+    "v_cmp_gt_u32 vcc_lo, s19, v0",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_lshlrev_b32 v10, 4, v0",
+    "ds_load_b32 v11, v10",
+    "s_mov_b32 exec_lo, -1",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 2147483648,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`ds_load_b32 v11, v10` (instruction 5): its address offset may wrap past 32 bits - `v_lshlrev_b32 v10, 4, v0` (instruction 4) computes [0, 2147483647] << 4: 0 .. 34359738352, every u32 value"
+  },
+  {
+   "name": "signed upper comparison alone retains a possibly negative lower endpoint",
+   "input": [
+    "v_cmp_lt_i32 vcc_lo, v0, 96",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_lshlrev_b32 v10, 1, v0",
+    "ds_load_b32 v11, v10",
+    "s_mov_b32 exec_lo, -1",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 2147483648,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "declared scalar argument interval propagates through add and scale",
+   "input": [
+    "s_load_b32 s20, s[0:1], 20",
+    "s_wait_kmcnt 0",
+    "v_add_nc_u32 v13, s20, v0",
+    "v_lshlrev_b32 v14, 3, v13",
+    "ds_load_b32 v15, v14",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      8,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      20,
+      4,
+      true,
+      2,
+      500,
+      false
+     ]
+    ],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "subtract then re-add recovers a positive constant address",
+   "input": [
+    "v_sub_nc_u32 v16, 7, v0",
+    "v_add_nc_u32 v17, 300, v16",
+    "v_add_nc_u32 v17, v17, v0",
+    "ds_load_b32 v18, v17",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "small constant minus lane id crosses below zero",
+   "input": [
+    "v_sub_nc_u32 v19, 5, v0",
+    "ds_load_b32 v20, v19",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`ds_load_b32 v20, v19` (instruction 1): its address offset may be -122 .. 5, outside 0 .. 2^32 - 1 - computed by `v_sub_nc_u32 v19, 5, v0` (instruction 0)"
+  },
+  {
+   "name": "right shift does not erase earlier wrap provenance",
+   "input": [
+    "v_sub_nc_u32 v19, 5, v0",
+    "v_lshrrev_b32 v21, 2, v19",
+    "ds_load_b32 v20, v21",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`ds_load_b32 v20, v21` (instruction 2): its address offset may wrap past 32 bits - `v_lshrrev_b32 v21, 2, v19` (instruction 1) reads [-122, 5], across a multiple of 2^32 (its u32 value lost)"
+  },
+  {
+   "name": "unknown raw vector offset is reported rather than assumed",
+   "input": [
+    "ds_load_b32 v22, v23",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 0,
+    "unproven": 1,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "u24 multiplier rejects a scaled value beyond 24 bits",
+   "input": [
+    "v_lshlrev_b32 v24, 22, v0",
+    "v_mul_u32_u24 v25, v24, 5",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`v_mul_u32_u24 v25, v24, 5` (instruction 1): operand 1 may be up to 264241152, past 24 bits (the instruction multiplies their low 24 bits)"
+  },
+  {
+   "name": "u24 multiplier rejects an entirely unknown scalar operand",
+   "input": [
+    "s_load_b32 s21, s[0:1], 0",
+    "s_wait_kmcnt 0",
+    "v_mul_u32_u24 v25, s21, 5",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`v_mul_u32_u24 v25, s21, 5` (instruction 2): operand 1 has no known bound, so it may pass 24 bits (the instruction multiplies their low 24 bits)"
+  },
+  {
+   "name": "u24 product inside its operand bound can feed DS",
+   "input": [
+    "v_lshlrev_b32 v24, 9, v0",
+    "v_mul_u32_u24 v25, v24, 5",
+    "ds_load_b32 v26, v25",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 128,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "global memory address reports scalar and vector offset facts",
+   "input": [
+    "global_load_b32 v27, v0, s[28:29]",
+    "s_wait_loadcnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "explicit DS immediate contributes to the address byte range",
+   "input": [
+    "v_lshlrev_b32 v28, 2, v0",
+    "ds_load_b32 v29, v28 offset:65280",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "M0 arithmetic is followed alongside the explicit address",
+   "input": [
+    "s_mov_b32 m0, 512",
+    "s_add_co_u32 m0, m0, 12",
+    "v_lshlrev_b32 v30, 2, v0",
+    "ds_load_b32 v31, v30",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "comparison without a lane region does not narrow the later address",
+   "input": [
+    "v_cmp_gt_u32 vcc_lo, 96, v0",
+    "v_lshlrev_b32 v32, 3, v0",
+    "ds_load_b32 v33, v32",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 2147483648,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "error": "`ds_load_b32 v33, v32` (instruction 2): its address offset may wrap past 32 bits - `v_lshlrev_b32 v32, 3, v0` (instruction 1) computes [0, 2147483647] << 3: 0 .. 17179869176, every u32 value"
+  },
+  {
+   "name": "loop-carried address widens conservatively",
+   "input": [
+    "v_mov_b32 v34, 8",
+    ".Lrange_head:",
+    "v_add_nc_u32 v34, 12, v34",
+    "ds_load_b32 v35, v34",
+    "s_wait_dscnt 0",
+    "s_cbranch_scc1 .Lrange_head",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 0,
+    "unproven": 1,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "explicit thread id subset supplies the address bounds",
+   "input": [
+    "v_lshlrev_b32 v36, 2, v0",
+    "ds_load_b32 v37, v36",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 96,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": [
+     16,
+     47
+    ]
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "explicit loaded data claim controls the subsequent DS proof",
+   "input": [
+    "global_load_b32 v38, v0, s[30:31]",
+    "s_wait_loadcnt 0",
+    "; assume: v:x[0]x1+1 in [4, 900] (independent data contract)",
+    "v_lshlrev_b32 v39, 2, v38",
+    "ds_load_b32 v40, v39",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 1,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "buffer VOFFEN offset is described by the range report",
+   "input": [
+    "buffer_load_b32 v41, v0, s[36:39], 0 offen",
+    "s_wait_loadcnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "plain lane-scaled DS address is fully bounded",
+   "input": [
+    "v_lshlrev_b32 v42, 2, v0",
+    "ds_load_b32 v43, v42",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "workgroup Y id participates in a large power-of-two scale",
+   "input": [
+    "v_mov_b32 v44, ttmp7",
+    "v_lshlrev_b32 v45, 11, v44",
+    "ds_load_b32 v46, v45",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [],
+    "wgsize": 64,
+    "wgy": 1,
+    "max_grid": [
+     3,
+     2097152
+    ],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "preloaded bounded scalar supplies a DS address",
+   "input": [
+    "v_lshlrev_b32 v47, 3, s2",
+    "ds_load_b32 v48, v47",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      4,
+      true,
+      0,
+      60,
+      false
+     ]
+    ],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 1,
+    "tid": null
+   },
+   "report": {
+    "proven": 1,
+    "unproven": 0,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "divisor materialization with variable shift is deliberately not inferred",
+   "input": [
+    "s_load_b128 s[40:43], s[0:1], 0",
+    "s_wait_kmcnt 0",
+    "v_lshlrev_b32 v49, s42, v0",
+    "ds_load_b32 v50, v49",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      16,
+      true,
+      1,
+      65536,
+      true
+     ]
+    ],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 0,
+    "unproven": 1,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  },
+  {
+   "name": "overwriting kernarg base prevents later argument range recovery",
+   "input": [
+    "s_nop 0",
+    "s_mov_b32 s0, 0",
+    "s_load_b32 s44, s[0:1], 20",
+    "s_wait_kmcnt 0",
+    "v_add_nc_u32 v51, s44, v0",
+    "ds_load_b32 v52, v51",
+    "s_wait_dscnt 0",
+    "s_endpgm"
+   ],
+   "launch": {
+    "args": [
+     [
+      0,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      8,
+      8,
+      false,
+      null,
+      null,
+      false
+     ],
+     [
+      20,
+      4,
+      true,
+      1,
+      300000,
+      false
+     ]
+    ],
+    "wgsize": 64,
+    "wgy": 0,
+    "max_grid": [],
+    "preload": 0,
+    "tid": null
+   },
+   "report": {
+    "proven": 0,
+    "unproven": 1,
+    "inside": 0,
+    "unknown": 0,
+    "lds_bytes": {}
+   }
+  }
+ ]
+}

@@ -1,0 +1,603 @@
+{
+ "notation": "Two waves of one workgroup, 32 lanes each (lane l of either wave addresses the dword at LDS byte 4 l, so both waves touch the same 128 bytes; '@256' adds 256). A script is a list of: 'barrier' (the workgroup barrier), 'fence' (a barrier that is an LDS fence), [w, ops] (ops run by wave w only), ['all', ops] (by both). The core runs each wave to its next barrier in wave order, so between two barriers wave 0's ops run before wave 1's. Ops: read (a 4-byte LDS read), write (a 4-byte LDS write of 7), atomic (a 4-byte LDS add of 7), wait_ds / wait_ds(1) (the ds counter's wait with count 0 / 1), wait_vm (the load counter's wait, count 0), smem (a scalar load), end (the wave ends), store (the wave stores the dword it read to global memory; 'stored' gives the first 8 dwords), fence_sole / barrier_sole (a wave stops at that barrier alone). After the script every wave waits for all its counters and ends. error: the expected message with instruction texts replaced by op names (wording informative; the facts - which wave, which byte, which ops - required), or null.",
+ "cases": [
+  {
+   "name": "a read in flight at the barrier, a write after it",
+   "script": [
+    [
+     0,
+     [
+      "read"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 write: writes LDS byte 0 that wave 0's `read` reads, still in flight (not covered by its ds wait; a barrier waits for no LDS op): the write may land before the read (a WAR race)"
+  },
+  {
+   "name": "the fix: the read waited for",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "a read in flight at the barrier, an atomic after it",
+   "script": [
+    [
+     0,
+     [
+      "read"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "atomic"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 atomic: writes LDS byte 0 that wave 0's `read` reads, still in flight (not covered by its ds wait; a barrier waits for no LDS op): the write may land before the read (a WAR race)"
+  },
+  {
+   "name": "a read waited for, another wave's write in the same epoch",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 write: writes LDS byte 0 that wave 0's `read` read, since the last barrier (none between the read and the write): the write may land before the read (a WAR race)"
+  },
+  {
+   "name": "the fix: a barrier between",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "ds wait (1) covers the older of two reads",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "read@256",
+      "wait_ds(1)"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write@256"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 write@256: writes LDS byte 256 that wave 0's `read@256` reads, still in flight (not covered by its ds wait; a barrier waits for no LDS op): the write may land before the read (a WAR race)"
+  },
+  {
+   "name": "ds wait (1) covers the older of two reads (other bytes)",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "read@256",
+      "wait_ds(1)"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "a scalar load is not counted on the ds counter",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "smem",
+      "wait_ds(1)"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 write: writes LDS byte 0 that wave 0's `read` reads, still in flight (not covered by its ds wait; a barrier waits for no LDS op): the write may land before the read (a WAR race)"
+  },
+  {
+   "name": "a write in flight at the barrier, read by another wave",
+   "script": [
+    [
+     0,
+     [
+      "write"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 read: reads LDS byte 0 of wave 0's `write` still in flight: it did not wait for it (ds wait) before the barrier - a barrier waits for no LDS op"
+  },
+  {
+   "name": "the fix",
+   "script": [
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "an atomic in flight at the barrier, read by another wave",
+   "script": [
+    [
+     0,
+     [
+      "atomic"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 read: reads LDS byte 0 of wave 0's `atomic` still in flight: it did not wait for it (ds wait) before the barrier - a barrier waits for no LDS op"
+  },
+  {
+   "name": "a write in flight at the barrier, written by another wave",
+   "script": [
+    [
+     0,
+     [
+      "write"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 write: writes LDS byte 0 that wave 0's `write` writes, still in flight at a barrier since (not covered by its ds wait): the two writes may land in either order"
+  },
+  {
+   "name": "a write in flight at a barrier, covered after it, overwritten by another wave, then read",
+   "script": [
+    [
+     0,
+     [
+      "write"
+     ]
+    ],
+    "barrier",
+    [
+     0,
+     [
+      "wait_ds"
+     ]
+    ],
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     "all",
+     [
+      "read",
+      "wait_ds"
+     ]
+    ]
+   ],
+   "error": "wave 0 read: reads LDS byte 0, which wave 0's `write` and wave 1's later write both wrote, the first in flight at a barrier between them (a barrier waits for no LDS op; waited for only after it, or not yet): the two writes may land in either order"
+  },
+  {
+   "name": "the fix",
+   "script": [
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     "all",
+     [
+      "read",
+      "wait_ds"
+     ]
+    ]
+   ],
+   "error": null
+  },
+  {
+   "name": "a wave's own write over its own read in flight",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "an atomic over another wave's atomic in flight",
+   "script": [
+    [
+     0,
+     [
+      "atomic"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "atomic",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "a read in flight at the wave's end is dropped",
+   "script": [
+    [
+     0,
+     [
+      "read",
+      "end"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ]
+   ],
+   "error": null
+  },
+  {
+   "name": "two waves reading the same bytes, neither waiting",
+   "script": [
+    [
+     0,
+     [
+      "read"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "read"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "two waves writing the same bytes in one epoch",
+   "script": [
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    [
+     1,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null
+  },
+  {
+   "name": "a write by one wave in the epoch, read by another in the same epoch",
+   "script": [
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    [
+     1,
+     [
+      "read",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 1 read: reads LDS bytes written by wave(s) [0] since the last barrier"
+  },
+  {
+   "name": "a read across a plain barrier sees the value",
+   "script": [
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "read",
+      "wait_ds",
+      "store"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null,
+   "stored": [
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007"
+   ]
+  },
+  {
+   "name": "a read across an LDS fence sees the fill",
+   "script": [
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "fence",
+    [
+     1,
+     [
+      "read",
+      "wait_ds",
+      "store"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null,
+   "stored": [
+    "0x60c22485",
+    "0xd93b9dfe",
+    "0x52b41577",
+    "0xcb2c8ef0",
+    "0x44a50769",
+    "0xbc1e80e2",
+    "0x3597f95b",
+    "0xae1072d3"
+   ]
+  },
+  {
+   "name": "a write after the fence reads back",
+   "script": [
+    "fence",
+    [
+     0,
+     [
+      "write",
+      "wait_ds"
+     ]
+    ],
+    "barrier",
+    [
+     1,
+     [
+      "read",
+      "wait_ds",
+      "store"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": null,
+   "stored": [
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007",
+    "0x00000007"
+   ]
+  },
+  {
+   "name": "a fence and a plain barrier together",
+   "script": [
+    [
+     0,
+     [
+      "fence_sole"
+     ]
+    ],
+    [
+     1,
+     [
+      "barrier_sole"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "waves released from an LDS fence and a plain barrier together"
+  },
+  {
+   "name": "a write in flight at the fence",
+   "script": [
+    [
+     0,
+     [
+      "write"
+     ]
+    ],
+    "fence",
+    [
+     "all",
+     [
+      "wait_vm",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 0: `write` (an LDS op) in flight at the LDS fence"
+  },
+  {
+   "name": "a read in flight at the fence",
+   "script": [
+    [
+     0,
+     [
+      "read"
+     ]
+    ],
+    "fence",
+    [
+     "all",
+     [
+      "wait_vm",
+      "wait_ds"
+     ]
+    ],
+    "barrier"
+   ],
+   "error": "wave 0: `read` (an LDS op) in flight at the LDS fence"
+  }
+ ]
+}

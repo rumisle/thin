@@ -1,0 +1,1381 @@
+{
+ "notation": "Executable: `setup` runs first, then every `call` in document order, in one namespace holding thin.opspec's exported names, thin.runtime's LaunchError, DeviceFault and Bound, np (numpy) and torch; texts are compiled with the file name `file`. A call sets r: ok is r as JSON holds it; refused/message are the exception's class and text, (<file>) masking a source path. kind_of(v) is [type name, value]; facts(t) is [io, dtype, shape, shared]; bits(t) is a tensor's storage and its poisoned array; offer(fields, **tensors) makes a decl.pair op and says which given tensors it holds as passed; placed(op) is a group op's key, handle and given tensors.",
+ "file": "<test>/opspec/spec.py",
+ "setup": "def kind_of(v):\n    \"\"\"[type name, value] of a field value; a Field also shows the range it serves.\"\"\"\n    if isinstance(v, Field):\n        return [\"Field\", int(v), *v.range]\n    return [type(v).__name__, v]\n\nclass Norm(Spec, name=\"decl.norm\"):\n    fmt = Choice(\"bf16\", \"f16\")\n    rows = Int(lo=2, hi=64)\n    eps_mode = Choice(\"fast\", \"exact\", default=\"exact\")\n    width = Int(default=8, lo=2, hi=32)\n    lanes = Choice(32, 64, 16, default=32)\n    fused = Bool(default=True)\n    def signature(op):\n        return {\"a\": In(op.fmt, op.rows), \"b\": Out(op.fmt, op.rows)}\n\ndef summary(op):\n    return {\"key\": op.key(), \"values\": {n: kind_of(v) for n, v in op.field_values().items()},\n            \"given\": sorted(op.tensors), \"group\": op.group, \"rank\": op.rank}\n\ndef facts(t):\n    return [t.io, t.dtype.name, [int(s) for s in t.shape], t.shared]\n\ndef bits(t):\n    numpy_name, shape = t.storage()\n    p = t.poisoned()\n    raw = p.reshape(-1).view(np.uint8).tobytes()\n    return {\"numpy\": numpy_name, \"shape\": list(shape), \"torch\": t.dtype.torch,\n            \"poison\": {\"dtype\": p.dtype.name, \"shape\": list(p.shape),\n                       \"bytes\": len(raw), \"values\": sorted(set(raw))}}\n\nclass Pair(Spec, name=\"decl.pair\"):\n    cols = Int(lo=1)\n    kind = Choice(\"bf16\", \"f32\", \"e2m1\", default=\"bf16\")\n    def signature(op):\n        return {\"src\": In(op.kind, 2, op.cols), \"dst\": Out(op.kind, 2, op.cols)}\n\ndef offer(fields, **tensors):\n    op = Pair(**fields, **tensors)\n    kept = [n for n, v in tensors.items() if getattr(op, n) is v]\n    return {\"given\": sorted(op.tensors), \"kept\": kept}\n\nclass Overlap(Spec, name=\"decl.overlap\"):\n    a = Int(lo=1)\n    b = Int(lo=1)\n    def signature(op):\n        return {\"b\": Out(\"u8\", op.a), \"a\": In(\"u8\", op.b), \"c\": In(\"u8\", 1)}\n\nclass Gather(Spec, name=\"decl.gather\", group=\"size\"):\n    size = Int(lo=2, hi=6)\n    part = Int(lo=1)\n    def signature(op):\n        return {\"piece\": In(\"f32\", op.part), \"whole\": Out(\"f32\", op.size, op.part, shared=True)}\n\nclass Lonely(Spec, name=\"decl.lonely\"):\n    m = Int(lo=1)\n    def signature(op):\n        return {\"buf\": InOut(\"u8\", op.m, shared=True)}\n\ncrew = group.emulated(3)\npair = group.emulated(2)\nwhole = [h.tensor(\"whole\", \"f32\", (3, 2)) for h in crew]\nforeign = pair[0].tensor(\"whole\", \"f32\", (3, 2))\n\ndef placed(op):\n    return {\"key\": op.key(), \"group\": None if op.group is None else repr(op.group), \"rank\": op.rank,\n            \"given\": sorted(op.tensors)}\n",
+ "names": [
+  {
+   "case_": "no name at all",
+   "call": "class Gelu(Spec):\n    pass\nr = Gelu.name()",
+   "refused": "TypeError",
+   "message": "Gelu: a spec names itself - class Gelu(thin.Spec, name=\"namespace.op\")"
+  },
+  {
+   "case_": "a name of one part",
+   "call": "class Gelu(Spec, name='gelu'):\n    pass\nr = Gelu.name()",
+   "refused": "ValueError",
+   "message": "Gelu: spec name 'gelu': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "a namespace and a name",
+   "call": "class Gelu(Spec, name='decl.gelu'):\n    pass\nr = Gelu.name()",
+   "ok": "decl.gelu"
+  },
+  {
+   "case_": "four parts, underscores and digits after the first character",
+   "call": "class Tanh(Spec, name='decl._fused.gelu_tanh2.v1'):\n    pass\nr = Tanh.name()",
+   "ok": "decl._fused.gelu_tanh2.v1"
+  },
+  {
+   "case_": "a part beginning with a digit",
+   "call": "class Conv(Spec, name='decl.1x1conv'):\n    pass\nr = Conv.name()",
+   "refused": "ValueError",
+   "message": "Conv: spec name 'decl.1x1conv': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "an empty last part",
+   "call": "class Gelu(Spec, name='decl.gelu.'):\n    pass\nr = Gelu.name()",
+   "refused": "ValueError",
+   "message": "Gelu: spec name 'decl.gelu.': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "an empty first part",
+   "call": "class Gelu(Spec, name='.decl.gelu'):\n    pass\nr = Gelu.name()",
+   "refused": "ValueError",
+   "message": "Gelu: spec name '.decl.gelu': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "a space inside a part",
+   "call": "class Gelu(Spec, name='decl.gelu tanh'):\n    pass\nr = Gelu.name()",
+   "refused": "ValueError",
+   "message": "Gelu: spec name 'decl.gelu tanh': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "a non-ASCII letter",
+   "call": "class Gelu(Spec, name='decl.gélu'):\n    pass\nr = Gelu.name()",
+   "refused": "ValueError",
+   "message": "Gelu: spec name 'decl.gélu': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "a tuple of parts",
+   "call": "class Gelu(Spec, name=('decl', 'gelu')):\n    pass\nr = Gelu.name()",
+   "refused": "ValueError",
+   "message": "Gelu: spec name ('decl', 'gelu'): dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "group names an Int field",
+   "call": "class Ring(Spec, name='decl.ring', group='peers'):\n    peers = Int(lo=1, hi=16)\n    n = Int(lo=1)\nr = [Ring.name(), Ring.group_field(), list(Ring.fields())]",
+   "ok": [
+    "decl.ring",
+    "peers",
+    [
+     "peers",
+     "n"
+    ]
+   ]
+  },
+  {
+   "case_": "group names a Bool field (a Choice)",
+   "call": "class Flag(Spec, name='decl.flag', group='peers'):\n    peers = Bool()\nr = Flag.name()",
+   "refused": "TypeError",
+   "message": "Flag: group='peers' names the Int field of the group's size"
+  },
+  {
+   "case_": "group names a field the spec does not have",
+   "call": "class Lost(Spec, name='decl.lost', group='peers'):\n    n = Int(lo=1)\nr = Lost.name()",
+   "refused": "TypeError",
+   "message": "Lost: group='peers' names the Int field of the group's size"
+  },
+  {
+   "case_": "the group is checked before the name: no field, no name",
+   "call": "class Anon(Spec, group='peers'):\n    pass\nr = Anon.name()",
+   "refused": "TypeError",
+   "message": "Anon: group='peers' names the Int field of the group's size"
+  },
+  {
+   "case_": "a group that holds, then a name that does not",
+   "call": "class Anon(Spec, name='decl', group='peers'):\n    peers = Int(lo=2)\nr = Anon.name()",
+   "refused": "ValueError",
+   "message": "Anon: spec name 'decl': dotted identifiers, a namespace first (\"example.vadd\")"
+  },
+  {
+   "case_": "a name taken by a class statement in another file",
+   "call": "exec(compile(\"class Copy(Spec, name='decl.gelu'):\\n    pass\\n\", \"<test>/opspec/elsewhere_too.py\", \"exec\"), {\"Spec\": Spec})",
+   "refused": "TypeError",
+   "message": "spec name 'decl.gelu': Copy (<file>) and Gelu (<file>) - one name one spec"
+  },
+  {
+   "case_": "a name taken by another class statement in the same file",
+   "call": "class Twin(Spec, name='decl.gelu'):\n    pass\nr = Twin.name()",
+   "refused": "TypeError",
+   "message": "spec name 'decl.gelu': Twin (<file>) and Gelu (<file>) - one name one spec"
+  },
+  {
+   "case_": "one class statement run twice: two classes, one name",
+   "call": "code = compile(\"class Again(Spec, name='decl.again'):\\n    width = Int(lo=1)\\n    def signature(op): return {}\\n\", \"<test>/opspec/again.py\", \"exec\")\nfirst, second = {\"Spec\": Spec, \"Int\": Int}, {\"Spec\": Spec, \"Int\": Int}\nexec(code, first)\nexec(code, second)\nr = [first[\"Again\"] is second[\"Again\"], second[\"Again\"].name(), second[\"Again\"](width=3).key()]",
+   "ok": [
+    false,
+    "decl.again",
+    "decl.again{width=3}"
+   ]
+  }
+ ],
+ "declarations": [
+  {
+   "case_": "no options",
+   "call": "r = Choice()",
+   "refused": "ValueError",
+   "message": "a Choice of one value at least"
+  },
+  {
+   "case_": "a float and bytes among ints",
+   "call": "r = Choice(3, 2.5, b'q')",
+   "refused": "TypeError",
+   "message": "a Choice's values are str, bool or int, not [2.5, b'q']"
+  },
+  {
+   "case_": "an int twice",
+   "call": "r = Choice(8, 16, 8)",
+   "refused": "ValueError",
+   "message": "a Choice's values once each: (8, 16, 8)"
+  },
+  {
+   "case_": "1/True and 0/False are four options",
+   "call": "r = list(Choice(1, True, 0, False).options)",
+   "ok": [
+    1,
+    true,
+    0,
+    false
+   ]
+  },
+  {
+   "case_": "a default not among the options",
+   "call": "r = Choice('bf16', 'f16', default='f32')",
+   "refused": "ValueError",
+   "message": "a Choice's default 'f32': one of ('bf16', 'f16')"
+  },
+  {
+   "case_": "default 0 against False",
+   "call": "r = Choice(False, True, default=0)",
+   "refused": "ValueError",
+   "message": "a Choice's default 0: one of (False, True)"
+  },
+  {
+   "case_": "Bool's options and default",
+   "call": "b = Bool()\nr = {'class': type(b).__name__, 'options': list(b.options), 'default': b.default}",
+   "ok": {
+    "class": "Choice",
+    "options": [
+     false,
+     true
+    ],
+    "default": null
+   }
+  },
+  {
+   "case_": "a False default is kept",
+   "call": "r = Bool(default=False).default",
+   "ok": false
+  },
+  {
+   "case_": "lo above hi",
+   "call": "r = Int(lo=0, hi=-1)",
+   "refused": "ValueError",
+   "message": "Int(lo=0, hi=-1): lo above hi"
+  },
+  {
+   "case_": "a float lo",
+   "call": "r = Int(lo=1.5)",
+   "refused": "TypeError",
+   "message": "Int(lo=1.5): an int or None"
+  },
+  {
+   "case_": "a bool hi",
+   "call": "r = Int(hi=True)",
+   "refused": "TypeError",
+   "message": "Int(hi=True): an int or None"
+  },
+  {
+   "case_": "a default below lo",
+   "call": "r = Int(default=0, lo=1)",
+   "refused": "ValueError",
+   "message": "Int: default = 0 outside 1 .. None"
+  },
+  {
+   "case_": "a field with no bounds",
+   "call": "f = Int()\nr = [f.default, f.lo, f.hi, repr(f)]",
+   "ok": [
+    null,
+    null,
+    null,
+    "Int(default=None, lo=None, hi=None)"
+   ]
+  }
+ ],
+ "ops": [
+  {
+   "case_": "field order is declaration order",
+   "call": "r = list(Norm.fields())",
+   "ok": [
+    "fmt",
+    "rows",
+    "eps_mode",
+    "width",
+    "lanes",
+    "fused"
+   ]
+  },
+  {
+   "case_": "only the required fields",
+   "call": "r = summary(Norm(fmt='f16', rows=12))",
+   "ok": {
+    "key": "decl.norm{eps_mode=exact,fmt=f16,fused=True,lanes=32,rows=12,width=8}",
+    "values": {
+     "fmt": [
+      "str",
+      "f16"
+     ],
+     "rows": [
+      "int",
+      12
+     ],
+     "eps_mode": [
+      "str",
+      "exact"
+     ],
+     "width": [
+      "int",
+      8
+     ],
+     "lanes": [
+      "int",
+      32
+     ],
+     "fused": [
+      "bool",
+      true
+     ]
+    },
+    "given": [],
+    "group": null,
+    "rank": null
+   }
+  },
+  {
+   "case_": "every field at its upper end or last option",
+   "call": "r = summary(Norm(fmt='f16', rows=64, eps_mode='fast', width=32, lanes=16, fused=False))",
+   "ok": {
+    "key": "decl.norm{eps_mode=fast,fmt=f16,fused=False,lanes=16,rows=64,width=32}",
+    "values": {
+     "fmt": [
+      "str",
+      "f16"
+     ],
+     "rows": [
+      "int",
+      64
+     ],
+     "eps_mode": [
+      "str",
+      "fast"
+     ],
+     "width": [
+      "int",
+      32
+     ],
+     "lanes": [
+      "int",
+      16
+     ],
+     "fused": [
+      "bool",
+      false
+     ]
+    },
+    "given": [],
+    "group": null,
+    "rank": null
+   }
+  },
+  {
+   "case_": "every Int at its lower end",
+   "call": "r = summary(Norm(fmt='bf16', rows=2, width=2))",
+   "ok": {
+    "key": "decl.norm{eps_mode=exact,fmt=bf16,fused=True,lanes=32,rows=2,width=2}",
+    "values": {
+     "fmt": [
+      "str",
+      "bf16"
+     ],
+     "rows": [
+      "int",
+      2
+     ],
+     "eps_mode": [
+      "str",
+      "exact"
+     ],
+     "width": [
+      "int",
+      2
+     ],
+     "lanes": [
+      "int",
+      32
+     ],
+     "fused": [
+      "bool",
+      true
+     ]
+    },
+    "given": [],
+    "group": null,
+    "rank": null
+   }
+  },
+  {
+   "case_": "a numpy int32 for an Int",
+   "call": "r = summary(Norm(fmt='bf16', rows=np.int32(9)))",
+   "ok": {
+    "key": "decl.norm{eps_mode=exact,fmt=bf16,fused=True,lanes=32,rows=9,width=8}",
+    "values": {
+     "fmt": [
+      "str",
+      "bf16"
+     ],
+     "rows": [
+      "int",
+      9
+     ],
+     "eps_mode": [
+      "str",
+      "exact"
+     ],
+     "width": [
+      "int",
+      8
+     ],
+     "lanes": [
+      "int",
+      32
+     ],
+     "fused": [
+      "bool",
+      true
+     ]
+    },
+    "given": [],
+    "group": null,
+    "rank": null
+   }
+  },
+  {
+   "case_": "a Field for an Int is held as given",
+   "call": "r = summary(Norm(fmt='bf16', rows=Field(10, 2, 64)))",
+   "ok": {
+    "key": "decl.norm{eps_mode=exact,fmt=bf16,fused=True,lanes=32,rows=10,width=8}",
+    "values": {
+     "fmt": [
+      "str",
+      "bf16"
+     ],
+     "rows": [
+      "Field",
+      10,
+      2,
+      64
+     ],
+     "eps_mode": [
+      "str",
+      "exact"
+     ],
+     "width": [
+      "int",
+      8
+     ],
+     "lanes": [
+      "int",
+      32
+     ],
+     "fused": [
+      "bool",
+      true
+     ]
+    },
+    "given": [],
+    "group": null,
+    "rank": null
+   }
+  },
+  {
+   "case_": "the required Int missing",
+   "call": "r = summary(Norm(fmt='f16'))",
+   "refused": "TypeError",
+   "message": "decl.norm: field rows not given"
+  },
+  {
+   "case_": "nothing given: the first declared is named",
+   "call": "r = summary(Norm())",
+   "refused": "TypeError",
+   "message": "decl.norm: field fmt not given"
+  },
+  {
+   "case_": "an Int one below lo",
+   "call": "r = summary(Norm(fmt='f16', rows=1))",
+   "refused": "ValueError",
+   "message": "decl.norm: rows = 1 outside 2 .. 64"
+  },
+  {
+   "case_": "an Int one above hi",
+   "call": "r = summary(Norm(fmt='f16', rows=65))",
+   "refused": "ValueError",
+   "message": "decl.norm: rows = 65 outside 2 .. 64"
+  },
+  {
+   "case_": "a defaulted Int above hi",
+   "call": "r = summary(Norm(fmt='f16', rows=4, width=33))",
+   "refused": "ValueError",
+   "message": "decl.norm: width = 33 outside 2 .. 32"
+  },
+  {
+   "case_": "True for an Int",
+   "call": "r = summary(Norm(fmt='f16', rows=True))",
+   "refused": "TypeError",
+   "message": "decl.norm: rows = True: an int"
+  },
+  {
+   "case_": "a float for an Int",
+   "call": "r = summary(Norm(fmt='f16', rows=8.0))",
+   "refused": "TypeError",
+   "message": "decl.norm: rows = 8.0: an int"
+  },
+  {
+   "case_": "a str for an Int",
+   "call": "r = summary(Norm(fmt='f16', rows='8'))",
+   "refused": "TypeError",
+   "message": "decl.norm: rows = '8': an int"
+  },
+  {
+   "case_": "a str that is no option",
+   "call": "r = summary(Norm(fmt='f32', rows=8))",
+   "refused": "ValueError",
+   "message": "decl.norm: fmt = 'f32': one of ('bf16', 'f16')"
+  },
+  {
+   "case_": "0 for a Bool",
+   "call": "r = summary(Norm(fmt='f16', rows=8, fused=0))",
+   "refused": "ValueError",
+   "message": "decl.norm: fused = 0: one of (False, True)"
+  },
+  {
+   "case_": "a numpy int for an int Choice",
+   "call": "r = summary(Norm(fmt='f16', rows=8, lanes=np.int64(64)))",
+   "refused": "ValueError",
+   "message": "decl.norm: lanes = np.int64(64): one of (32, 64, 16)"
+  },
+  {
+   "case_": "None for a defaulted field",
+   "call": "r = summary(Norm(fmt='f16', rows=8, eps_mode=None))",
+   "refused": "TypeError",
+   "message": "decl.norm: field eps_mode not given"
+  },
+  {
+   "case_": "two unknown keywords",
+   "call": "r = summary(Norm(fmt='f16', rows=8, gamma=1, beta=2))",
+   "refused": "TypeError",
+   "message": "decl.norm: unknown ['beta', 'gamma']"
+  },
+  {
+   "case_": "a tensor given with the fields",
+   "call": "r = summary(Norm(fmt='f16', rows=6, a=np.zeros(6, np.uint16)))",
+   "ok": {
+    "key": "decl.norm{eps_mode=exact,fmt=f16,fused=True,lanes=32,rows=6,width=8}",
+    "values": {
+     "fmt": [
+      "str",
+      "f16"
+     ],
+     "rows": [
+      "int",
+      6
+     ],
+     "eps_mode": [
+      "str",
+      "exact"
+     ],
+     "width": [
+      "int",
+      8
+     ],
+     "lanes": [
+      "int",
+      32
+     ],
+     "fused": [
+      "bool",
+      true
+     ]
+    },
+    "given": [
+     "a"
+    ],
+    "group": null,
+    "rank": null
+   }
+  }
+ ],
+ "tensors": {
+  "made": [
+   {
+    "case_": "an Out of two sizes",
+    "call": "r = facts(Out(\"f16\", 3, 5))",
+    "ok": [
+     "out",
+     "f16",
+     [
+      3,
+      5
+     ],
+     false
+    ]
+   },
+   {
+    "case_": "an InOut of one size",
+    "call": "r = facts(InOut(\"i8\", 7))",
+    "ok": [
+     "inout",
+     "i8",
+     [
+      7
+     ],
+     false
+    ]
+   },
+   {
+    "case_": "a shared In",
+    "call": "r = facts(In(\"e4m3fn\", 2, 2, shared=True))",
+    "ok": [
+     "in",
+     "e4m3fn",
+     [
+      2,
+      2
+     ],
+     true
+    ]
+   },
+   {
+    "case_": "no sizes",
+    "call": "r = facts(Out(\"u64\"))",
+    "ok": [
+     "out",
+     "u64",
+     [],
+     false
+    ]
+   },
+   {
+    "case_": "a zero size",
+    "call": "r = facts(InOut(\"f32\", 4, 0))",
+    "ok": [
+     "inout",
+     "f32",
+     [
+      4,
+      0
+     ],
+     false
+    ]
+   },
+   {
+    "case_": "a negative size, kept",
+    "call": "r = facts(In(\"u8\", -3))",
+    "ok": [
+     "in",
+     "u8",
+     [
+      -3
+     ],
+     false
+    ]
+   },
+   {
+    "case_": "an unknown dtype",
+    "call": "r = facts(Out(\"bf8\", 2))",
+    "refused": "ValueError",
+    "message": "dtype 'bf8': one of ['bf16', 'e2m1', 'e2m3', 'e3m2', 'e4m3fn', 'e5m2', 'e8m0', 'f16', 'f32', 'i8', 'u32', 'u64', 'u8']"
+   },
+   {
+    "case_": "the shape as one list",
+    "call": "r = facts(In(\"f16\", [4, 4]))",
+    "refused": "ValueError",
+    "message": "shape ([4, 4],): the sizes one by one, ints - In(dtype, rows, cols)"
+   },
+   {
+    "case_": "a bool size",
+    "call": "r = facts(In(\"u32\", 2, False))",
+    "refused": "ValueError",
+    "message": "shape (2, False): the sizes one by one, ints - In(dtype, rows, cols)"
+   },
+   {
+    "case_": "a float size",
+    "call": "r = facts(In(\"u32\", 10.0))",
+    "refused": "ValueError",
+    "message": "shape (10.0,): the sizes one by one, ints - In(dtype, rows, cols)"
+   },
+   {
+    "case_": "a numpy size",
+    "call": "r = facts(In(\"u8\", np.uint16(5)))",
+    "ok": [
+     "in",
+     "u8",
+     [
+      5
+     ],
+     false
+    ]
+   },
+   {
+    "case_": "a dtype record, not a name",
+    "call": "r = facts(Out(In(\"bf16\", 1).dtype, 2))",
+    "ok": [
+     "out",
+     "bf16",
+     [
+      2
+     ],
+     false
+    ]
+   }
+  ],
+  "storage": [
+   {
+    "dtype": "f32",
+    "shape": [
+     2,
+     2
+    ],
+    "call": "r = bits(Out('f32', 2, 2))",
+    "ok": {
+     "numpy": "float32",
+     "shape": [
+      2,
+      2
+     ],
+     "torch": "float32",
+     "poison": {
+      "dtype": "float32",
+      "shape": [
+       2,
+       2
+      ],
+      "bytes": 16,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "bf16",
+    "shape": [
+     3
+    ],
+    "call": "r = bits(Out('bf16', 3))",
+    "ok": {
+     "numpy": "uint16",
+     "shape": [
+      3
+     ],
+     "torch": "bfloat16",
+     "poison": {
+      "dtype": "uint16",
+      "shape": [
+       3
+      ],
+      "bytes": 6,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "f16",
+    "shape": [
+     1,
+     4
+    ],
+    "call": "r = bits(Out('f16', 1, 4))",
+    "ok": {
+     "numpy": "uint16",
+     "shape": [
+      1,
+      4
+     ],
+     "torch": "float16",
+     "poison": {
+      "dtype": "uint16",
+      "shape": [
+       1,
+       4
+      ],
+      "bytes": 8,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "e4m3fn",
+    "shape": [
+     5
+    ],
+    "call": "r = bits(Out('e4m3fn', 5))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      5
+     ],
+     "torch": "float8_e4m3fn",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       5
+      ],
+      "bytes": 5,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "e5m2",
+    "shape": [
+     2,
+     3
+    ],
+    "call": "r = bits(Out('e5m2', 2, 3))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      2,
+      3
+     ],
+     "torch": "float8_e5m2",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       2,
+       3
+      ],
+      "bytes": 6,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "e8m0",
+    "shape": [
+     4
+    ],
+    "call": "r = bits(Out('e8m0', 4))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      4
+     ],
+     "torch": "uint8",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       4
+      ],
+      "bytes": 4,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "e2m1",
+    "shape": [
+     2,
+     4
+    ],
+    "call": "r = bits(Out('e2m1', 2, 4))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      2,
+      2
+     ],
+     "torch": "uint8",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       2,
+       2
+      ],
+      "bytes": 4,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "e2m1",
+    "shape": [
+     0
+    ],
+    "call": "r = bits(Out('e2m1', 0))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      0
+     ],
+     "torch": "uint8",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       0
+      ],
+      "bytes": 0,
+      "values": []
+     }
+    }
+   },
+   {
+    "dtype": "e2m1",
+    "shape": [
+     5
+    ],
+    "call": "r = bits(Out('e2m1', 5))",
+    "refused": "ValueError",
+    "message": "a e2m1 tensor's last axis whole bytes (2 a byte), not (5,)"
+   },
+   {
+    "dtype": "e2m1",
+    "shape": [],
+    "call": "r = bits(Out('e2m1'))",
+    "refused": "ValueError",
+    "message": "a e2m1 tensor's last axis whole bytes (2 a byte), not ()"
+   },
+   {
+    "dtype": "e2m3",
+    "shape": [
+     2
+    ],
+    "call": "r = bits(Out('e2m3', 2))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      2
+     ],
+     "torch": "uint8",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       2
+      ],
+      "bytes": 2,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "e2m3",
+    "shape": [],
+    "call": "r = bits(Out('e2m3'))",
+    "refused": "ValueError",
+    "message": "a e2m3 tensor's last axis whole bytes (1 a byte), not ()"
+   },
+   {
+    "dtype": "e3m2",
+    "shape": [
+     4
+    ],
+    "call": "r = bits(Out('e3m2', 4))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      4
+     ],
+     "torch": "uint8",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       4
+      ],
+      "bytes": 4,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "u8",
+    "shape": [
+     1
+    ],
+    "call": "r = bits(Out('u8', 1))",
+    "ok": {
+     "numpy": "uint8",
+     "shape": [
+      1
+     ],
+     "torch": "uint8",
+     "poison": {
+      "dtype": "uint8",
+      "shape": [
+       1
+      ],
+      "bytes": 1,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "i8",
+    "shape": [
+     3
+    ],
+    "call": "r = bits(Out('i8', 3))",
+    "ok": {
+     "numpy": "int8",
+     "shape": [
+      3
+     ],
+     "torch": "int8",
+     "poison": {
+      "dtype": "int8",
+      "shape": [
+       3
+      ],
+      "bytes": 3,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "u32",
+    "shape": [
+     1,
+     3
+    ],
+    "call": "r = bits(Out('u32', 1, 3))",
+    "ok": {
+     "numpy": "uint32",
+     "shape": [
+      1,
+      3
+     ],
+     "torch": "uint32",
+     "poison": {
+      "dtype": "uint32",
+      "shape": [
+       1,
+       3
+      ],
+      "bytes": 12,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "u32",
+    "shape": [],
+    "call": "r = bits(Out('u32'))",
+    "ok": {
+     "numpy": "uint32",
+     "shape": [],
+     "torch": "uint32",
+     "poison": {
+      "dtype": "uint32",
+      "shape": [],
+      "bytes": 4,
+      "values": [
+       255
+      ]
+     }
+    }
+   },
+   {
+    "dtype": "u64",
+    "shape": [
+     2
+    ],
+    "call": "r = bits(Out('u64', 2))",
+    "ok": {
+     "numpy": "uint64",
+     "shape": [
+      2
+     ],
+     "torch": "uint64",
+     "poison": {
+      "dtype": "uint64",
+      "shape": [
+       2
+      ],
+      "bytes": 16,
+      "values": [
+       255
+      ]
+     }
+    }
+   }
+  ]
+ },
+ "given": [
+  {
+   "case_": "bf16 held as uint16",
+   "call": "r = offer({'cols': 6}, src=np.zeros((2, 6), np.uint16))",
+   "ok": {
+    "given": [
+     "src"
+    ],
+    "kept": [
+     "src"
+    ]
+   }
+  },
+  {
+   "case_": "both tensors",
+   "call": "r = offer({'cols': 3, 'kind': 'f32'}, src=np.ones((2, 3), np.float32), dst=np.empty((2, 3), np.float32))",
+   "ok": {
+    "given": [
+     "dst",
+     "src"
+    ],
+    "kept": [
+     "src",
+     "dst"
+    ]
+   }
+  },
+  {
+   "case_": "f32 given as int32",
+   "call": "r = offer({'cols': 3, 'kind': 'f32'}, dst=np.zeros((2, 3), np.int32))",
+   "refused": "TypeError",
+   "message": "decl.pair: tensor dst: f32 - a numpy array of float32, not int32"
+  },
+  {
+   "case_": "f32 as float32",
+   "call": "r = offer({'cols': 1, 'kind': 'f32'}, src=np.zeros((2, 1), np.float32))",
+   "ok": {
+    "given": [
+     "src"
+    ],
+    "kept": [
+     "src"
+    ]
+   }
+  },
+  {
+   "case_": "bf16 given as float16",
+   "call": "r = offer({'cols': 6}, src=np.zeros((2, 6), np.float16))",
+   "refused": "TypeError",
+   "message": "decl.pair: tensor src: bf16 - a numpy array of uint16, not float16"
+  },
+  {
+   "case_": "e2m1 two a byte",
+   "call": "r = offer({'cols': 6, 'kind': 'e2m1'}, dst=np.zeros((2, 3), np.uint8))",
+   "ok": {
+    "given": [
+     "dst"
+    ],
+    "kept": [
+     "dst"
+    ]
+   }
+  },
+  {
+   "case_": "e2m1 a byte each",
+   "call": "r = offer({'cols': 6, 'kind': 'e2m1'}, dst=np.zeros((2, 6), np.uint8))",
+   "refused": "ValueError",
+   "message": "decl.pair: tensor dst: shape (2, 3), not (2, 6)"
+  },
+  {
+   "case_": "one column too many",
+   "call": "r = offer({'cols': 6}, src=np.zeros((2, 7), np.uint16))",
+   "refused": "ValueError",
+   "message": "decl.pair: tensor src: shape (2, 6), not (2, 7)"
+  },
+  {
+   "case_": "the right size, flat",
+   "call": "r = offer({'cols': 6}, src=np.zeros(12, np.uint16))",
+   "refused": "ValueError",
+   "message": "decl.pair: tensor src: shape (2, 6), not (12,)"
+  },
+  {
+   "case_": "column-major order",
+   "call": "r = offer({'cols': 6}, src=np.zeros((2, 6), np.uint16, order='F'))",
+   "refused": "ValueError",
+   "message": "decl.pair: tensor src: contiguous"
+  },
+  {
+   "case_": "a tuple of numbers",
+   "call": "r = offer({'cols': 2}, src=((0, 0), (0, 0)))",
+   "refused": "TypeError",
+   "message": "decl.pair: tensor src: a numpy array or a torch tensor, not tuple"
+  },
+  {
+   "case_": "a CPU torch float32",
+   "call": "r = offer({'cols': 4, 'kind': 'f32'}, src=torch.zeros(2, 4))",
+   "ok": {
+    "given": [
+     "src"
+    ],
+    "kept": [
+     "src"
+    ]
+   }
+  },
+  {
+   "case_": "a CPU torch bfloat16",
+   "call": "r = offer({'cols': 4}, dst=torch.zeros(2, 4, dtype=torch.bfloat16))",
+   "ok": {
+    "given": [
+     "dst"
+    ],
+    "kept": [
+     "dst"
+    ]
+   }
+  },
+  {
+   "case_": "a torch float16 for bf16",
+   "call": "r = offer({'cols': 4}, dst=torch.zeros(2, 4, dtype=torch.float16))",
+   "refused": "TypeError",
+   "message": "decl.pair: tensor dst: bf16 - a torch tensor of bfloat16, not float16"
+  },
+  {
+   "case_": "a transposed torch view",
+   "call": "r = offer({'cols': 2, 'kind': 'f32'}, src=torch.zeros(2, 2).t())",
+   "refused": "ValueError",
+   "message": "decl.pair: tensor src: contiguous"
+  },
+  {
+   "case_": "torch and numpy together",
+   "call": "r = offer({'cols': 4, 'kind': 'f32'}, src=torch.zeros(2, 4), dst=np.zeros((2, 4), np.float32))",
+   "refused": "ValueError",
+   "message": "decl.pair: tensors on one device, not {'src': 'cpu', 'dst': 'host'}"
+  },
+  {
+   "case_": "the wrong dtype and shape: dtype named",
+   "call": "r = offer({'cols': 6}, src=np.zeros((3, 3), np.float32))",
+   "refused": "TypeError",
+   "message": "decl.pair: tensor src: bf16 - a numpy array of uint16, not float32"
+  },
+  {
+   "case_": "the wrong shape, column-major: shape named",
+   "call": "r = offer({'cols': 6}, src=np.zeros((2, 5), np.uint16, order='F'))",
+   "refused": "ValueError",
+   "message": "decl.pair: tensor src: shape (2, 6), not (2, 5)"
+  }
+ ],
+ "misc": [
+  {
+   "case_": "two signature tensors named as fields",
+   "call": "r = Overlap(a=2, b=3)",
+   "refused": "TypeError",
+   "message": "decl.overlap: tensors ['b', 'a'] named as fields"
+  },
+  {
+   "case_": "neither a field nor a tensor",
+   "call": "r = Pair(cols=2).bias",
+   "refused": "AttributeError",
+   "message": "bias"
+  },
+  {
+   "case_": "a signature tensor not given",
+   "call": "op = Pair(cols=2, src=np.zeros((2, 2), np.uint16))\nr = op.dst",
+   "refused": "AttributeError",
+   "message": "dst"
+  },
+  {
+   "case_": "with_tensors makes new ops with only the tensors given",
+   "call": "op = Pair(cols=3, kind='f32')\ns, d = np.ones((2, 3), np.float32), np.zeros((2, 3), np.float32)\no2 = op.with_tensors({'src': s})\no3 = o2.with_tensors({'dst': d})\nr = {'types': [type(o2).__name__, type(o3).__name__], 'keys': [o2.key(), o3.key()], 'o2 src': o2.src is s, 'o3 given': sorted(o3.tensors), 'op given': sorted(op.tensors)}",
+   "ok": {
+    "types": [
+     "Pair",
+     "Pair"
+    ],
+    "keys": [
+     "decl.pair{cols=3,kind=f32}",
+     "decl.pair{cols=3,kind=f32}"
+    ],
+    "o2 src": true,
+    "o3 given": [
+     "dst"
+    ],
+    "op given": []
+   }
+  },
+  {
+   "case_": "a subclass adds a field, keeps fields and signature",
+   "call": "class Deep(Pair, name='decl.pair_deep'):\n    depth = Choice(1, 2, default=2)\nr = {'fields': list(Deep.fields()), 'key': Deep(cols=5).key(), 'signature': sorted(Deep(cols=5).signature())}",
+   "ok": {
+    "fields": [
+     "cols",
+     "kind",
+     "depth"
+    ],
+    "key": "decl.pair_deep{cols=5,depth=2,kind=bf16}",
+    "signature": [
+     "dst",
+     "src"
+    ]
+   }
+  },
+  {
+   "case_": "a plain class attribute leaves the base's Choice a field",
+   "call": "class Fixed(Pair, name='decl.pair_fixed'):\n    kind = 'f32'\nr = {'fields': list(Fixed.fields()), 'key': Fixed(cols=1).key(), 'bf16 refused': Fixed.fields()['kind'].options}",
+   "ok": {
+    "fields": [
+     "cols",
+     "kind"
+    ],
+    "key": "decl.pair_fixed{cols=1,kind=bf16}",
+    "bf16 refused": [
+     "bf16",
+     "f32",
+     "e2m1"
+    ]
+   }
+  },
+  {
+   "case_": "fields named as an op's own attributes",
+   "call": "r = type('Bad', (Spec,), {'rank': Int(default=0), 'with_tensors': Choice('a')}, name='decl.bad_fields')",
+   "refused": "TypeError",
+   "message": "Bad: fields ['rank', 'with_tensors'] shadow an op's own attributes"
+  },
+  {
+   "case_": "the shadow check comes before the missing name",
+   "call": "r = type('Worse', (Spec,), {'tensors': Int(default=1)})",
+   "refused": "TypeError",
+   "message": "Worse: fields ['tensors'] shadow an op's own attributes"
+  }
+ ],
+ "group_ops": [
+  {
+   "case_": "no handle (as check makes it)",
+   "call": "r = placed(Gather(size=3, part=2))",
+   "ok": {
+    "key": "decl.gather{part=2,size=3}",
+    "group": null,
+    "rank": null,
+    "given": []
+   }
+  },
+  {
+   "case_": "rank 2's handle",
+   "call": "r = placed(Gather(size=3, part=2, group=crew[2]))",
+   "ok": {
+    "key": "decl.gather{part=2,size=3}",
+    "group": "Group(emulated, rank 2 of 3)",
+    "rank": 2,
+    "given": []
+   }
+  },
+  {
+   "case_": "a handle of a group of 2",
+   "call": "r = placed(Gather(size=3, part=2, group=pair[1]))",
+   "refused": "ValueError",
+   "message": "decl.gather: size = 3, its group's world 2"
+  },
+  {
+   "case_": "a size below the field's lo",
+   "call": "r = placed(Gather(size=1, part=2))",
+   "refused": "ValueError",
+   "message": "decl.gather: size = 1 outside 2 .. 6"
+  },
+  {
+   "case_": "a handle for a spec that is no group spec",
+   "call": "r = placed(Pair(cols=2, group=crew[0]))",
+   "refused": "TypeError",
+   "message": "decl.pair: not a group spec - an op of it takes no group="
+  },
+  {
+   "case_": "a shared tensor in a spec that is no group spec",
+   "call": "r = placed(Lonely(m=4))",
+   "refused": "TypeError",
+   "message": "decl.lonely: tensor buf shared - a group spec's"
+  },
+  {
+   "case_": "a plain array for the shared tensor, no handle",
+   "call": "r = placed(Gather(size=3, part=2, whole=np.zeros((3, 2), np.float32)))",
+   "refused": "ValueError",
+   "message": "decl.gather: tensor whole is shared: its group's copy (g.tensor), given with the group"
+  },
+  {
+   "case_": "the group's copy, no handle",
+   "call": "r = placed(Gather(size=3, part=2, whole=whole[1]))",
+   "refused": "ValueError",
+   "message": "decl.gather: tensor whole is shared: its group's copy (g.tensor), given with the group"
+  },
+  {
+   "case_": "a plain array with the handle",
+   "call": "r = placed(Gather(size=3, part=2, group=crew[0], whole=np.zeros((3, 2), np.float32)))",
+   "refused": "ValueError",
+   "message": "decl.gather: tensor whole is shared: its group's copy (g.tensor), given with the group"
+  },
+  {
+   "case_": "the rank's own copy with its handle",
+   "call": "r = placed(Gather(size=3, part=2, group=crew[0], whole=whole[0]))",
+   "ok": {
+    "key": "decl.gather{part=2,size=3}",
+    "group": "Group(emulated, rank 0 of 3)",
+    "rank": 0,
+    "given": [
+     "whole"
+    ]
+   }
+  },
+  {
+   "case_": "another rank's copy with the handle",
+   "call": "r = placed(Gather(size=3, part=2, group=crew[0], whole=whole[2]))",
+   "ok": {
+    "key": "decl.gather{part=2,size=3}",
+    "group": "Group(emulated, rank 0 of 3)",
+    "rank": 0,
+    "given": [
+     "whole"
+    ]
+   }
+  },
+  {
+   "case_": "another group's copy of the same name",
+   "call": "r = placed(Gather(size=3, part=2, group=crew[0], whole=foreign))",
+   "refused": "ValueError",
+   "message": "decl.gather: tensor whole is shared: its group's copy (g.tensor), given with the group"
+  },
+  {
+   "case_": "the unshared input given with the handle",
+   "call": "r = placed(Gather(size=3, part=2, group=crew[1], piece=np.zeros(2, np.float32)))",
+   "ok": {
+    "key": "decl.gather{part=2,size=3}",
+    "group": "Group(emulated, rank 1 of 3)",
+    "rank": 1,
+    "given": [
+     "piece"
+    ]
+   }
+  }
+ ]
+}

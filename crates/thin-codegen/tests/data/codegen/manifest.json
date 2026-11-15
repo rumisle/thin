@@ -1,0 +1,96 @@
+{
+ "notation": "manifest_line output and split_manifest results computed by thin-codegen from independently authored records and assembly text.",
+ "lines": [
+  {
+   "name": "sparse_record_defaults",
+   "manifest": "; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [], \"resident\": 0, \"sgpr\": 7, \"symbol\": \"authored_ping\", \"vgpr\": 5, \"wgsize\": 128, \"wgy\": 0}\n"
+  },
+  {
+   "name": "complete_record",
+   "manifest": "; thin.manifest {\"agpr\": 3, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"buffer\", \"offset\": 0}, {\"bytes\": 16, \"divisor\": true, \"hi\": 127, \"kind\": \"u32\", \"library\": \"sampler\", \"lo\": 2, \"mem\": \"uncached\", \"multiple\": 3, \"name\": \"factor\", \"offset\": 8, \"owned\": \"scratch\", \"ranks\": 3}], \"build\": {\"recipe\": {\"rows\": 8}}, \"grid\": [8, 2, 1], \"kernarg_bytes\": 32, \"lds\": 1024, \"max_grid\": [32, 4], \"mix\": {\"valu\": 7, \"vmem\": 2}, \"needs\": {\"co_resident\": \"paired consumer\"}, \"notes\": [\"authored diagnostic\"], \"phases\": {\"v\": [{\"at\": \"v_xor_b32 v:a, v:b, v:c\", \"base\": 4, \"peak\": 9, \"phase\": \"(derived)\", \"size\": null, \"used\": 12}]}, \"resident\": 2, \"sgpr\": 18, \"symbol\": \"authored_manifest\", \"vgpr\": 11, \"wgsize\": 128, \"wgy\": 2}\n"
+  },
+  {
+   "name": "unicode_note",
+   "manifest": "; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [\"latency \\u00b5s \\u2192 tile\"], \"resident\": 0, \"sgpr\": 4, \"symbol\": \"authored_unicode\", \"vgpr\": 2, \"wgsize\": 32, \"wgy\": 0}\n"
+  }
+ ],
+ "split": [
+  {
+   "name": "final_line_after_body",
+   "text": "\tv_xor_b32 v0, v0, v0\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [], \"resident\": 0, \"sgpr\": 7, \"symbol\": \"authored_ping\", \"vgpr\": 5, \"wgsize\": 128, \"wgy\": 0}\n",
+   "body": "\tv_xor_b32 v0, v0, v0\n\t.end_amdgpu_metadata\n",
+   "manifest": {
+    "agpr": 0,
+    "args": [],
+    "build": {},
+    "grid": [],
+    "kernarg_bytes": 0,
+    "lds": 0,
+    "mix": {},
+    "notes": [],
+    "resident": 0,
+    "sgpr": 7,
+    "symbol": "authored_ping",
+    "vgpr": 5,
+    "wgsize": 128,
+    "wgy": 0
+   }
+  },
+  {
+   "name": "extra_trailing_newlines",
+   "text": "\ts_nop 0\n\ts_endpgm\n; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [], \"resident\": 0, \"sgpr\": 7, \"symbol\": \"authored_ping\", \"vgpr\": 5, \"wgsize\": 128, \"wgy\": 0}\n\n\n",
+   "body": "\ts_nop 0\n\ts_endpgm\n",
+   "manifest": {
+    "agpr": 0,
+    "args": [],
+    "build": {},
+    "grid": [],
+    "kernarg_bytes": 0,
+    "lds": 0,
+    "mix": {},
+    "notes": [],
+    "resident": 0,
+    "sgpr": 7,
+    "symbol": "authored_ping",
+    "vgpr": 5,
+    "wgsize": 128,
+    "wgy": 0
+   }
+  },
+  {
+   "name": "plain_assembly",
+   "text": "\ts_endpgm\n",
+   "body": "\ts_endpgm\n",
+   "manifest": null
+  },
+  {
+   "name": "manifest_before_instruction",
+   "text": "; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [], \"resident\": 0, \"sgpr\": 7, \"symbol\": \"authored_ping\", \"vgpr\": 5, \"wgsize\": 128, \"wgy\": 0}\n\tv_add_nc_u32 v1, v0, 1\n",
+   "body": "; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [], \"resident\": 0, \"sgpr\": 7, \"symbol\": \"authored_ping\", \"vgpr\": 5, \"wgsize\": 128, \"wgy\": 0}\n\tv_add_nc_u32 v1, v0, 1\n",
+   "manifest": null
+  },
+  {
+   "name": "single_manifest_line",
+   "text": "; thin.manifest {\"agpr\": 0, \"args\": [], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 0, \"lds\": 0, \"mix\": {}, \"notes\": [\"latency \\u00b5s \\u2192 tile\"], \"resident\": 0, \"sgpr\": 4, \"symbol\": \"authored_unicode\", \"vgpr\": 2, \"wgsize\": 32, \"wgy\": 0}\n",
+   "body": "\n",
+   "manifest": {
+    "agpr": 0,
+    "args": [],
+    "build": {},
+    "grid": [],
+    "kernarg_bytes": 0,
+    "lds": 0,
+    "mix": {},
+    "notes": [
+     "latency µs → tile"
+    ],
+    "resident": 0,
+    "sgpr": 4,
+    "symbol": "authored_unicode",
+    "vgpr": 2,
+    "wgsize": 32,
+    "wgy": 0
+   }
+  }
+ ]
+}

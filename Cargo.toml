@@ -1,0 +1,72 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "tests/rust"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.86"
+license = "FSL-1.1-ALv2"
+authors = ["rumisle"]
+
+[workspace.dependencies]
+thin-formats = { path = "crates/thin-formats", version = "0.1.0" }
+thin-target = { path = "crates/thin-target", version = "0.1.0" }
+thin-ir = { path = "crates/thin-ir", version = "0.1.0" }
+thin-passes = { path = "crates/thin-passes", version = "0.1.0" }
+thin-targets = { path = "crates/thin-targets", version = "0.1.0" }
+thin-dsl = { path = "crates/thin-dsl", version = "0.1.0" }
+thin-codegen = { path = "crates/thin-codegen", version = "0.1.0" }
+thin-emu = { path = "crates/thin-emu", version = "0.1.0" }
+pyo3 = "0.30"
+numpy = "0.30"
+serde_json = "1"
+flate2 = "1"
+sha2 = "0.10"
+rayon = "1.10"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+
+# Thin LTO inlines across crates, so hot paths that span the IR, the passes
+# and the emulator optimize as one unit. codegen-units stays at cargo's
+# default of 16: thin LTO already recovers cross-unit inlining, and a
+# release build (and so a wheel) keeps compiling in parallel.
+[profile.release]
+debug = 1
+lto = "thin"
+codegen-units = 16
+
+# The editable install's profile ([tool.maturin] editable-profile): fast
+# edit-rebuild cycles while keeping optimized code. Incremental and without
+# LTO, so an edit rebuilds in about a second instead of 11-25 s; the code is
+# about 20% slower than release's. Not for measuring the compiler's speed:
+# use release (or dist) for that.
+[profile.iterate]
+inherits = "release"
+lto = false
+debug = "line-tables-only"
+incremental = true
+codegen-units = 256
+
+# Wheels: `maturin build --profile dist`. No debug info, stripped, fat LTO
+# with one codegen unit: 2.6 MB instead of 13.3 MB, and no slower. Release
+# keeps debug = 1 for local profiling.
+[profile.dist]
+inherits = "release"
+debug = 0
+strip = true
+lto = "fat"
+codegen-units = 1
+
+# Test builds of thin-formats run optimized. Its element loops (encode,
+# decode, the layout walks) are about ten times slower unoptimized, which
+# the golden and unit tests would feel as their inputs grow; the crate is
+# small, so the compile cost is a second. The other crates stay at
+# opt-level 0 until a test of theirs needs speed.
+[profile.test.package.thin-formats]
+opt-level = 3

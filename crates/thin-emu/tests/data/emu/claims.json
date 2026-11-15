@@ -1,0 +1,352 @@
+{
+ "notation": "Independently authored claim fragments. Each case records native uniform, assume, and undefined results (or the kind's native error), plus user_sgprs. Instruction claims are keyed by instruction index and edge claims by edge:FROM->TO. messages are native assume-failure and held-value formatting results for the explicit inputs in this generator.",
+ "cases": [
+  {
+   "name": "uniform_register_inventory",
+   "text": "\ts_mov_b32 s17, 9\n; uniform: s17, s[20:22], scc (shared address)\n; uniform: s:x#9[3]x7 (unplaced scratch)\n\ts_nop 6\n",
+   "uniform": {
+    "1": [
+     [
+      [
+       "s",
+       17,
+       1
+      ],
+      [
+       "s",
+       20,
+       3
+      ],
+      [
+       "scc",
+       0,
+       1
+      ]
+     ],
+     "uniform: s17, s[20:22], scc (shared address)"
+    ]
+   },
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "adjacent_uniform_claims_merge",
+   "text": "\ts_mov_b32 s12, 4\n; uniform: s12 (base)\n; uniform: s13 (stride)\n\ts_add_u32 s18, s19, s20\n\ts_nop 2\n; uniform: vcc_lo, s[14:16] (mask and descriptor)\n\ts_endpgm\n",
+   "uniform": {
+    "1": [
+     [
+      [
+       "s",
+       12,
+       1
+      ],
+      [
+       "s",
+       13,
+       1
+      ]
+     ],
+     "uniform: s12 (base); uniform: s13 (stride)"
+    ],
+    "3": [
+     [
+      [
+       "vcc",
+       0,
+       1
+      ],
+      [
+       "s",
+       14,
+       3
+      ]
+     ],
+     "uniform: vcc_lo, s[14:16] (mask and descriptor)"
+    ]
+   },
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "undefined_register_inventory",
+   "text": "\tv_mov_b32 v11, 2\n; undefined: v12, v[14:16], s22, a[4:6] (dead after spill)\n; undefined: v:x#5[2]x3 (unplaced)\n\ts_nop 7\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "1": [
+     [
+      "v",
+      12,
+      1
+     ],
+     [
+      "v",
+      14,
+      3
+     ],
+     [
+      "s",
+      22,
+      1
+     ],
+     [
+      "a",
+      4,
+      3
+     ]
+    ]
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "decimal_assume_intervals",
+   "text": "\tv_mov_b32 v8, 1\n; assume: v9 in [2, 31] (small lane code)\n; assume: s[30:31] in [7, 4294967295] (unsigned payload)\n\ts_nop 4\n",
+   "uniform": {},
+   "assume": {
+    "1": [
+     [
+      "v",
+      9,
+      1,
+      2,
+      31,
+      "assume: v9 in [2, 31] (small lane code)"
+     ],
+     [
+      "s",
+      30,
+      2,
+      7,
+      4294967295,
+      "assume: s[30:31] in [7, 4294967295] (unsigned payload)"
+     ]
+    ]
+   },
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "hexadecimal_assume_bound_refused",
+   "text": "\tv_mov_b32 v4, 0\n; assume: v7 in [0x10, 63] (hex lower bound)\n; assume: s8 in [1, 9] (not reached)\n\ts_nop 3\n",
+   "uniform": {},
+   "assume": {
+    "error": "line 2: `; assume: v7 in [0x10, 63] (hex lower bound)` is not a claim line: `assume: R in [LO, HI] (why)`, LO and HI decimal"
+   },
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "assume_requires_explanation",
+   "text": "\ts_mov_b32 s14, 2\n; assume: v15 in [1, 8]\n\ts_nop 5\n",
+   "uniform": {},
+   "assume": {
+    "error": "line 2: `; assume: v15 in [1, 8]` is not a claim line: `assume: R in [LO, HI] (why)`, LO and HI decimal"
+   },
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "uniform_cannot_precede_label",
+   "text": "\ts_nop 2\n; uniform: s19 (loop invariant)\n.Lheader_fresh:\n\ts_endpgm\n",
+   "uniform": {
+    "error": "line 2: `; uniform: s19 (loop invariant)` is followed by a label: the claim would be checked on every path into it (place Builder.uniform after an instruction of its own)"
+   },
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "uniform_rejects_vector_register",
+   "text": "\ts_nop 4\n; uniform: v21 (whole vector)\n\ts_endpgm\n",
+   "uniform": {
+    "error": "line 2: `; uniform: v21 (whole vector)` is not a claim line: `uniform: R, ... (why)`, R an SGPR or a named scalar register"
+   },
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "undefined_before_second_label_refused",
+   "text": "\ts_cbranch_scc1 .Lwrite\n\tv_mov_b32 v7, 5\n.Lwrite:\n; undefined: v9 (not written on one arm)\n.Ljoin_fresh:\n\tv_mov_b32 v10, 1\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "error": "line 4: `; undefined: v9 (not written on one arm)` is followed by a label, not by an instruction of its own: the claim would poison every path through that label (Builder.undefined emits its own s_nop)"
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "undefined_has_explicit_anchor",
+   "text": "\ts_cbranch_scc1 .Lother\n\tv_mov_b32 v6, 3\n.Lother:\n; undefined: v7 (claim anchored to explicit nop)\n\ts_nop 9\n.Ldone:\n\tv_mov_b32 v8, 0\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "2": [
+     [
+      "v",
+      7,
+      1
+     ]
+    ]
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "assume_cannot_precede_label",
+   "text": "\ts_cbranch_scc1 .Ltarget\n; assume: v12 in [4, 9] (would cover all incoming paths)\n.Ltarget:\n\tv_mov_b32 v13, 6\n",
+   "uniform": {},
+   "assume": {
+    "error": "line 2: `; assume: v12 in [4, 9] (would cover all incoming paths)` is followed by a label: the claim would be checked on every path into it (place Builder.assume after an instruction of its own)"
+   },
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "assume_after_label_is_anchored",
+   "text": "\ts_cbranch_scc1 .Lentry\n.Lentry:\n; assume: v16 in [2, 6] (check after joining label)\n\tv_mov_b32 v17, 8\n",
+   "uniform": {},
+   "assume": {
+    "1": [
+     [
+      "v",
+      16,
+      1,
+      2,
+      6,
+      "assume: v16 in [2, 6] (check after joining label)"
+     ]
+    ]
+   },
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "indented_claim_is_trivia",
+   "text": "\ts_nop 7\n\t; uniform: s27 (indented trivia)\n\ts_nop 8\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "descriptor_only_user_sgprs",
+   "text": ".amdhsa_kernel authored_empty\n.amdhsa_user_sgpr_count 7\n.end_amdhsa_kernel\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 7
+  },
+  {
+   "name": "plain_program_has_no_claims",
+   "text": "\ts_nop 10\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {},
+   "user_sgprs": 2
+  },
+  {
+   "name": "undefined_on_fallthrough_edge",
+   "text": "\ts_cbranch_scc1 .Lalternate\n\tv_mov_b32 v18, 6\n; undefined on fall: v19 (fall-through arm did not produce it)\n.Lalternate:\n\tv_mov_b32 v20, 2\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "edge:1->2": [
+     [
+      "v",
+      19,
+      1
+     ]
+    ]
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "undefined_on_taken_edge_range",
+   "text": "\tv_mov_b32 v22, 4\n; undefined on taken: v[24:26] (only fall-through initializes these)\n\ts_cbranch_scc1 .Lskip\n\tv_mov_b32 v27, 1\n.Lskip:\n\tv_mov_b32 v28, 9\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "edge:1->3": [
+     [
+      "v",
+      24,
+      3
+     ]
+    ]
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "taken_edge_claim_requires_branch",
+   "text": "\tv_mov_b32 v29, 2\n; undefined on taken: v30 (no branch follows)\n\tv_mov_b32 v31, 3\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "error": "line 2: `; undefined on taken: v30 (no branch follows)` is not followed by a branch: an edge claim on taken stands just before its branch"
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "fall_edge_claim_requires_label",
+   "text": "\tv_mov_b32 v32, 2\n; undefined on fall: v33 (no label follows)\n\tv_mov_b32 v34, 3\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "error": "line 2: `; undefined on fall: v33 (no label follows)` is not followed by a label: an edge claim on fall stands just before the label it falls into"
+   },
+   "user_sgprs": 2
+  },
+  {
+   "name": "undefined_at_label_preinstruction",
+   "text": ".Ltop_fresh:\n; undefined: v35 (poison at every incoming edge)\n\tv_mov_b32 v36, 4\n\ts_cbranch_scc1 .Ltop_fresh\n",
+   "uniform": {},
+   "assume": {},
+   "undefined": {
+    "0": [
+     [
+      "v",
+      35,
+      1
+     ]
+    ]
+   },
+   "user_sgprs": 2
+  }
+ ],
+ "message_inputs": {
+  "sgpr": {
+   "text": "assume: s18 in [2, 9] (bounded setup)",
+   "pc": 17,
+   "wave": 2,
+   "value": 42,
+   "lane": null
+  },
+  "lane": {
+   "text": "assume: v23 in [1, 7] (initialized lanes)",
+   "pc": 18,
+   "wave": 4,
+   "lane": 5,
+   "value": 2143387585
+  },
+  "held": [
+   [
+    7
+   ],
+   [
+    11,
+    12,
+    13
+   ],
+   [
+    256
+   ]
+  ]
+ },
+ "messages": {
+  "assume_false_sgpr": "`; assume: s18 in [2, 9] (bounded setup)` before instruction 17 is false: wave 2 holds 0x2a (Builder.assume's claim)",
+  "assume_false_lane": "`; assume: v23 in [1, 7] (initialized lanes)` before instruction 18 is false: wave 4 lane 5 holds POISON (never written, or its load not landed) (Builder.assume's claim)",
+  "held_text": "[0x7, [0xb, 0xc, 0xd], 0x100]"
+ }
+}

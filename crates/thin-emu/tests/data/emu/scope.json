@@ -1,0 +1,217 @@
+{
+ "notation": "One workgroup of one wave per rank, ranks over one memory with the scope model on; every workgroup is on L2 0 of its rank. buf is 64 bytes, cached unless buffer says {ipc: true} (shared, uncached). Each lane's address is buf[0]. Ops: store / store_agent (store 7 at wave / agent scope), load / load_agent / load_nt (load at wave scope / agent scope / with the non-temporal policy only), atomic / atomic_system (an add at agent / system scope), invalidate (drop the L2's kept lines), writeback (write back the L2's held bytes), wait (the load and store counters' waits, 0), busy (a 1000-round scalar loop). skew: the turns each rank waits before its first dispatch. error: the error class (ScopeModel, IpcPolicy) or null; message: the expected message with canonical operation names (informative).",
+ "cases": [
+  {
+   "name": "a wave-scope store read by the other rank before it is written back",
+   "rank0": [
+    "store",
+    "wait",
+    "busy"
+   ],
+   "rank1": [
+    "load",
+    "wait"
+   ],
+   "buffer": {},
+   "skew": [
+    0,
+    5
+   ],
+   "error": "ScopeModel",
+   "message": "load: rank 1 L2 0 reads bytes of buf that rank 0 L2 0 stored below agent scope in this launch: they are in its L2, not in memory (a peer sees them after an agent-scope store, a write-back or the launch's end)"
+  },
+  {
+   "name": "the same, an agent-scope store",
+   "rank0": [
+    "store_agent",
+    "wait",
+    "busy"
+   ],
+   "rank1": [
+    "load",
+    "wait"
+   ],
+   "buffer": {},
+   "skew": [
+    0,
+    5
+   ],
+   "error": null,
+   "message": null
+  },
+  {
+   "name": "the same, written back after the store",
+   "rank0": [
+    "store",
+    "wait",
+    "writeback",
+    "busy"
+   ],
+   "rank1": [
+    "load",
+    "wait"
+   ],
+   "buffer": {},
+   "skew": [
+    0,
+    5
+   ],
+   "error": null,
+   "message": null
+  },
+  {
+   "name": "an atomic on bytes another L2 holds",
+   "rank0": [
+    "store",
+    "wait",
+    "busy"
+   ],
+   "rank1": [
+    "atomic"
+   ],
+   "buffer": {},
+   "skew": [
+    0,
+    5
+   ],
+   "error": "ScopeModel",
+   "message": "atomic: an atomic of rank 1 L2 0 on bytes of buf that rank 0 L2 0 stored below agent scope in this launch: they are in its L2, not in memory, and the atomic misses them (store at agent scope, or write back after the store)"
+  },
+  {
+   "name": "the same, the store at agent scope",
+   "rank0": [
+    "store_agent",
+    "wait",
+    "busy"
+   ],
+   "rank1": [
+    "atomic"
+   ],
+   "buffer": {},
+   "skew": [
+    0,
+    5
+   ],
+   "error": null,
+   "message": null
+  },
+  {
+   "name": "a line kept by the reader's L2, written by the other rank, read again below agent scope",
+   "rank0": [
+    "store_agent",
+    "wait"
+   ],
+   "rank1": [
+    "load",
+    "wait",
+    "busy",
+    "load",
+    "wait"
+   ],
+   "buffer": {},
+   "skew": [
+    5,
+    0
+   ],
+   "error": "ScopeModel",
+   "message": "load: rank 1 L2 0 reads byte 0 of buf below agent scope from the line its L2 kept since an earlier read in this launch - another L2 wrote it since: the read is stale (an acquire at agent scope: an agent-scope load, or an invalidate before it)"
+  },
+  {
+   "name": "the same, the second read at agent scope",
+   "rank0": [
+    "store_agent",
+    "wait"
+   ],
+   "rank1": [
+    "load",
+    "wait",
+    "busy",
+    "load_agent",
+    "wait"
+   ],
+   "buffer": {},
+   "skew": [
+    5,
+    0
+   ],
+   "error": null,
+   "message": null
+  },
+  {
+   "name": "the same, invalidated before the second read",
+   "rank0": [
+    "store_agent",
+    "wait"
+   ],
+   "rank1": [
+    "load",
+    "wait",
+    "busy",
+    "invalidate",
+    "load",
+    "wait"
+   ],
+   "buffer": {},
+   "skew": [
+    5,
+    0
+   ],
+   "error": null,
+   "message": null
+  },
+  {
+   "name": "an uncached shared buffer loaded without the policy bits",
+   "rank0": [
+    "load",
+    "wait"
+   ],
+   "rank1": [],
+   "buffer": {
+    "ipc": true
+   },
+   "skew": null,
+   "error": "IpcPolicy",
+   "message": "load: accesses the IPC buffer buf without scope ≥ SCOPE_DEV or a non-temporal th (another rank's view)"
+  },
+  {
+   "name": "the same, loaded non-temporal",
+   "rank0": [
+    "load_nt",
+    "wait"
+   ],
+   "rank1": [],
+   "buffer": {
+    "ipc": true
+   },
+   "skew": null,
+   "error": null,
+   "message": null
+  },
+  {
+   "name": "an atomic on an uncached shared buffer without the bits",
+   "rank0": [
+    "atomic"
+   ],
+   "rank1": [],
+   "buffer": {
+    "ipc": true
+   },
+   "skew": null,
+   "error": "IpcPolicy",
+   "message": "atomic: accesses the IPC buffer buf without scope ≥ SCOPE_DEV or a non-temporal th (another rank's view)"
+  },
+  {
+   "name": "the same, at system scope",
+   "rank0": [
+    "atomic_system"
+   ],
+   "rank1": [],
+   "buffer": {
+    "ipc": true
+   },
+   "skew": null,
+   "error": null,
+   "message": null
+  }
+ ]
+}

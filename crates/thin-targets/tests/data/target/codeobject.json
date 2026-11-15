@@ -1,0 +1,362 @@
+{
+ "e_flags": 78,
+ "granule": 8,
+ "directives": [
+  "forward_progress",
+  "memory_ordered",
+  "round_robin_scheduling",
+  "wavefront_size32",
+  "workgroup_processor_mode"
+ ],
+ "common_directives": [
+  "enable_private_segment",
+  "float_denorm_mode_16_64",
+  "float_denorm_mode_32",
+  "float_round_mode_16_64",
+  "float_round_mode_32",
+  "fp16_overflow",
+  "group_segment_fixed_size",
+  "kernarg_size",
+  "next_free_sgpr",
+  "next_free_vgpr",
+  "private_segment_fixed_size",
+  "reserve_vcc",
+  "system_sgpr_workgroup_id_x",
+  "system_sgpr_workgroup_id_y",
+  "system_sgpr_workgroup_id_z",
+  "system_sgpr_workgroup_info",
+  "system_vgpr_workitem_id",
+  "user_sgpr_count",
+  "user_sgpr_dispatch_id",
+  "user_sgpr_dispatch_ptr",
+  "user_sgpr_kernarg_segment_ptr",
+  "user_sgpr_private_segment_size",
+  "user_sgpr_queue_ptr",
+  "uses_dynamic_stack"
+ ],
+ "footers": [
+  {
+   "params": {
+    "name": "k",
+    "target_name": "amdgcn-amd-amdhsa--gfx1201",
+    "lds": 0,
+    "kernarg": 24,
+    "vgpr": 3,
+    "agpr": 0,
+    "sgpr": 10,
+    "wgsize": 256,
+    "wgy": 0,
+    "preload": 0
+   },
+   "text": "\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel k\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 24\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 3\n\t\t.amdhsa_next_free_sgpr 10\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tk, .Lfunc_end0-k\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           24\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 24\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 256\n    .name:           k\n    .private_segment_fixed_size: 0\n    .sgpr_count:     12\n    .sgpr_spill_count: 0\n    .symbol:         k.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     3\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n"
+  },
+  {
+   "params": {
+    "name": "gemm_1",
+    "target_name": "amdgcn-amd-amdhsa--gfx1201",
+    "lds": 32768,
+    "kernarg": 64,
+    "vgpr": 0,
+    "agpr": 0,
+    "sgpr": 0,
+    "wgsize": 1024,
+    "wgy": 1,
+    "preload": 0
+   },
+   "text": "\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel gemm_1\n\t\t.amdhsa_group_segment_fixed_size 32768\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 64\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 1\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 1\n\t\t.amdhsa_next_free_sgpr 0\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tgemm_1, .Lfunc_end0-gemm_1\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           64\n        .value_kind:     by_value\n    .group_segment_fixed_size: 32768\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 64\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 1024\n    .name:           gemm_1\n    .private_segment_fixed_size: 0\n    .sgpr_count:     2\n    .sgpr_spill_count: 0\n    .symbol:         gemm_1.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     1\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n"
+  }
+ ],
+ "footer_refusals": [
+  {
+   "params": {
+    "name": "k",
+    "target_name": "amdgcn-amd-amdhsa--gfx1201",
+    "lds": 0,
+    "kernarg": 24,
+    "vgpr": 3,
+    "agpr": 4,
+    "sgpr": 10,
+    "wgsize": 256,
+    "wgy": 0,
+    "preload": 0
+   },
+   "refused": true
+  },
+  {
+   "params": {
+    "name": "k",
+    "target_name": "amdgcn-amd-amdhsa--gfx1201",
+    "lds": 0,
+    "kernarg": 24,
+    "vgpr": 3,
+    "agpr": 0,
+    "sgpr": 10,
+    "wgsize": 256,
+    "wgy": 0,
+    "preload": 2
+   },
+   "refused": true
+  }
+ ],
+ "resources": [
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 3758096384,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 0,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 3758096384,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 8,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 3758096384,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 9,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 3758096385,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 512,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 3758096447,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 513,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "refused": "registers past the descriptor's fields: vgpr 513, sgpr 10"
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 106,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 3758096384,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 107,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "refused": "registers past the descriptor's fields: vgpr 3, sgpr 107"
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 0,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "refused": ".amdhsa_wavefront_size32 0: gfx1201's kernels are wave32"
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 1
+   },
+   "resources": {
+    "rsrc1": 3760193536,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 0,
+    "memory_ordered": 0,
+    "forward_progress": 0,
+    "round_robin_scheduling": 0
+   },
+   "resources": {
+    "rsrc1": 0,
+    "rsrc3": 0,
+    "props": 1024,
+    "preload": 0,
+    "user_sgprs": 0
+   }
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 2,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 1,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "refused": ".amdhsa_reserve_vcc 2: does not fit its 1 bits"
+  },
+  {
+   "block": {
+    "next_free_vgpr": 3,
+    "next_free_sgpr": 10,
+    "reserve_vcc": 1,
+    "wavefront_size32": 1,
+    "workgroup_processor_mode": 1,
+    "memory_ordered": 2,
+    "forward_progress": 1,
+    "round_robin_scheduling": 0
+   },
+   "refused": ".amdhsa_memory_ordered 2: does not fit its 1 bits"
+  }
+ ],
+ "kernel": {
+  "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tk\n\t.globl\tk\n\t.p2align\t8\n\t.type\tk,@function\nk:\n\ts_endpgm\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel k\n\t\t.amdhsa_group_segment_fixed_size 1024\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 24\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 1\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 3\n\t\t.amdhsa_next_free_sgpr 10\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tk, .Lfunc_end0-k\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           24\n        .value_kind:     by_value\n    .group_segment_fixed_size: 1024\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 24\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 256\n    .name:           k\n    .private_segment_fixed_size: 0\n    .sgpr_count:     12\n    .sgpr_spill_count: 0\n    .symbol:         k.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     3\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n",
+  "descriptor_hex": "00040000000000001800000000000000000000000000000000000000000000000000000000000000000000000000000000000fe0840100000804000000000000",
+  "metadata": {
+   "amdhsa.kernels": [
+    {
+     ".args": [
+      {
+       ".offset": 0,
+       ".size": 24,
+       ".value_kind": "by_value"
+      }
+     ],
+     ".group_segment_fixed_size": 1024,
+     ".kernarg_segment_align": 8,
+     ".kernarg_segment_size": 24,
+     ".language": "OpenCL C",
+     ".language_version": [
+      2,
+      0
+     ],
+     ".max_flat_workgroup_size": 256,
+     ".name": "k",
+     ".private_segment_fixed_size": 0,
+     ".sgpr_count": 12,
+     ".sgpr_spill_count": 0,
+     ".symbol": "k.kd",
+     ".uniform_work_group_size": 1,
+     ".uses_dynamic_stack": false,
+     ".vgpr_count": 3,
+     ".vgpr_spill_count": 0,
+     ".wavefront_size": 32,
+     ".workgroup_processor_mode": 1
+    }
+   ],
+   "amdhsa.target": "amdgcn-amd-amdhsa--gfx1201",
+   "amdhsa.version": [
+    1,
+    2
+   ]
+  }
+ }
+}

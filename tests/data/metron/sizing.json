@@ -1,0 +1,554 @@
+{
+ "notation": "Sizing boundaries and explicit stack/environment inputs, evaluated through metron's API.",
+ "constants": {
+  "COLD": 2147483648,
+  "GAP": 4096,
+  "ALIGN": 16,
+  "REPLAY_US": 10000,
+  "SWEEP_US": 200000,
+  "PROBE": 64,
+  "MIN_ROUNDS": 6,
+  "POISON": 255,
+  "GUARD": 91,
+  "HYGIENE": 65536,
+  "OWNED_ALIGN": 256,
+  "GENS_START": 4294967293,
+  "GRAPH_CALLS": {
+   "ROCm 7.x": 4096,
+   "other stacks": 4096
+  },
+  "PLAIN_MOST": 65536
+ },
+ "copies": [
+  {
+   "rotated_bytes": 0,
+   "most": 65536,
+   "copies": 65536
+  },
+  {
+   "rotated_bytes": 1,
+   "most": 65536,
+   "copies": 65536
+  },
+  {
+   "rotated_bytes": 128,
+   "most": 65536,
+   "copies": 65536
+  },
+  {
+   "rotated_bytes": 128,
+   "most": 32768,
+   "copies": 32768
+  },
+  {
+   "rotated_bytes": 3221225472,
+   "most": 65536,
+   "copies": 2
+  },
+  {
+   "rotated_bytes": 2147483648,
+   "most": 65536,
+   "copies": 2
+  },
+  {
+   "rotated_bytes": 2147483647,
+   "most": 65536,
+   "copies": 2
+  },
+  {
+   "rotated_bytes": 1073741824,
+   "most": 65536,
+   "copies": 2
+  },
+  {
+   "rotated_bytes": 268435456,
+   "most": 65536,
+   "copies": 8
+  },
+  {
+   "rotated_bytes": 100663296,
+   "most": 65536,
+   "copies": 22
+  },
+  {
+   "rotated_bytes": 6291456,
+   "most": 65536,
+   "copies": 342
+  },
+  {
+   "rotated_bytes": 12582912,
+   "most": 65536,
+   "copies": 171
+  },
+  {
+   "rotated_bytes": 32768,
+   "most": 65536,
+   "copies": 65536
+  },
+  {
+   "rotated_bytes": 128,
+   "most": 1365,
+   "copies": 1365
+  },
+  {
+   "rotated_bytes": 128,
+   "most": 585,
+   "copies": 585
+  },
+  {
+   "rotated_bytes": 786432,
+   "most": 1365,
+   "copies": 1365
+  },
+  {
+   "rotated_bytes": 1572864,
+   "most": 1365,
+   "copies": 1365
+  },
+  {
+   "rotated_bytes": 1572863,
+   "most": 1365,
+   "copies": 1365
+  },
+  {
+   "rotated_bytes": 12582912,
+   "most": 1365,
+   "copies": 171
+  },
+  {
+   "rotated_bytes": 786432,
+   "most": 2,
+   "copies": 2
+  },
+  {
+   "rotated_bytes": 262144,
+   "most": 682,
+   "copies": 682
+  }
+ ],
+ "fitted": [
+  {
+   "copies": 65536,
+   "call_us": 1.0,
+   "fitted": 65536
+  },
+  {
+   "copies": 65536,
+   "call_us": 71.0,
+   "fitted": 2816
+  },
+  {
+   "copies": 22,
+   "call_us": 1000000.0,
+   "fitted": 2
+  },
+  {
+   "copies": 22,
+   "call_us": 0.0,
+   "fitted": 22
+  },
+  {
+   "copies": 100,
+   "call_us": 2000.0,
+   "fitted": 100
+  },
+  {
+   "copies": 100,
+   "call_us": 1999.0,
+   "fitted": 100
+  },
+  {
+   "copies": 5,
+   "call_us": 30000.0,
+   "fitted": 5
+  },
+  {
+   "copies": 2,
+   "call_us": 1000000000.0,
+   "fitted": 2
+  }
+ ],
+ "calls": [
+  {
+   "copies": 22,
+   "sweep_us": 1000.0,
+   "most": 65536,
+   "calls": 220
+  },
+  {
+   "copies": 22,
+   "sweep_us": 1000000.0,
+   "most": 65536,
+   "calls": 22
+  },
+  {
+   "copies": 65536,
+   "sweep_us": 1.0,
+   "most": 65536,
+   "calls": 65536
+  },
+  {
+   "copies": 8,
+   "sweep_us": 10.0,
+   "most": 65536,
+   "calls": 8000
+  },
+  {
+   "copies": 8,
+   "sweep_us": 0.0,
+   "most": 65536,
+   "calls": 65536
+  },
+  {
+   "copies": 7,
+   "sweep_us": 3333.0,
+   "most": 65536,
+   "calls": 28
+  },
+  {
+   "copies": 2,
+   "sweep_us": 1.0,
+   "most": 65536,
+   "calls": 20000
+  },
+  {
+   "copies": 3,
+   "sweep_us": 1.0,
+   "most": 32768,
+   "calls": 30000
+  },
+  {
+   "copies": 32768,
+   "sweep_us": 5.0,
+   "most": 32768,
+   "calls": 32768
+  },
+  {
+   "copies": 22,
+   "sweep_us": 10000.0,
+   "most": 65536,
+   "calls": 22
+  },
+  {
+   "copies": 22,
+   "sweep_us": 9999.0,
+   "most": 65536,
+   "calls": 44
+  },
+  {
+   "copies": 1365,
+   "sweep_us": 1000.0,
+   "most": 1365,
+   "calls": 1365
+  },
+  {
+   "copies": 171,
+   "sweep_us": 500.0,
+   "most": 1365,
+   "calls": 1197
+  },
+  {
+   "copies": 171,
+   "sweep_us": 50.0,
+   "most": 1365,
+   "calls": 1197
+  },
+  {
+   "copies": 585,
+   "sweep_us": 1.0,
+   "most": 585,
+   "calls": 585
+  },
+  {
+   "copies": 2,
+   "sweep_us": 1.0,
+   "most": 2,
+   "calls": 2
+  },
+  {
+   "copies": 2,
+   "sweep_us": 1.0,
+   "most": 3,
+   "calls": 2
+  },
+  {
+   "copies": 683,
+   "sweep_us": 100.0,
+   "most": 1365,
+   "calls": 683
+  }
+ ],
+ "graph_calls": [
+  {
+   "env": null,
+   "hip_version": 70152802,
+   "graph_calls": 4096
+  },
+  {
+   "env": null,
+   "hip_version": 70000000,
+   "graph_calls": 4096
+  },
+  {
+   "env": null,
+   "hip_version": 60443483,
+   "graph_calls": 4096
+  },
+  {
+   "env": null,
+   "hip_version": 0,
+   "graph_calls": 4096
+  },
+  {
+   "env": "8192",
+   "hip_version": 70152802,
+   "graph_calls": 8192
+  },
+  {
+   "env": "1",
+   "hip_version": 70152802,
+   "graph_calls": 1
+  },
+  {
+   "env": "65536",
+   "hip_version": 60443483,
+   "graph_calls": 65536
+  },
+  {
+   "env": "0",
+   "hip_version": 70152802,
+   "raises": "ValueError",
+   "message": "METRON_GRAPH_CALLS='0': a whole number of graph calls, at least 1"
+  },
+  {
+   "env": "-5",
+   "hip_version": 70152802,
+   "raises": "ValueError",
+   "message": "METRON_GRAPH_CALLS='-5': a whole number of graph calls, at least 1"
+  },
+  {
+   "env": "4k",
+   "hip_version": 70152802,
+   "raises": "ValueError",
+   "message": "METRON_GRAPH_CALLS='4k': a whole number of graph calls, at least 1"
+  },
+  {
+   "env": "",
+   "hip_version": 70152802,
+   "raises": "ValueError",
+   "message": "METRON_GRAPH_CALLS='': a whole number of graph calls, at least 1"
+  },
+  {
+   "env": "1.5",
+   "hip_version": 70152802,
+   "raises": "ValueError",
+   "message": "METRON_GRAPH_CALLS='1.5': a whole number of graph calls, at least 1"
+  }
+ ],
+ "most": [
+  {
+   "budget": 4096,
+   "ranks": 1,
+   "arms": 1,
+   "cold": false,
+   "most": 2048
+  },
+  {
+   "budget": 4096,
+   "ranks": 1,
+   "arms": 2,
+   "cold": false,
+   "most": 1365
+  },
+  {
+   "budget": 4096,
+   "ranks": 1,
+   "arms": 2,
+   "cold": true,
+   "most": 585
+  },
+  {
+   "budget": 4096,
+   "ranks": 1,
+   "arms": 3,
+   "cold": false,
+   "most": 1024
+  },
+  {
+   "budget": 4096,
+   "ranks": 2,
+   "arms": 2,
+   "cold": false,
+   "most": 682
+  },
+  {
+   "budget": 4096,
+   "ranks": 8,
+   "arms": 2,
+   "cold": false,
+   "most": 170
+  },
+  {
+   "budget": 4096,
+   "ranks": 8,
+   "arms": 4,
+   "cold": true,
+   "most": 46
+  },
+  {
+   "budget": 4096,
+   "ranks": 1,
+   "arms": 1,
+   "cold": true,
+   "most": 819
+  },
+  {
+   "budget": 65536,
+   "ranks": 1,
+   "arms": 2,
+   "cold": false,
+   "most": 21845
+  },
+  {
+   "budget": 6,
+   "ranks": 1,
+   "arms": 2,
+   "cold": false,
+   "most": 2
+  },
+  {
+   "budget": 5,
+   "ranks": 1,
+   "arms": 2,
+   "cold": false,
+   "raises": "ValueError",
+   "message": "race at <key>: 2 arms × 1 ranks need 6 graph calls alive at the least; this stack holds 5 (set METRON_GRAPH_CALLS to change it)"
+  },
+  {
+   "budget": 13,
+   "ranks": 1,
+   "arms": 2,
+   "cold": true,
+   "raises": "ValueError",
+   "message": "race at <key>: 2 arms × 1 ranks, cold code need 14 graph calls alive at the least; this stack holds 13 (set METRON_GRAPH_CALLS to change it)"
+  },
+  {
+   "budget": 14,
+   "ranks": 1,
+   "arms": 2,
+   "cold": true,
+   "most": 2
+  },
+  {
+   "budget": 1,
+   "ranks": 1,
+   "arms": 1,
+   "cold": false,
+   "raises": "ValueError",
+   "message": "race at <key>: 1 arms × 1 ranks need 4 graph calls alive at the least; this stack holds 1 (set METRON_GRAPH_CALLS to change it)"
+  },
+  {
+   "budget": 4096,
+   "ranks": 64,
+   "arms": 31,
+   "cold": true,
+   "raises": "ValueError",
+   "message": "race at <key>: 31 arms × 64 ranks, cold code need 8320 graph calls alive at the least; this stack holds 4096 (set METRON_GRAPH_CALLS to change it)"
+  }
+ ],
+ "graph_replays_ok": [
+  {
+   "env": null,
+   "hip_version": 70152802,
+   "archs": [
+    "gfx1201"
+   ],
+   "ok": false
+  },
+  {
+   "env": null,
+   "hip_version": 70000000,
+   "archs": [
+    "gfx1201",
+    "gfx1201"
+   ],
+   "ok": false
+  },
+  {
+   "env": null,
+   "hip_version": 70152802,
+   "archs": [
+    "gfx1036",
+    "gfx1201"
+   ],
+   "ok": false
+  },
+  {
+   "env": null,
+   "hip_version": 70152802,
+   "archs": [
+    "gfx1100"
+   ],
+   "ok": true
+  },
+  {
+   "env": null,
+   "hip_version": 60443483,
+   "archs": [
+    "gfx1201"
+   ],
+   "ok": true
+  },
+  {
+   "env": null,
+   "hip_version": 80000000,
+   "archs": [
+    "gfx1201"
+   ],
+   "ok": true
+  },
+  {
+   "env": "1",
+   "hip_version": 70152802,
+   "archs": [
+    "gfx1201"
+   ],
+   "ok": true
+  },
+  {
+   "env": "0",
+   "hip_version": 60443483,
+   "archs": [
+    "gfx1100"
+   ],
+   "ok": false
+  },
+  {
+   "env": "yes",
+   "hip_version": 70152802,
+   "archs": [
+    "gfx1201"
+   ],
+   "raises": "ValueError",
+   "message": "METRON_GRAPHS='yes': 1 (graphs) or 0 (plain launches)"
+  },
+  {
+   "env": "",
+   "hip_version": 70152802,
+   "archs": [
+    "gfx1201"
+   ],
+   "raises": "ValueError",
+   "message": "METRON_GRAPHS='': 1 (graphs) or 0 (plain launches)"
+  },
+  {
+   "env": "true",
+   "hip_version": 60443483,
+   "archs": [
+    "gfx1100"
+   ],
+   "raises": "ValueError",
+   "message": "METRON_GRAPHS='true': 1 (graphs) or 0 (plain launches)"
+  }
+ ]
+}

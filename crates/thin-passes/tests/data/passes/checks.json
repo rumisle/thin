@@ -1,0 +1,380 @@
+{
+ "target": "gfx1201",
+ "notation": "native pass diagnostics; null error means the check accepts the program",
+ "cases": [
+  {
+   "name": "both sides of a branch overwrite the initial value",
+   "input": [
+    "v_or_b32 v6, v1, 5",
+    "s_cmp_lg_u32 s21, 0",
+    "s_cbranch_scc0 .Lck_left",
+    "v_xor_b32 v6, v2, 9",
+    "s_branch .Lck_join",
+    ".Lck_left:",
+    "v_sub_nc_u32 v6, 99, v3",
+    ".Lck_join:",
+    "v_add_nc_u32 v7, v6, 1",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": "`v_or_b32 v6, v1, 5`: its value is written over on every path before a read (`v_xor_b32 v6, v2, 9` writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+  },
+  {
+   "name": "one side consumes before its peer overwrites",
+   "input": [
+    "v_or_b32 v6, v1, 5",
+    "s_cmp_lg_u32 s21, 0",
+    "s_cbranch_scc0 .Lck_left",
+    "v_add_nc_u32 v8, v6, 2",
+    "s_branch .Lck_join",
+    ".Lck_left:",
+    "v_sub_nc_u32 v6, 99, v3",
+    ".Lck_join:",
+    "v_add_nc_u32 v7, v6, 1",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "kernel exit is not considered a dead overwrite",
+   "input": [
+    "v_xor_b32 v10, v8, 3",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "disabled lanes preserve the old vector value",
+   "input": [
+    "v_mov_b32 v9, 77",
+    "s_mov_b32 exec_lo, 31",
+    "v_xor_b32 v9, v4, 1",
+    "s_mov_b32 exec_lo, -1",
+    "v_add_nc_u32 v11, v9, 1",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "full EXEC write is dead only after restoration",
+   "input": [
+    "v_mov_b32 v9, 79",
+    "s_mov_b32 exec_lo, 15",
+    "s_mov_b32 exec_lo, -1",
+    "v_xor_b32 v9, v4, 1",
+    "v_add_nc_u32 v11, v9, 1",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": "`v_mov_b32 v9, 79`: its value is written over on every path before a read (`v_xor_b32 v9, v4, 1` writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+  },
+  {
+   "name": "immediate full width replacement is dead",
+   "input": [
+    "v_mov_b32 v12, 81",
+    "v_add_nc_u32 v12, v1, 7",
+    "v_xor_b32 v13, v12, 3",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": "`v_mov_b32 v12, 81`: its value is written over on every path before a read (`v_add_nc_u32 v12, v1, 7` writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+  },
+  {
+   "name": "explicit discard is a consumer",
+   "input": [
+    "v_mov_b32 v12, 83",
+    "; discard v:x[0]x1: lane values no longer needed",
+    "v_add_nc_u32 v12, v1, 7",
+    "v_xor_b32 v13, v12, 3",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": "`v_mov_b32 v12, 83`: its value is written over on every path before a read (`v_add_nc_u32 v12, v1, 7` writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+  },
+  {
+   "name": "scalar replacement is outside the vector dead write check",
+   "input": [
+    "s_mov_b32 s19, 85",
+    "s_add_co_u32 s19, s19, 3",
+    "s_and_b32 s20, s19, 7",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "multiply accumulate reads its original destination",
+   "input": [
+    "v_mov_b32 v15, 87",
+    "v_fmac_f32 v15, v5, v7",
+    "v_xor_b32 v16, v15, 3",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "op sel half write leaves the other half observable",
+   "input": [
+    "v_mov_b32 v17, 89",
+    "v_add_f16_e64 v17, v8, v9 op_sel:[0,0,1]",
+    "v_add_nc_u32 v18, v17, 1",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "overwritten dword is diagnosed even beside a live dword",
+   "input": [
+    "v_mov_b32 v20, 91",
+    "v_mov_b32 v21, 93",
+    "v_xor_b32 v20, v5, 7",
+    "global_store_b64 v[50:51], v[20:21], s[12:13]",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": "`v_mov_b32 v20, 91`: its value is written over on every path before a read (`v_xor_b32 v20, v5, 7` writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+  },
+  {
+   "name": "loop head consumes the previous iteration write",
+   "input": [
+    "v_mov_b32 v22, 0",
+    ".Lck_loop:",
+    "v_sub_nc_u32 v23, v22, v4",
+    "v_add_nc_u32 v22, v5, 3",
+    "s_cbranch_scc1 .Lck_loop",
+    "s_endpgm"
+   ],
+   "check": "dead writes",
+   "error": null
+  },
+  {
+   "name": "select below join has a comparison on each predecessor",
+   "input": [
+    "s_cmp_lg_u32 s30, 0",
+    "s_cbranch_scc0 .Lscc_b",
+    "s_cmp_ge_u32 s31, 7",
+    "s_branch .Lscc_join",
+    ".Lscc_b:",
+    "s_cmp_le_u32 s32, 19",
+    ".Lscc_join:",
+    "s_cselect_b32 s33, 11, 22",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_cselect_b32 s33, 11, 22`: SCC was last written by the paths into it (unknown), not a compare"
+  },
+  {
+   "name": "arithmetic on one predecessor makes joined SCC unknown",
+   "input": [
+    "s_cmp_lg_u32 s30, 0",
+    "s_cbranch_scc0 .Lscc_b",
+    "s_cmp_ge_u32 s31, 7",
+    "s_branch .Lscc_join",
+    ".Lscc_b:",
+    "s_sub_co_u32 s32, s32, 5",
+    ".Lscc_join:",
+    "s_cselect_b32 s33, 11, 22",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_cselect_b32 s33, 11, 22`: SCC was last written by the paths into it (unknown), not a compare"
+  },
+  {
+   "name": "SCC producing shift invalidates a later select",
+   "input": [
+    "s_cmp_le_u32 s34, 29",
+    "s_lshl2_add_u32 s35, s35, 3",
+    "s_cselect_b32 s36, 4, 8",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_cselect_b32 s36, 4, 8`: SCC was last written by s_lshl2_add_u32 (arith), not a compare"
+  },
+  {
+   "name": "non SCC mov can sit between compare and select",
+   "input": [
+    "s_cmp_gt_u32 s34, 31",
+    "s_mov_b32 s35, 73",
+    "s_cselect_b32 s36, 6, 9",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": null
+  },
+  {
+   "name": "unsigned add feeds its adjacent carry step",
+   "input": [
+    "s_add_co_u32 s37, s38, 13",
+    "s_add_co_ci_u32 s39, s40, 1",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": null
+  },
+  {
+   "name": "comparison is not a carry producer",
+   "input": [
+    "s_cmp_eq_u32 s37, 17",
+    "s_add_co_ci_u32 s39, s40, 1",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_add_co_ci_u32 s39, s40, 1`: carry chain needs an add / sub right before (SCC from s_cmp_eq_u32)"
+  },
+  {
+   "name": "signed overflow is not unsigned carry",
+   "input": [
+    "s_add_co_i32 s37, s38, 15",
+    "s_add_co_ci_u32 s39, s40, 1",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_add_co_ci_u32 s39, s40, 1`: carry chain needs an add / sub right before (SCC from s_add_co_i32)"
+  },
+  {
+   "name": "bitwise SCC is not carry chain state",
+   "input": [
+    "s_or_b32 s37, s38, 16",
+    "s_add_co_ci_u32 s39, s40, 1",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_add_co_ci_u32 s39, s40, 1`: carry chain needs an add / sub right before (SCC from s_or_b32)"
+  },
+  {
+   "name": "entry select has no comparison predecessor",
+   "input": [
+    "s_cselect_b32 s41, 14, 28",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": "`s_cselect_b32 s41, 14, 28`: SCC was last written by nothing (unknown), not a compare"
+  },
+  {
+   "name": "two adjacent carry steps form one chain",
+   "input": [
+    "s_sub_co_u32 s42, s43, 21",
+    "s_sub_co_ci_u32 s44, s45, 1",
+    "s_add_co_ci_u32 s46, s47, 1",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": null
+  },
+  {
+   "name": "conditional branch consumption is outside the select checker",
+   "input": [
+    "s_add_co_u32 s48, s48, 19",
+    "s_cbranch_scc1 .Lscc_exit",
+    ".Lscc_exit:",
+    "s_endpgm"
+   ],
+   "check": "SCC readers",
+   "error": null
+  },
+  {
+   "name": "save less entry is legal with full EXEC",
+   "input": [
+    "v_mov_b32 v24, 3",
+    "v_cmp_lt_u32 vcc_lo, v24, 100",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    1
+   ],
+   "error": null
+  },
+  {
+   "name": "save less entry rejects a narrowed EXEC",
+   "input": [
+    "s_mov_b32 exec_lo, 63",
+    "v_cmp_lt_u32 vcc_lo, v24, 100",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    1
+   ],
+   "error": "`v_cmp_lt_u32 vcc_lo, v24, 100` (instruction 1) enters a lane region without a save register where exec is 0x3f: every lane must be on (else pass save=)"
+  },
+  {
+   "name": "full mask restoration makes the later region legal",
+   "input": [
+    "s_mov_b32 exec_lo, 63",
+    "s_mov_b32 exec_lo, -1",
+    "v_cmp_lt_u32 vcc_lo, v24, 100",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    2
+   ],
+   "error": null
+  },
+  {
+   "name": "saved full scalar mask restores all lanes",
+   "input": [
+    "s_mov_b32 s56, exec_lo",
+    "s_mov_b32 exec_lo, 127",
+    "s_mov_b32 exec_lo, s56",
+    "v_cmp_lt_u32 vcc_lo, v24, 100",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    3
+   ],
+   "error": null
+  },
+  {
+   "name": "join carries inconsistent EXEC facts",
+   "input": [
+    "s_cmp_lg_u32 s57, 0",
+    "s_cbranch_scc0 .Lexec_merge",
+    "s_mov_b32 exec_lo, 255",
+    ".Lexec_merge:",
+    "v_cmp_lt_u32 vcc_lo, v24, 100",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    4
+   ],
+   "error": "`v_cmp_lt_u32 vcc_lo, v24, 100` (instruction 4) enters a lane region without a save register where exec is not one constant on every path: every lane must be on (else pass save=)"
+  },
+  {
+   "name": "comparison produced EXEC is not a constant full mask",
+   "input": [
+    "v_cmp_ge_u32 vcc_lo, v24, 17",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "v_xor_b32 v25, v4, 3",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    2
+   ],
+   "error": "`v_xor_b32 v25, v4, 3` (instruction 2) enters a lane region without a save register where exec is not one constant on every path: every lane must be on (else pass save=)"
+  },
+  {
+   "name": "high bit constant remains a known partial EXEC",
+   "input": [
+    "s_mov_b32 exec_lo, 1073741824",
+    "s_mov_b32 exec_lo, -1",
+    "v_mov_b32 v26, 6",
+    "s_endpgm"
+   ],
+   "check": "save-less regions",
+   "entries": [
+    1
+   ],
+   "error": "`s_mov_b32 exec_lo, -1` (instruction 1) enters a lane region without a save register where exec is 0x40000000: every lane must be on (else pass save=)"
+  }
+ ]
+}

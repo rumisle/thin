@@ -1,0 +1,1293 @@
+{
+ "notation": "Argument checking and packing. `blocks` are argument blocks as the manifest records them, built for gfx1201; `sizes` their kernarg bytes. A value is JSON: an int or a str itself; {\"buffer\": true} a pointer value the check admits as a buffer; {\"bytes\": hex}; {\"bool\": b}; {\"float\": x}; {\"numpy\": type, \"value\": v} a numpy scalar. `check`: each case's `error` is the LaunchError message for kernel symbol 'k', or null when accepted. `pack`: `addresses` gives address(name) (a list for a ranked pointer); `hex` is the packed block, or `error` a LaunchError, or `raises` another exception's class.",
+ "blocks": {
+  "vadd": [
+   {
+    "name": "x",
+    "offset": 0,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "y",
+    "offset": 8,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "z",
+    "offset": 16,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "n",
+    "offset": 24,
+    "bytes": 4,
+    "kind": "u32",
+    "lo": 1,
+    "hi": 1073741823,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   }
+  ],
+  "every": [
+   {
+    "name": "x",
+    "offset": 0,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "d",
+    "offset": 8,
+    "bytes": 16,
+    "kind": "u32",
+    "lo": 1,
+    "hi": 1000,
+    "divisor": true,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "m",
+    "offset": 24,
+    "bytes": 4,
+    "kind": "u32",
+    "lo": 0,
+    "hi": 4096,
+    "divisor": false,
+    "multiple": 4,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "i",
+    "offset": 28,
+    "bytes": 4,
+    "kind": "i32",
+    "lo": -5,
+    "hi": 5,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "q",
+    "offset": 32,
+    "bytes": 8,
+    "kind": "u64",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "f",
+    "offset": 40,
+    "bytes": 4,
+    "kind": "f32",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "w",
+    "offset": 44,
+    "bytes": 4,
+    "kind": "u32",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "s",
+    "offset": 48,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": "scratch",
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "k",
+    "offset": 56,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": "kept",
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "c",
+    "offset": 64,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": "carried",
+    "library": null,
+    "mem": "uncached",
+    "ranks": null
+   },
+   {
+    "name": "g",
+    "offset": 72,
+    "bytes": 8,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": "gens",
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "mp",
+    "offset": 80,
+    "bytes": 24,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": "mapped",
+    "library": null,
+    "mem": null,
+    "ranks": 2
+   },
+   {
+    "name": "pe",
+    "offset": 104,
+    "bytes": 24,
+    "kind": "ptr",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": 2
+   }
+  ],
+  "plain": [
+   {
+    "name": "a",
+    "offset": 0,
+    "bytes": 4,
+    "kind": "i32",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "b",
+    "offset": 4,
+    "bytes": 4,
+    "kind": "u32",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "c",
+    "offset": 8,
+    "bytes": 8,
+    "kind": "u64",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   },
+   {
+    "name": "f",
+    "offset": 16,
+    "bytes": 4,
+    "kind": "f32",
+    "lo": null,
+    "hi": null,
+    "divisor": false,
+    "multiple": 1,
+    "owned": null,
+    "library": null,
+    "mem": null,
+    "ranks": null
+   }
+  ]
+ },
+ "sizes": {
+  "vadd": 28,
+  "every": 128,
+  "plain": 20
+ },
+ "check": [
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": 1
+   },
+   "error": null,
+   "what": "every argument given, each of its kind"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    }
+   },
+   "error": "k: arguments ['n', 'x', 'y', 'z'], given ['x', 'y', 'z'] (missing ['n'], unknown [])",
+   "what": "one missing"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": 1,
+    "w": 1
+   },
+   "error": "k: arguments ['n', 'x', 'y', 'z'], given ['n', 'w', 'x', 'y', 'z'] (missing [], unknown ['w'])",
+   "what": "one unknown"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "n": 1,
+    "w": 1
+   },
+   "error": "k: arguments ['n', 'x', 'y', 'z'], given ['n', 'w', 'x', 'y'] (missing ['z'], unknown ['w'])",
+   "what": "missing and unknown at once"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": "y",
+    "z": {
+     "buffer": true
+    },
+    "n": 1
+   },
+   "error": "k: argument y is a pointer: a buffer, not str",
+   "what": "a pointer given a str"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": 0,
+    "z": {
+     "buffer": true
+    },
+    "n": 1
+   },
+   "error": "k: argument y is a pointer: a buffer, not int",
+   "what": "a pointer given an int"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": 0
+   },
+   "error": "k: argument n = 0: outside its range 1 .. 1073741823",
+   "what": "below the declared range"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": 1073741824
+   },
+   "error": "k: argument n = 1073741824: outside its range 1 .. 1073741823",
+   "what": "above the declared range"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": {
+     "bool": true
+    }
+   },
+   "error": "k: argument n is a u32: an int, not bool",
+   "what": "a bool for an integer"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": {
+     "float": 2.0
+    }
+   },
+   "error": "k: argument n is a u32: an int, not float",
+   "what": "a float for an integer"
+  },
+  {
+   "block": "vadd",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "y": {
+     "buffer": true
+    },
+    "z": {
+     "buffer": true
+    },
+    "n": {
+     "numpy": "uint32",
+     "value": 5
+    }
+   },
+   "error": null,
+   "what": "a numpy integer is an int"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": null,
+   "what": "every kind, each well given"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": {
+     "bytes": "0102"
+    },
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": null,
+   "what": "kept memory given its first bytes"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": {
+     "bytes": ""
+    },
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument k is the kernel's own kept memory: give its size, an int of bytes (1 or more), or its first bytes - not b''",
+   "what": "kept memory given empty bytes"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": {
+     "bytes": "01"
+    },
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument c is the kernel's own carried memory: give its size, an int of bytes (1 or more) - not b'\\x01'",
+   "what": "carried memory given bytes"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 0,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument s is the kernel's own scratch memory: give its size, an int of bytes (1 or more) - not 0",
+   "what": "scratch of 0 bytes"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": {
+     "bool": true
+    },
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument s is the kernel's own scratch memory: give its size, an int of bytes (1 or more) - not True",
+   "what": "scratch given a bool"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": {
+     "buffer": true
+    },
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument s is the kernel's own scratch memory: give its size, an int of bytes (1 or more) - not <buffer>",
+   "what": "scratch given a buffer (its repr is <buffer>)"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument s is the kernel's own scratch memory: give its size, an int of bytes (1 or more) - not 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "what": "a value's repr is cut to 60 characters"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 6,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument g is generation words: 6 bytes, not whole u32 words",
+   "what": "gens not whole words"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 0,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument mp is the kernel's own mapped memory: give its size, an int of bytes (1 or more) - not 0",
+   "what": "mapped of 0 bytes"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": 3
+   },
+   "error": "k: argument pe is a pointer: a buffer, not int",
+   "what": "peers given an int"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 0,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument d = 0: outside its range 1 .. 1000",
+   "what": "a divisor below its range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 1001,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument d = 1001: outside its range 1 .. 1000",
+   "what": "a divisor above its range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 6,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument m = 6: not a multiple of 4",
+   "what": "not a multiple"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 4100,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument m = 4100: outside its range 0 .. 4096",
+   "what": "a multiple above the range: the range is checked first"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -6,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument i = -6: outside its range -5 .. 5",
+   "what": "an i32 below its range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": -1,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument q = -1: outside its range 0 .. 18446744073709551615",
+   "what": "a u64 below its kind's range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551616,
+    "f": {
+     "float": 1.5
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument q = 18446744073709551616: outside its range 0 .. 18446744073709551615",
+   "what": "a u64 above its kind's range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 4294967296,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument w = 4294967296: outside its range 0 .. 4294967295",
+   "what": "a u32 above its kind's range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": -1,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument w = -1: outside its range 0 .. 4294967295",
+   "what": "a u32 below its kind's range"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "bool": true
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument f is an f32: a number, not bool",
+   "what": "an f32 given a bool"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": "1.0",
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument f is an f32: a number, not str",
+   "what": "an f32 given a str"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": 3,
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": null,
+   "what": "an f32 given an int"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "numpy": "float16",
+     "value": 2.0
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": null,
+   "what": "an f32 given a numpy float"
+  },
+  {
+   "block": "every",
+   "values": {
+    "x": {
+     "buffer": true
+    },
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1e+40
+    },
+    "w": 0,
+    "s": 64,
+    "k": 16,
+    "c": 32,
+    "g": 8,
+    "mp": 4096,
+    "pe": {
+     "buffer": true
+    }
+   },
+   "error": "k: argument f = 1e+40: past f32's range",
+   "what": "an f32 past f32's range is refused"
+  },
+  {
+   "block": "plain",
+   "values": {
+    "a": -2147483648,
+    "b": 4294967295,
+    "c": 0,
+    "f": {
+     "float": 0.0
+    }
+   },
+   "error": null,
+   "what": "the kinds' own ranges, at their ends"
+  },
+  {
+   "block": "plain",
+   "values": {
+    "a": 2147483648,
+    "b": 0,
+    "c": 0,
+    "f": {
+     "float": 0.0
+    }
+   },
+   "error": "k: argument a = 2147483648: outside its range -2147483648 .. 2147483647",
+   "what": "an i32 above its kind's range"
+  }
+ ],
+ "pack": [
+  {
+   "block": "vadd",
+   "nbytes": 28,
+   "values": {
+    "n": 1000
+   },
+   "addresses": {
+    "x": 139637976731648,
+    "y": 139637976735744,
+    "z": 139637976739840
+   },
+   "what": "pointers as u64, n as u32, little-endian at their offsets",
+   "hex": "00100000007f000000200000007f000000300000007f0000e8030000"
+  },
+  {
+   "block": "every",
+   "nbytes": 128,
+   "values": {
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 18446744073709551615,
+    "f": {
+     "float": 1.5
+    },
+    "w": 3735928559
+   },
+   "addresses": {
+    "x": 4096,
+    "s": 8192,
+    "k": 12288,
+    "c": 16384,
+    "g": 20480,
+    "mp": [
+     24576,
+     24832,
+     24576
+    ],
+    "pe": [
+     28672,
+     28928,
+     28928
+    ]
+   },
+   "what": "every kind: a divisor with its magic pair and a zero pad, a ranked pointer's ranks then its own",
+   "hex": "00100000000000000700000025499224030000000000000008000000fbffffffffffffffffffffff0000c03fefbeadde0020000000000000003000000000000000400000000000000050000000000000006000000000000000610000000000000060000000000000007000000000000000710000000000000071000000000000"
+  },
+  {
+   "block": "every",
+   "nbytes": 128,
+   "values": {
+    "d": 7,
+    "m": 8,
+    "i": -5,
+    "q": 1,
+    "f": {
+     "float": 1.5
+    },
+    "w": 1
+   },
+   "addresses": {
+    "x": 4096,
+    "s": 8192,
+    "k": 12288,
+    "c": 16384,
+    "g": 20480,
+    "mp": [
+     24576,
+     24832
+    ],
+    "pe": [
+     28672,
+     28928,
+     28928
+    ]
+   },
+   "what": "a ranked pointer given too few addresses",
+   "error": "argument mp: 3 ranks' addresses, given 2"
+  },
+  {
+   "block": "plain",
+   "nbytes": 20,
+   "values": {
+    "a": -1,
+    "b": 4294967295,
+    "c": 1099511627776,
+    "f": {
+     "float": NaN
+    }
+   },
+   "addresses": {},
+   "what": "i32 as signed, u64 as 8 bytes, f32 NaN",
+   "hex": "ffffffffffffffff00000000000100000000c07f"
+  },
+  {
+   "block": "plain",
+   "nbytes": 20,
+   "values": {
+    "a": 0,
+    "b": 0,
+    "c": 0,
+    "f": {
+     "float": 1e+40
+    }
+   },
+   "addresses": {},
+   "what": "an f32 past f32's range fails at pack (pack takes checked values)",
+   "raises": "OverflowError",
+   "message": "float too large to pack with f format"
+  }
+ ]
+}

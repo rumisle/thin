@@ -1,0 +1,35 @@
+[package]
+name = "thin-passes"
+description = "The passes of thin: hazards, wait counts, register assignment, stream checks, the alias check, value ranges and the LDS proof"
+keywords = ["gpu", "compiler", "register-allocation", "amdgpu"]
+categories = ["compilers"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+thin-target.workspace = true
+thin-ir.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+thin-test-support = { path = "../../tests/rust" }
+serde_json.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-targets.workspace = true
+thin-dsl.workspace = true
+thin-codegen.workspace = true
+thin-emu.workspace = true
+
+
+[[test]]
+name = "passes"
+harness = false

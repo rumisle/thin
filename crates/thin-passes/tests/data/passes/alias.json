@@ -1,0 +1,567 @@
+{
+ "target": "gfx1201",
+ "notation": "independently authored alias groups and waivers; findings are computed by thin_passes::alias",
+ "cases": [
+  {
+   "name": "linear read observes the other logical value",
+   "input": [
+    "v_xor_b32 v12, v21, 7",
+    "v_or_b32 v29, v12, 3",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_xor_b32 %early, v21, 7",
+    "v_or_b32 %sink, %late, 3",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_or_b32 v29, v12, 3` (instruction 1) reads v12 through `late`, but on a path to it `late` is not written: v12 holds `early` there, written by `v_xor_b32 v12, v21, 7` (instruction 0). A derived file gives a value's registers to others before its first write: write `late` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"late\", why=..)`"
+   ]
+  },
+  {
+   "name": "rewrite makes the second logical value available",
+   "input": [
+    "v_xor_b32 v12, v21, 7",
+    "v_or_b32 v29, v12, 3",
+    "v_and_b32 v12, v22, 15",
+    "v_add_nc_u32 v29, v12, 9",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_xor_b32 %early, v21, 7",
+    "v_or_b32 %sink, %early, 3",
+    "v_and_b32 %late, v22, 15",
+    "v_add_nc_u32 %sink, %late, 9",
+    "s_endpgm"
+   ],
+   "findings": []
+  },
+  {
+   "name": "conditional definition leaves a bypass path",
+   "input": [
+    "v_mov_b32 v12, 17",
+    "v_mov_b32 v29, v12",
+    "s_cmp_ge_u32 s31, 2",
+    "s_cbranch_scc1 .Lauth_alias_merge",
+    "v_sub_nc_u32 v12, 91, v20",
+    ".Lauth_alias_merge:",
+    "v_xor_b32 v29, v12, 5",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %early, 17",
+    "v_mov_b32 %sink, %early",
+    "s_cmp_ge_u32 s31, 2",
+    "s_cbranch_scc1 .Lauth_alias_merge",
+    "v_sub_nc_u32 %late, 91, v20",
+    ".Lauth_alias_merge:",
+    "v_xor_b32 %sink, %late, 5",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_xor_b32 v29, v12, 5` (instruction 6) reads v12 through `late`, but on a path to it (through .Lauth_alias_merge) `late` is not written: v12 holds `early` there, written by `v_mov_b32 v12, 17` (instruction 0). A derived file gives a value's registers to others before its first write: write `late` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"late\", why=..)`"
+   ]
+  },
+  {
+   "name": "memory overwrite cannot retire an older logical reader",
+   "input": [
+    "v_mov_b32 v12, 23",
+    "global_load_b32 v12, v[44:45], off offset:12",
+    "v_mul_lo_u32 v29, v12, 3",
+    "s_wait_loadcnt 0",
+    "v_add_nc_u32 v29, v12, 1",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %early, 23",
+    "global_load_b32 %late, v[44:45], off offset:12",
+    "v_mul_lo_u32 %sink, %early, 3",
+    "s_wait_loadcnt 0",
+    "v_add_nc_u32 %sink, %late, 1",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_mul_lo_u32 v29, v12, 3` (instruction 2) reads v12 through `early`, but on a path to it `early` is not written: v12 holds `late` there, written by `global_load_b32 v12, v[44:45], off offset:12` (instruction 1). A derived file gives a value's registers to others before its first write: write `early` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"early\", why=..)`"
+   ]
+  },
+  {
+   "name": "masked write read under its own alias is self consistent",
+   "input": [
+    "v_mov_b32 v12, 29",
+    "v_mov_b32 v29, v12",
+    "s_mov_b32 exec_lo, 15",
+    "v_add_nc_u32 v12, v20, 4",
+    "v_mov_b32 v29, v12",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %early, 29",
+    "v_mov_b32 %sink, %early",
+    "s_mov_b32 exec_lo, 15",
+    "v_add_nc_u32 %late, v20, 4",
+    "v_mov_b32 %sink, %late",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "findings": []
+  },
+  {
+   "name": "whole read after a lane partial overwrite still detects clobber",
+   "input": [
+    "v_mov_b32 v12, 31",
+    "v_mov_b32 v29, v12",
+    "s_mov_b32 exec_lo, 7",
+    "v_xor_b32 v12, v21, 11",
+    "v_mov_b32 v29, v12",
+    "v_mov_b32 v12, 37",
+    "s_mov_b32 exec_lo, -1",
+    "v_or_b32 v29, v12, 1",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %late, 31",
+    "v_mov_b32 %sink, %late",
+    "s_mov_b32 exec_lo, 7",
+    "v_xor_b32 %early, v21, 11",
+    "v_mov_b32 %sink, %early",
+    "v_mov_b32 %late, 37",
+    "s_mov_b32 exec_lo, -1",
+    "v_or_b32 %sink, %late, 1",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_or_b32 v29, v12, 1` (instruction 7) reads v12 through `late`, but v12 was written through `early` by `v_xor_b32 v12, v21, 11` (instruction 3) (a partial write over the whole value): `early` and `late` share the register; if they name one value, declare it (same_as), else the write clobbers a value still to be read"
+   ]
+  },
+  {
+   "name": "masked consumers intentionally focus on the newly written lanes",
+   "input": [
+    "v_mov_b32 v12, 41",
+    "v_mov_b32 v29, v12",
+    "s_mov_b32 exec_lo, 31",
+    "v_sub_nc_u32 v12, v21, 2",
+    "v_mov_b32 v29, v12",
+    "v_mov_b32 v12, 43",
+    "v_xor_b32 v29, v12, 1",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %late, 41",
+    "v_mov_b32 %sink, %late",
+    "s_mov_b32 exec_lo, 31",
+    "v_sub_nc_u32 %early, v21, 2",
+    "v_mov_b32 %sink, %early",
+    "v_mov_b32 %late, 43",
+    "v_xor_b32 %sink, %late, 1",
+    "s_mov_b32 exec_lo, -1",
+    "s_endpgm"
+   ],
+   "findings": []
+  },
+  {
+   "name": "fused accumulation has an implicit destination read",
+   "input": [
+    "v_mov_b32 v12, 47",
+    "v_mov_b32 v29, v12",
+    "v_fmac_f32 v12, v46, v47",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %early, 47",
+    "v_mov_b32 %sink, %early",
+    "v_fmac_f32 %late, v46, v47",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_fmac_f32 v12, v46, v47` (instruction 2) reads v12 through `late`, but on a path to it `late` is not written: v12 holds `early` there, written by `v_mov_b32 v12, 47` (instruction 0). A derived file gives a value's registers to others before its first write: write `late` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"late\", why=..)`"
+   ]
+  },
+  {
+   "name": "hardware initialized vector entry and an unwritten peer alias",
+   "input": [
+    "v_add_nc_u32 v33, v0, 5",
+    "v_xor_b32 v33, v0, 9",
+    "s_endpgm"
+   ],
+   "groups": {
+    "derived": [
+     "v",
+     0,
+     1,
+     false
+    ],
+    "lane_id": [
+     "v",
+     0,
+     1
+    ],
+    "sink": [
+     "v",
+     33,
+     1
+    ]
+   },
+   "entry": [
+    "lane_id"
+   ],
+   "source": [
+    "v_add_nc_u32 %sink, %lane_id, 5",
+    "v_xor_b32 %sink, %derived, 9",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_xor_b32 v33, v0, 9` (instruction 1) reads v0 through `derived`, but on a path to it `derived` is not written: v0 holds `lane_id` there, written by the hardware at entry. A derived file gives a value's registers to others before its first write: write `derived` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"derived\", why=..)`"
+   ]
+  },
+  {
+   "name": "scalar aliases follow the same provenance rules",
+   "input": [
+    "s_or_b32 s36, s38, 6",
+    "s_and_b32 s46, s36, 14",
+    "s_endpgm"
+   ],
+   "groups": {
+    "left_s": [
+     "s",
+     36,
+     1,
+     false
+    ],
+    "out_s": [
+     "s",
+     46,
+     1
+    ],
+    "right_s": [
+     "s",
+     36,
+     1,
+     false
+    ]
+   },
+   "entry": [],
+   "source": [
+    "s_or_b32 %left_s, s38, 6",
+    "s_and_b32 %out_s, %right_s, 14",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`s_and_b32 s46, s36, 14` (instruction 1) reads s36 through `right_s`, but on a path to it `right_s` is not written: s36 holds `left_s` there, written by `s_or_b32 s36, s38, 6` (instruction 0). A derived file gives a value's registers to others before its first write: write `right_s` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"right_s\", why=..)`"
+   ]
+  },
+  {
+   "name": "narrow overwrite of one member invalidates a wide group read",
+   "input": [
+    "v_lshlrev_b64 v[14:15], 1, v[52:53]",
+    "v_xor_b32 v15, v22, 13",
+    "global_store_b64 v54, v[14:15], s[8:9]",
+    "s_endpgm"
+   ],
+   "groups": {
+    "member": [
+     "v",
+     15,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     35,
+     1
+    ],
+    "wide": [
+     "v",
+     14,
+     2,
+     false
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_lshlrev_b64 %wide, 1, v[52:53]",
+    "v_xor_b32 %member, v22, 13",
+    "global_store_b64 v54, %wide, s[8:9]",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`global_store_b64 v54, v[14:15], s[8:9]` (instruction 2) reads v[14:15] through `wide`, but on a path to it `wide` is not written: v15 (its dword 1) holds `member` there, written by `v_xor_b32 v15, v22, 13` (instruction 1). A derived file gives a value's registers to others before its first write: write `wide` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"wide\", why=..)`"
+   ]
+  },
+  {
+   "name": "matching reader waiver suppresses the provenance diagnostic",
+   "input": [
+    "v_mov_b32 v12, 53",
+    "v_or_b32 v29, v12, 3",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %early, 53",
+    "(alias_ok late) v_or_b32 %sink, %late, 3",
+    "s_endpgm"
+   ],
+   "findings": []
+  },
+  {
+   "name": "writer constrained waiver does not waive the actual writer",
+   "input": [
+    "v_mov_b32 v12, 59",
+    "v_or_b32 v29, v12, 3",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %early, 59",
+    "(alias_ok late over sink) v_or_b32 %sink, %late, 3",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_or_b32 v29, v12, 3` (instruction 1) reads v12 through `late`, but on a path to it `late` is not written: v12 holds `early` there, written by `v_mov_b32 v12, 59` (instruction 0). A derived file gives a value's registers to others before its first write: write `late` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"late\", why=..)`"
+   ]
+  },
+  {
+   "name": "back edge carries a different name into the loop head",
+   "input": [
+    "v_mov_b32 v12, 61",
+    ".Lauth_alias_head:",
+    "v_add_nc_u32 v29, v12, 6",
+    "v_xor_b32 v12, v20, 3",
+    "v_mov_b32 v29, v12",
+    "s_cbranch_scc1 .Lauth_alias_head",
+    "s_endpgm"
+   ],
+   "groups": {
+    "early": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "late": [
+     "v",
+     12,
+     1,
+     false
+    ],
+    "sink": [
+     "v",
+     29,
+     1
+    ]
+   },
+   "entry": [],
+   "source": [
+    "v_mov_b32 %late, 61",
+    ".Lauth_alias_head:",
+    "v_add_nc_u32 %sink, %late, 6",
+    "v_xor_b32 %early, v20, 3",
+    "v_mov_b32 %sink, %early",
+    "s_cbranch_scc1 .Lauth_alias_head",
+    "s_endpgm"
+   ],
+   "findings": [
+    "`v_add_nc_u32 v29, v12, 6` (instruction 2) reads v12 through `late`, but on a path to it (through .Lauth_alias_head) `late` is not written: v12 holds `early` there, written by `v_xor_b32 v12, v20, 3` (instruction 3). A derived file gives a value's registers to others before its first write: write `late` on every path to the read (all its dwords; a default before the branch), or - when that path never runs (the read's branch taken only when the write's was: one condition) - say so around the read: `with b.alias_ok(\"late\", why=..)`"
+   ]
+  }
+ ]
+}

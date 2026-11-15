@@ -1,0 +1,435 @@
+{
+ "notation": "All constructors, schedule values, tensor identities, allocation reuse and\nrefusals below come from thin's real emulated group implementation.  Buffers are\nassigned stable encounter labels solely to make identity visible in JSON.  The\nlast section stops at group.emulate's contract checks with lightweight call\nrecords; Bound.emulate's rank-alone refusal uses the real runtime Bound.  Cases\nshare one namespace and the memory steps deliberately share and mutate group\nstate in document order.",
+ "file": "<test>/opspec/group.py",
+ "setup": "class Kernel:\n    def __init__(self, label, arguments=None, address=None):\n        self.name = label\n        self.args = dict(arguments or {})\n        self.address = address or ('group-address:' + label)\n\nclass GroupProbe:\n    def __init__(self, kernel, handle, args=None, *, co_resident=False, grid=(1, 1, 1)):\n        self.kernel, self.group = kernel, handle\n        self.args = dict(args or {})\n        self.grid, self.co_resident, self.overread = tuple(grid), co_resident, {}\n\ndef probe(kernel, handle, args=None, **kw):\n    return GroupProbe(kernel, handle, args, **kw)\n\nranks = group.emulated(2)\nteam = ranks[0].team\nlabels = {}\nobjects = []\n\ndef label_of(value):\n    key = id(value)\n    if key not in labels:\n        labels[key] = f'object{len(labels)}'\n        objects.append(value)\n    return labels[key]\n\ndef tensor_fact(rank, name, dtype, shape):\n    value = ranks[rank].tensor(name, dtype, shape)\n    return {'identity': label_of(value), 'storage_dtype': value.dtype.name,\n            'storage_shape': list(value.shape),\n            'zero_filled': bool(np.all(value.reshape(-1).view(np.uint8) == 0))}\n\ndef peer_identities(value):\n    copies = team.peers_of(value)\n    return None if copies is None else [label_of(c) for c in copies]\n\nfirst_kernel = Kernel('alpha', address='address-A')\nother_kernel = Kernel('beta', address='address-B')\n\ndef allocation_fact(kernel, name, size):\n    buffers = team.mapped(kernel, name, size)\n    return {'identities': [label_of(b) for b in buffers],\n            'sizes': [len(b) for b in buffers], 'zero_filled': all(not any(b) for b in buffers)}\n\nleft_group, right_group = group.emulated(2), group.emulated(2)\nmapped_kernel = Kernel('mapped_call', {'window': {'owned': 'mapped', 'ranks': 2, 'kind': 'ptr'}})\nplain_kernel = Kernel('plain_call')\n",
+ "emulated": [
+  {
+   "world": 1,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(1)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "ok": [
+    "Group(emulated, rank 0 of 1)",
+    "emulated"
+   ]
+  },
+  {
+   "world": 3,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(3)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "ok": [
+    "Group(emulated, rank 0 of 3)",
+    "Group(emulated, rank 1 of 3)",
+    "Group(emulated, rank 2 of 3)",
+    "emulated"
+   ]
+  },
+  {
+   "world": 6,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(6)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "ok": [
+    "Group(emulated, rank 0 of 6)",
+    "Group(emulated, rank 1 of 6)",
+    "Group(emulated, rank 2 of 6)",
+    "Group(emulated, rank 3 of 6)",
+    "Group(emulated, rank 4 of 6)",
+    "Group(emulated, rank 5 of 6)",
+    "emulated"
+   ]
+  },
+  {
+   "world": 0,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(0)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "refused": "ValueError",
+   "message": "a group of 0 ranks: a positive int"
+  },
+  {
+   "world": -3,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(-3)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "refused": "ValueError",
+   "message": "a group of -3 ranks: a positive int"
+  },
+  {
+   "world": true,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(True)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "refused": "ValueError",
+   "message": "a group of True ranks: a positive int"
+  },
+  {
+   "world": "3",
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated('3')\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "refused": "ValueError",
+   "message": "a group of '3' ranks: a positive int"
+  },
+  {
+   "world": 3.0,
+   "case_": "positive worlds or exact world validation",
+   "call": "handles = group.emulated(3.0)\nr = [repr(h) for h in handles] + [handles[0].device]",
+   "refused": "ValueError",
+   "message": "a group of 3.0 ranks: a positive int"
+  }
+ ],
+ "slow": [
+  {
+   "world": 2,
+   "call": "r = group.slow(2)",
+   "ok": {
+    "skew": [
+     0,
+     40
+    ],
+    "speed": [
+     1,
+     0.0625
+    ]
+   }
+  },
+  {
+   "world": 5,
+   "call": "r = group.slow(5)",
+   "ok": {
+    "skew": [
+     0,
+     0,
+     0,
+     0,
+     40
+    ],
+    "speed": [
+     1,
+     1,
+     1,
+     1,
+     0.0625
+    ]
+   }
+  },
+  {
+   "world": 5,
+   "resident": 2,
+   "call": "r = group.slow(5, resident=2)",
+   "ok": {
+    "skew": [
+     0,
+     0,
+     0,
+     0,
+     40
+    ],
+    "speed": [
+     1,
+     1,
+     1,
+     1,
+     0.0625
+    ],
+    "resident": 2
+   }
+  },
+  {
+   "world": 1,
+   "call": "r = group.slow(1)",
+   "ok": {
+    "skew": [
+     40
+    ],
+    "speed": [
+     0.0625
+    ]
+   }
+  }
+ ],
+ "memory": {
+  "steps": [
+   {
+    "step": "first rank creates all zeroed copies",
+    "call": "r = tensor_fact(0, 'matrix', 'f16', (3, 7))",
+    "ok": {
+     "identity": "object0",
+     "storage_dtype": "uint16",
+     "storage_shape": [
+      3,
+      7
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "a repeated request reuses the copy",
+    "call": "r = tensor_fact(0, 'matrix', 'f16', (3, 7))",
+    "ok": {
+     "identity": "object0",
+     "storage_dtype": "uint16",
+     "storage_shape": [
+      3,
+      7
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "another rank receives its distinct copy",
+    "call": "r = tensor_fact(1, 'matrix', 'f16', (3, 7))",
+    "ok": {
+     "identity": "object1",
+     "storage_dtype": "uint16",
+     "storage_shape": [
+      3,
+      7
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "a list shape identifies the same tensor",
+    "call": "r = tensor_fact(1, 'matrix', 'f16', [3, 7])",
+    "ok": {
+     "identity": "object1",
+     "storage_dtype": "uint16",
+     "storage_shape": [
+      3,
+      7
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "an existing name refuses another shape",
+    "call": "r = tensor_fact(1, 'matrix', 'f16', (6, 7))",
+    "refused": "ValueError",
+    "message": "the group's tensor matrix: ('f16', (3, 7)), asked as ('f16', (6, 7))"
+   },
+   {
+    "step": "an existing name refuses another dtype",
+    "call": "r = tensor_fact(1, 'matrix', 'bf16', (3, 7))",
+    "refused": "ValueError",
+    "message": "the group's tensor matrix: ('f16', (3, 7)), asked as ('bf16', (3, 7))"
+   },
+   {
+    "step": "sub-byte elements use packed zeroed storage",
+    "call": "r = tensor_fact(0, 'packed', 'e2m1', (3, 8))",
+    "ok": {
+     "identity": "object2",
+     "storage_dtype": "uint8",
+     "storage_shape": [
+      3,
+      4
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "unknown group tensor dtype is refused",
+    "call": "r = tensor_fact(0, 'bad', 'f8', (3,))",
+    "refused": "ValueError",
+    "message": "dtype 'f8': one of ['bf16', 'e2m1', 'e2m3', 'e3m2', 'e4m3fn', 'e5m2', 'e8m0', 'f16', 'f32', 'i8', 'u32', 'u64', 'u8']"
+   },
+   {
+    "step": "every peer copy is returned for rank zero",
+    "call": "matrix0 = ranks[0].tensor('matrix', 'f16', (3, 7))\nr = peer_identities(matrix0)",
+    "ok": [
+     "object0",
+     "object1"
+    ]
+   },
+   {
+    "step": "the same list is found from rank one",
+    "call": "r = peer_identities(ranks[1].tensor('matrix', 'f16', (3, 7)))",
+    "ok": [
+     "object0",
+     "object1"
+    ]
+   },
+   {
+    "step": "a partial numpy view is not itself a group copy",
+    "call": "r = peer_identities(matrix0[:1])",
+    "ok": null
+   },
+   {
+    "step": "equal contents do not imply group-copy identity",
+    "call": "r = peer_identities(matrix0.copy())",
+    "ok": null
+   },
+   {
+    "step": "no allocation exists initially",
+    "call": "r = team.holds(first_kernel, 'window', 48)",
+    "ok": false
+   },
+   {
+    "step": "the first allocation creates one zeroed buffer per rank",
+    "call": "r = allocation_fact(first_kernel, 'window', 48)",
+    "ok": {
+     "identities": [
+      "object3",
+      "object4"
+     ],
+     "sizes": [
+      48,
+      48
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "the exact size is held",
+    "call": "r = team.holds(first_kernel, 'window', 48)",
+    "ok": true
+   },
+   {
+    "step": "a larger requirement is not held",
+    "call": "r = team.holds(first_kernel, 'window', 49)",
+    "ok": false
+   },
+   {
+    "step": "a smaller request reuses the adequate newest allocation",
+    "call": "r = allocation_fact(first_kernel, 'window', 24)",
+    "ok": {
+     "identities": [
+      "object3",
+      "object4"
+     ],
+     "sizes": [
+      48,
+      48
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "a larger request allocates new zeroed buffers",
+    "call": "r = allocation_fact(first_kernel, 'window', 96)",
+    "ok": {
+     "identities": [
+      "object5",
+      "object6"
+     ],
+     "sizes": [
+      96,
+      96
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "later requests use the newest adequate allocation",
+    "call": "r = allocation_fact(first_kernel, 'window', 48)",
+    "ok": {
+     "identities": [
+      "object5",
+      "object6"
+     ],
+     "sizes": [
+      96,
+      96
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "another argument has an independent allocation history",
+    "call": "r = allocation_fact(first_kernel, 'scratch', 48)",
+    "ok": {
+     "identities": [
+      "object7",
+      "object8"
+     ],
+     "sizes": [
+      48,
+      48
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "another kernel address has independent buffers",
+    "call": "r = allocation_fact(other_kernel, 'window', 48)",
+    "ok": {
+     "identities": [
+      "object9",
+      "object10"
+     ],
+     "sizes": [
+      48,
+      48
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "kernel address, rather than object or display name, keys allocations",
+    "call": "r = allocation_fact(Kernel('alpha_alias', address='address-A'), 'window', 48)",
+    "ok": {
+     "identities": [
+      "object5",
+      "object6"
+     ],
+     "sizes": [
+      96,
+      96
+     ],
+     "zero_filled": true
+    }
+   },
+   {
+    "step": "closing through either rank clears shared allocations",
+    "call": "ranks[1].close()\nr = team.holds(first_kernel, 'window', 48)",
+    "ok": false
+   },
+   {
+    "step": "a tensor request after close creates a fresh generation",
+    "call": "r = tensor_fact(0, 'matrix', 'f16', (3, 7))",
+    "ok": {
+     "identity": "object11",
+     "storage_dtype": "uint16",
+     "storage_shape": [
+      3,
+      7
+     ],
+     "zero_filled": true
+    }
+   }
+  ]
+ },
+ "emulate_refusals": [
+  {
+   "case_": "calls from two teams cannot be one emulated group run",
+   "call": "r = group.emulate([probe(plain_kernel, left_group[0]), probe(plain_kernel, right_group[1])])",
+   "refused": "LaunchError",
+   "message": "emulate: the Bounds of one emulated group (thin.group.emulated)"
+  },
+  {
+   "case_": "a rank-less call cannot participate",
+   "call": "r = group.emulate([probe(plain_kernel, None), probe(plain_kernel, left_group[1])])",
+   "refused": "LaunchError",
+   "message": "emulate: the Bounds of one emulated group (thin.group.emulated)"
+  },
+  {
+   "case_": "ranks must bind a mapped argument to the same byte count",
+   "call": "r = group.emulate([probe(mapped_kernel, left_group[0], {'window': 48}), probe(mapped_kernel, left_group[1], {'window': 96})])",
+   "refused": "LaunchError",
+   "message": "mapped_call: rank 1 binds its mapped window to 96 bytes, rank 0 to 48: a group's memory is sized alike on every rank"
+  },
+  {
+   "case_": "the mapped-size check covers kernels after the first call",
+   "call": "r = group.emulate([probe(plain_kernel, left_group[0]), probe(mapped_kernel, left_group[0], {'window': 48}), probe(mapped_kernel, left_group[1], {'window': 96})])",
+   "refused": "LaunchError",
+   "message": "mapped_call: rank 1 binds its mapped window to 96 bytes, rank 0 to 48: a group's memory is sized alike on every rank"
+  },
+  {
+   "case_": "a direct group emulation refuses an impossible co-residency schedule",
+   "call": "r = group.emulate([probe(plain_kernel, left_group[0], co_resident=True, grid=(3, 1, 1)), probe(plain_kernel, left_group[1], co_resident=True, grid=(3, 1, 1))], {'resident': 2})",
+   "refused": "LaunchError",
+   "message": "plain_call: co-resident, 3 workgroups; sched resident 2"
+  },
+  {
+   "case_": "Bound.emulate refuses to run only one rank of a group call",
+   "call": "r = Bound(plain_kernel, (1, 1, 1), {}, group=left_group[0]).emulate()",
+   "refused": "LaunchError",
+   "message": "plain_call: a group's call runs with its ranks' - thin.group.emulate(bounds) or thin.check"
+  }
+ ]
+}

@@ -1,0 +1,968 @@
+{
+ "notation": "Constructor products and invalid single-field boundaries, evaluated through the library API.",
+ "laps": [
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a",
+     "b"
+    ],
+    "wgsize": 64,
+    "keep": "sum"
+   },
+   "workgroups": 3,
+   "waves": 2,
+   "rows": 1,
+   "args": [
+    {
+     "name": "laps",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "scratch",
+     "library": "laps"
+    }
+   ],
+   "sizes": {
+    "laps": 768
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a",
+     "b"
+    ],
+    "wgsize": 256,
+    "keep": "last",
+    "records": 8
+   },
+   "workgroups": 2,
+   "waves": 8,
+   "rows": 3,
+   "args": [
+    {
+     "name": "laps",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "scratch",
+     "library": "laps"
+    }
+   ],
+   "sizes": {
+    "laps": 6144
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "x"
+    ],
+    "wgsize": 128,
+    "keep": "first"
+   },
+   "workgroups": 1,
+   "waves": 4,
+   "rows": 2,
+   "args": [
+    {
+     "name": "laps",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "scratch",
+     "library": "laps"
+    }
+   ],
+   "sizes": {
+    "laps": 1024
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "x"
+    ],
+    "wgsize": 64,
+    "on": false
+   },
+   "workgroups": 4,
+   "waves": 2,
+   "rows": 2,
+   "args": [],
+   "sizes": {}
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "l0",
+     "l1",
+     "l2",
+     "l3",
+     "l4",
+     "l5",
+     "l6",
+     "l7",
+     "l8",
+     "l9",
+     "l10",
+     "l11",
+     "l12",
+     "l13",
+     "l14",
+     "l15",
+     "l16",
+     "l17",
+     "l18",
+     "l19",
+     "l20",
+     "l21",
+     "l22"
+    ],
+    "wgsize": 64,
+    "keep": "sum"
+   },
+   "workgroups": 1,
+   "waves": 2,
+   "rows": 1,
+   "args": [
+    {
+     "name": "laps",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "scratch",
+     "library": "laps"
+    }
+   ],
+   "sizes": {
+    "laps": 256
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a"
+    ],
+    "wgsize": 64,
+    "keep": "max"
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "keep 'max': one of ('last', 'first', 'sum')"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a"
+    ],
+    "wgsize": 64,
+    "records": 0
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "records 0: 1 to 32 (a VGPR's lanes)"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a"
+    ],
+    "wgsize": 64,
+    "records": 65
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "records 65: 1 to 32 (a VGPR's lanes)"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a"
+    ],
+    "wgsize": 48
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 48: whole waves"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a"
+    ],
+    "wgsize": 16
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 16: whole waves"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [],
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "laps []: one or more, each once"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "a",
+     "a"
+    ],
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "laps ['a', 'a']: one or more, each once"
+   }
+  },
+  {
+   "call": "Laps",
+   "kw": {
+    "names": [
+     "l0",
+     "l1",
+     "l2",
+     "l3",
+     "l4",
+     "l5",
+     "l6",
+     "l7",
+     "l8",
+     "l9",
+     "l10",
+     "l11",
+     "l12",
+     "l13",
+     "l14",
+     "l15",
+     "l16",
+     "l17",
+     "l18",
+     "l19",
+     "l20",
+     "l21",
+     "l22",
+     "l23",
+     "l24",
+     "l25",
+     "l26",
+     "l27",
+     "l28",
+     "l29",
+     "l30",
+     "l31",
+     "l32",
+     "l33",
+     "l34",
+     "l35",
+     "l36",
+     "l37",
+     "l38",
+     "l39",
+     "l40",
+     "l41",
+     "l42",
+     "l43",
+     "l44",
+     "l45",
+     "l46",
+     "l47",
+     "l48",
+     "l49",
+     "l50",
+     "l51",
+     "l52",
+     "l53",
+     "l54",
+     "l55"
+    ],
+    "wgsize": 64,
+    "keep": "sum"
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "56 laps: at most 23 summed (the header row's lanes)"
+   }
+  },
+  {
+   "call": "Laps(['a'], wgsize=64, on=False).decode(b'', workgroups=1)",
+   "error": {
+    "class": "ValueError",
+    "message": "laps off: nothing recorded"
+   }
+  },
+  {
+   "call": "Laps(['a'], 64, keep='sum').decode(<a uint8 array of 252 zero bytes>, workgroups=1)",
+   "error": {
+    "class": "ValueError",
+    "message": "252 bytes of records, 1 workgroups need 256"
+   }
+  }
+ ],
+ "gens": [
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "member",
+    "words": 4,
+    "wgsize": 64
+   },
+   "waves": 2,
+   "args": [
+    {
+     "name": "xwg_gen",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "gens",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_gen": 32
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "member",
+    "words": 3,
+    "wgsize": 256
+   },
+   "waves": 8,
+   "args": [
+    {
+     "name": "xwg_gen",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "gens",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_gen": 96
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "party",
+    "words": 2,
+    "wgsize": 256
+   },
+   "waves": 1,
+   "args": [
+    {
+     "name": "xwg_gen",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "gens",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_gen": 8
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "name": "g2",
+    "per": "party",
+    "words": 1,
+    "wgsize": 1024
+   },
+   "waves": 1,
+   "args": [
+    {
+     "name": "g2",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "gens",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "g2": 4
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "wave",
+    "words": 1,
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "per 'wave': one of ('member', 'party')"
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "member",
+    "words": 0,
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "words 0: at least 1"
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "member",
+    "words": 1,
+    "wgsize": 16
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 16: whole waves, 32 .. 1024"
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "member",
+    "words": 1,
+    "wgsize": 2048
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 2048: whole waves, 32 .. 1024"
+   }
+  },
+  {
+   "call": "Gens",
+   "kw": {
+    "per": "member",
+    "words": 1,
+    "wgsize": 100
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 100: whole waves, 32 .. 1024"
+   }
+  }
+ ],
+ "slots": [
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 4,
+    "pieces": 64,
+    "piece": 8,
+    "tag": "dword",
+    "wgsize": 64
+   },
+   "kind": "dword",
+   "stride": 512,
+   "flags_at": 2048,
+   "lane_dwords": 2,
+   "bytes": 2048,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 2048
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 4,
+    "pieces": 16,
+    "piece": 64,
+    "tag": "dword",
+    "wgsize": 64
+   },
+   "kind": "dword",
+   "stride": 1024,
+   "flags_at": 4096,
+   "lane_dwords": 4,
+   "bytes": 4096,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 4096
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 3,
+    "pieces": 10,
+    "piece": 16,
+    "tag": "flag",
+    "wgsize": 128
+   },
+   "kind": "flag",
+   "stride": 256,
+   "flags_at": 768,
+   "lane_dwords": 4,
+   "bytes": 1152,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 1152
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 16,
+    "pieces": 1,
+    "piece": 8,
+    "tag": "flag",
+    "wgsize": 64,
+    "stride": 8
+   },
+   "kind": "flag",
+   "stride": 8,
+   "flags_at": 128,
+   "lane_dwords": 2,
+   "bytes": 2176,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 2176
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 2,
+    "pieces": 64,
+    "piece": 4,
+    "tag": [
+     "sign"
+    ],
+    "wgsize": 64
+   },
+   "kind": "bits",
+   "stride": 256,
+   "flags_at": 512,
+   "lane_dwords": 1,
+   "bytes": 512,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 512
+   },
+   "bits": 1,
+   "at": 31,
+   "mask": "0x80000000",
+   "keep": "0x7fffffff"
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 2,
+    "pieces": 64,
+    "piece": 4,
+    "tag": [
+     "high",
+     14
+    ],
+    "wgsize": 64
+   },
+   "kind": "bits",
+   "stride": 256,
+   "flags_at": 512,
+   "lane_dwords": 1,
+   "bytes": 512,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 512
+   },
+   "bits": 14,
+   "at": 18,
+   "mask": "0xfffc0000",
+   "keep": "0x3ffff"
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 2,
+    "pieces": 64,
+    "piece": 16,
+    "tag": [
+     "low",
+     1
+    ],
+    "wgsize": 64,
+    "uncached": true
+   },
+   "kind": "bits",
+   "stride": 1024,
+   "flags_at": 2048,
+   "lane_dwords": 4,
+   "bytes": 2048,
+   "args": [
+    {
+     "name": "xwg_slots",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg",
+     "mem": "uncached"
+    }
+   ],
+   "sizes": {
+    "xwg_slots": 2048
+   },
+   "bits": 1,
+   "at": 0,
+   "mask": "0x1",
+   "keep": "0xfffffffe"
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "name": "s2",
+    "slots": 5,
+    "pieces": 3,
+    "piece": 4,
+    "tag": [
+     "low",
+     16
+    ],
+    "wgsize": 64,
+    "stride": 12
+   },
+   "kind": "bits",
+   "stride": 12,
+   "flags_at": 128,
+   "lane_dwords": 1,
+   "bytes": 128,
+   "args": [
+    {
+     "name": "s2",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried",
+     "library": "xwg"
+    }
+   ],
+   "sizes": {
+    "s2": 128
+   },
+   "bits": 16,
+   "at": 0,
+   "mask": "0xffff",
+   "keep": "0xffff0000"
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 4,
+    "tag": "dword",
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "piece 4 with tag \"dword\": nothing left for a payload - a bits tag, or piece 8"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 64,
+    "tag": "flag",
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "tag \"flag\" with piece 64: a flag needs no quad; piece 4, 8 or 16"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 32,
+    "tag": "dword",
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "piece 32: one of (4, 8, 16, 64) bytes"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 4,
+    "tag": [
+     "low",
+     20
+    ],
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "tag ('low', 20): 1 .. 16 bits"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 4,
+    "tag": [
+     "low",
+     0
+    ],
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "tag ('low', 0): 1 .. 16 bits"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 4,
+    "tag": [
+     "mid",
+     3
+    ],
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "tag ('mid', 3): \"dword\", \"flag\", (\"sign\",), (\"high\", k) or (\"low\", k)"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 4,
+    "tag": [
+     "sign",
+     1
+    ],
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "tag ('sign', 1): \"dword\", \"flag\", (\"sign\",), (\"high\", k) or (\"low\", k)"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 4,
+    "tag": "bits",
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "tag 'bits': \"dword\", \"flag\", (\"sign\",), (\"high\", k) or (\"low\", k)"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 0,
+    "pieces": 1,
+    "piece": 8,
+    "tag": "dword",
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "slots 0, pieces 1: at least 1"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 0,
+    "piece": 8,
+    "tag": "dword",
+    "wgsize": 64
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "slots 1, pieces 0: at least 1"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 1,
+    "pieces": 1,
+    "piece": 8,
+    "tag": "dword",
+    "wgsize": 48
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 48: whole waves, 32 .. 1024"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 2,
+    "pieces": 4,
+    "piece": 8,
+    "tag": "dword",
+    "wgsize": 64,
+    "stride": 16
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "stride 16: at least the slot's 32 bytes, a multiple of the piece's 8"
+   }
+  },
+  {
+   "call": "Slots",
+   "kw": {
+    "slots": 2,
+    "pieces": 4,
+    "piece": 8,
+    "tag": "dword",
+    "wgsize": 64,
+    "stride": 36
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "stride 36: at least the slot's 32 bytes, a multiple of the piece's 8"
+   }
+  }
+ ],
+ "counts": [
+  {
+   "call": "Counts",
+   "kw": {
+    "wgsize": 64
+   },
+   "args": [
+    {
+     "name": "xwg_counts",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "kept",
+     "library": "xwg"
+    }
+   ],
+   "sizes(3)": {
+    "xwg_counts": 768
+   }
+  },
+  {
+   "call": "Counts(wgsize=64).sizes(0)",
+   "error": {
+    "class": "ValueError",
+    "message": "counts 0: at least 1"
+   }
+  },
+  {
+   "call": "Counts",
+   "kw": {
+    "wgsize": 65
+   },
+   "error": {
+    "class": "ValueError",
+    "message": "wgsize 65: whole waves, 32 .. 1024"
+   }
+  }
+ ]
+}

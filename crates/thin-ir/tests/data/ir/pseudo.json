@@ -1,0 +1,412 @@
+{
+ "target": "gfx1201",
+ "ops": [
+  {
+   "name": "ir.wait_regs",
+   "id": -1,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": true,
+   "slots": [
+    {
+     "kind": "any",
+     "role": 0,
+     "dwords": 0
+    }
+   ],
+   "fields": [
+    {
+     "name": "regions",
+     "kind": "tuple",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    },
+    {
+     "name": "counter",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": [
+      "load",
+      "store",
+      "ds",
+      "km"
+     ]
+    },
+    {
+     "name": "said",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    },
+    {
+     "name": "ablated",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.wait_tags",
+   "id": -2,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [],
+   "fields": [
+    {
+     "name": "tags",
+     "kind": "tuple",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    },
+    {
+     "name": "counter",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": [
+      "load",
+      "store",
+      "ds",
+      "km"
+     ]
+    },
+    {
+     "name": "said",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    },
+    {
+     "name": "ablated",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.wait_all",
+   "id": -3,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [],
+   "fields": [
+    {
+     "name": "counter",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": [
+      "load",
+      "store",
+      "ds",
+      "km"
+     ]
+    },
+    {
+     "name": "said",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    },
+    {
+     "name": "ablated",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.wait_left",
+   "id": -4,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [],
+   "fields": [
+    {
+     "name": "left",
+     "kind": "int",
+     "bits": 8,
+     "signed": false,
+     "required": true,
+     "choices": []
+    },
+    {
+     "name": "counter",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": [
+      "load",
+      "store",
+      "ds",
+      "km"
+     ]
+    },
+    {
+     "name": "said",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    },
+    {
+     "name": "ablated",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.wait_smem",
+   "id": -5,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [],
+   "fields": [
+    {
+     "name": "counter",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": [
+      "load",
+      "store",
+      "ds",
+      "km"
+     ]
+    },
+    {
+     "name": "said",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    },
+    {
+     "name": "ablated",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.discard",
+   "id": -6,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": true,
+   "slots": [
+    {
+     "kind": "any",
+     "role": 0,
+     "dwords": 0
+    }
+   ],
+   "fields": [
+    {
+     "name": "why",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.assume",
+   "id": -7,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [
+    {
+     "kind": "any",
+     "role": 1,
+     "dwords": 0
+    }
+   ],
+   "fields": [
+    {
+     "name": "lo",
+     "kind": "int",
+     "bits": 32,
+     "signed": false,
+     "required": true,
+     "choices": []
+    },
+    {
+     "name": "hi",
+     "kind": "int",
+     "bits": 32,
+     "signed": false,
+     "required": true,
+     "choices": []
+    },
+    {
+     "name": "why",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.uniform",
+   "id": -8,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": true,
+   "slots": [
+    {
+     "kind": "any",
+     "role": 0,
+     "dwords": 0
+    }
+   ],
+   "fields": [
+    {
+     "name": "why",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.undefined",
+   "id": -9,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": true,
+   "slots": [
+    {
+     "kind": "any",
+     "role": 0,
+     "dwords": 0
+    }
+   ],
+   "fields": [
+    {
+     "name": "why",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    },
+    {
+     "name": "on",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "required": false,
+     "choices": [
+      "next",
+      "taken",
+      "fall"
+     ]
+    }
+   ]
+  },
+  {
+   "name": "ir.label",
+   "id": -10,
+   "kind": "label",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [],
+   "fields": [
+    {
+     "name": "name",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    }
+   ]
+  },
+  {
+   "name": "ir.comment",
+   "id": -11,
+   "kind": "comment",
+   "flags": [
+    "PSEUDO"
+   ],
+   "variadic": false,
+   "slots": [],
+   "fields": [
+    {
+     "name": "text",
+     "kind": "text",
+     "bits": 0,
+     "signed": false,
+     "required": true,
+     "choices": []
+    }
+   ]
+  }
+ ]
+}

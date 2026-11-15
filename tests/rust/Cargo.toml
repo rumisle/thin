@@ -1,0 +1,24 @@
+[package]
+name = "thin-test-support"
+description = "Shared integration-test builders, notation and golden-data assertions"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde_json = { workspace = true, features = ["arbitrary_precision", "preserve_order"] }
+flate2.workspace = true
+sha2.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-targets.workspace = true
+thin-emu.workspace = true
+
+[lints]
+workspace = true
+

@@ -1,0 +1,198 @@
+{
+ "target": "gfx1201",
+ "values": {
+  "a": "v, 1 dword",
+  "b": "v, 1 dword",
+  "p": "v, 2 dwords",
+  "s": "s, 1 dword",
+  "s2": "s, 2 dwords"
+ },
+ "field_round_trip": [
+  {
+   "given": "False",
+   "back": "False",
+   "same_type": true,
+   "identical": true
+  },
+  {
+   "given": "7",
+   "back": "7",
+   "same_type": true,
+   "identical": true
+  },
+  {
+   "given": "-170141183460469231731687303715884105728",
+   "back": "-170141183460469231731687303715884105728",
+   "same_type": true,
+   "identical": false
+  },
+  {
+   "given": "'cache'",
+   "back": "'cache'",
+   "same_type": true,
+   "identical": false
+  },
+  {
+   "given": "()",
+   "back": "()",
+   "same_type": true,
+   "identical": true
+  },
+  {
+   "given": "(1, 1, 0)",
+   "back": "(1, 1, 0)",
+   "same_type": true,
+   "identical": false
+  },
+  {
+   "given": "('dev', 'lu')",
+   "back": "('dev', 'lu')",
+   "same_type": true,
+   "identical": false
+  },
+  {
+   "given": "(('noorder',), ('dma', 7, 2))",
+   "back": "(('noorder',), ('dma', 7, 2))",
+   "same_type": true,
+   "identical": false
+  },
+  {
+   "given": "(3, 'region')",
+   "back": "(3, 'region')",
+   "same_type": true,
+   "identical": true
+  },
+  {
+   "given": "None",
+   "back": "None",
+   "same_type": true,
+   "identical": true
+  },
+  {
+   "given": "1.25",
+   "back": "1.25",
+   "same_type": true,
+   "identical": true
+  },
+  {
+   "given": "[9]",
+   "back": "[9]",
+   "same_type": true,
+   "identical": true
+  }
+ ],
+ "attributes": [
+  {
+   "put": "Comment(text='authored note')",
+   "attr_after": "Comment(text='authored note')"
+  },
+  {
+   "put": "Comment(text='')",
+   "attr_after": "None"
+  },
+  {
+   "put": "Ablation(classes=frozenset({'schedule', 'memory'}))",
+   "attr_after": "Ablation(classes=frozenset(['memory', 'schedule']))"
+  },
+  {
+   "put": "Ablation(classes=frozenset())",
+   "attr_after": "None"
+  },
+  {
+   "put": "AliasOk(pairs=frozenset({('left', 'right'), ('single', None)}))",
+   "attr_after": "AliasOk(pairs=frozenset([('left', 'right'), ('single', None)]))"
+  },
+  {
+   "put": "Tag(value=('load', 4, 2))",
+   "attr_after": "Tag(value=('load', 4, 2))"
+  },
+  {
+   "put": "Tag(value=('unordered',))",
+   "attr_after": "Tag(value=('unordered',))"
+  },
+  {
+   "put": "Tag(value=())",
+   "attr_after": "None"
+  },
+  {
+   "put": "InRegion(id=11)",
+   "attr_after": "InRegion(id=11)"
+  },
+  {
+   "put": "Hazard()",
+   "attr_after": "Hazard()"
+  },
+  {
+   "put": "M0Set(value=19)",
+   "attr_after": "M0Set(value=19)"
+  },
+  {
+   "put": "WavesTaken(waves=frozenset({1, 4}))",
+   "attr_after": "WavesTaken(waves=frozenset([1, 4]))"
+  },
+  {
+   "put": "WavesTaken(waves=frozenset())",
+   "attr_after": "WavesTaken(waves=frozenset([]))"
+  },
+  {
+   "put": "Staged(stage=('load', 6))",
+   "attr_after": "Staged(stage=('load', 6))"
+  },
+  {
+   "put": "WaitUses((p.values[1][0],))",
+   "attr_after": "WaitUses(regs=(v:b[0]x1,))"
+  }
+ ],
+ "errors": [
+  {
+   "case": "WavesTaken wave 64",
+   "error": "ValueError",
+   "message": "WavesTaken: wave 64 (a workgroup has 64 at most)"
+  },
+  {
+   "case": "unknown field name",
+   "error": "ValueError",
+   "message": "no field nosuch (no form has one)"
+  },
+  {
+   "case": "operand of another type",
+   "error": "TypeError",
+   "message": "an operand: 5"
+  },
+  {
+   "case": "attr of a non-attribute class",
+   "error": "TypeError",
+   "message": "<class 'int'>: not an attribute of the IR"
+  }
+ ],
+ "reprs": {
+  "value": "%v0:a",
+  "value_s2": "%s4:s2",
+  "vreg_whole": "v:p[0]x2",
+  "vreg_dword1": "v:p[0]x1+1",
+  "vreg_slice": "v:p[0]x1+1",
+  "vreg_index": "v:p[0]x1+1",
+  "through": "p",
+  "through_part": "p.lo",
+  "vreg_eq_ignores_part": true,
+  "instr": "<v_add_nc_u32 v:a[0]x1, v:a[0]x1, Imm(value=4, text='')>",
+  "dwords": [
+   0,
+   1
+  ]
+ },
+ "instr_facts": {
+  "defs": "(v:a[0]x1,)",
+  "uses": "(v:a[0]x1, v:b[0]x1)",
+  "regs": "(v:a[0]x1, v:a[0]x1, v:b[0]x1)",
+  "writes": [],
+  "phys_uses": [
+   "exec"
+  ],
+  "kind": "valu",
+  "op": "v_add_nc_u32",
+  "where_unknown": "",
+  "target_none": null,
+  "pseudo_regs": "()"
+ }
+}

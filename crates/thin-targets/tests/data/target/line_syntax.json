@@ -1,0 +1,2202 @@
+{
+ "py_int": [
+  [
+   "00",
+   "0"
+  ],
+  [
+   "37",
+   "37"
+  ],
+  [
+   "-37",
+   "-37"
+  ],
+  [
+   "+29",
+   "29"
+  ],
+  [
+   "0x2B",
+   "43"
+  ],
+  [
+   "0X2b",
+   "43"
+  ],
+  [
+   "0o35",
+   "29"
+  ],
+  [
+   "0b1101",
+   "13"
+  ],
+  [
+   "2_048",
+   "2048"
+  ],
+  [
+   "2__7",
+   null
+  ],
+  [
+   "_9",
+   null
+  ],
+  [
+   "3_",
+   null
+  ],
+  [
+   "023",
+   null
+  ],
+  [
+   "0000",
+   "0"
+  ],
+  [
+   "\t19 ",
+   "19"
+  ],
+  [
+   "0x_ab",
+   "171"
+  ],
+  [
+   "0b",
+   null
+  ],
+  [
+   "",
+   null
+  ],
+  [
+   "+",
+   null
+  ],
+  [
+   "2.75",
+   null
+  ],
+  [
+   "0b3",
+   null
+  ],
+  [
+   "1393796574908163946345982392040522594123776",
+   null
+  ]
+ ],
+ "classify": [
+  {
+   "text": "37",
+   "int_text": true,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "-37",
+   "int_text": true,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "0x2b",
+   "int_text": true,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "-0x2B",
+   "int_text": true,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "0X2b",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "2.0",
+   "int_text": false,
+   "float_text": true,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "-3.",
+   "int_text": false,
+   "float_text": true,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": ".75",
+   "int_text": false,
+   "float_text": true,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "2e4",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "2.0e-4",
+   "int_text": false,
+   "float_text": true,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "2.e+3",
+   "int_text": false,
+   "float_text": true,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "-.75e2",
+   "int_text": false,
+   "float_text": true,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "e7",
+   "int_text": false,
+   "float_text": false,
+   "label_text": true,
+   "reg_text": null
+  },
+  {
+   "text": "2.0e",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": "tile",
+   "int_text": false,
+   "float_text": false,
+   "label_text": true,
+   "reg_text": null
+  },
+  {
+   "text": ".Ltile",
+   "int_text": false,
+   "float_text": false,
+   "label_text": true,
+   "reg_text": null
+  },
+  {
+   "text": "Tile7",
+   "int_text": false,
+   "float_text": false,
+   "label_text": true,
+   "reg_text": null
+  },
+  {
+   "text": "_row",
+   "int_text": false,
+   "float_text": false,
+   "label_text": true,
+   "reg_text": null
+  },
+  {
+   "text": "tile.row",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": ".Ltile_row",
+   "int_text": false,
+   "float_text": false,
+   "label_text": true,
+   "reg_text": null
+  },
+  {
+   "text": "8tile",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": ".",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  },
+  {
+   "text": ".row",
+   "int_text": false,
+   "float_text": false,
+   "label_text": false,
+   "reg_text": null
+  }
+ ],
+ "operands": [
+  {
+   "text": "v37",
+   "ok": {
+    "kind": "v",
+    "n": 37,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "v37"
+   }
+  },
+  {
+   "text": "v255",
+   "ok": {
+    "kind": "v",
+    "n": 255,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "v255"
+   }
+  },
+  {
+   "text": "v256",
+   "refused": "`v256`: past v255 (special registers by name only)"
+  },
+  {
+   "text": "s105",
+   "ok": {
+    "kind": "s",
+    "n": 105,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "s105"
+   }
+  },
+  {
+   "text": "s106",
+   "refused": "`s106`: past s105 (special registers by name only)"
+  },
+  {
+   "text": "s[30:31]",
+   "ok": {
+    "kind": "s",
+    "n": 30,
+    "cnt": 2,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "s[30:31]"
+   }
+  },
+  {
+   "text": "s[31:30]",
+   "refused": "register range `s[31:30]` is empty"
+  },
+  {
+   "text": "v[32:39]",
+   "ok": {
+    "kind": "v",
+    "n": 32,
+    "cnt": 8,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "v[32:39]"
+   }
+  },
+  {
+   "text": "v[253:257]",
+   "refused": "`v[253:257]`: past v255 (special registers by name only)"
+  },
+  {
+   "text": "a1",
+   "refused": "`a1`: past a-1 (special registers by name only)"
+  },
+  {
+   "text": "vcc",
+   "ok": {
+    "kind": "s",
+    "n": 106,
+    "cnt": 2,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "vcc"
+   }
+  },
+  {
+   "text": "vcc_lo",
+   "ok": {
+    "kind": "s",
+    "n": 106,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "vcc_lo"
+   }
+  },
+  {
+   "text": "exec_lo",
+   "ok": {
+    "kind": "s",
+    "n": 126,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "exec_lo"
+   }
+  },
+  {
+   "text": "m0",
+   "ok": {
+    "kind": "s",
+    "n": 125,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "m0"
+   }
+  },
+  {
+   "text": "null",
+   "ok": {
+    "kind": "s",
+    "n": 124,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "null"
+   }
+  },
+  {
+   "text": "scc",
+   "ok": {
+    "kind": "s",
+    "n": 253,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "scc"
+   }
+  },
+  {
+   "text": "ttmp9",
+   "ok": {
+    "kind": "s",
+    "n": 117,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "ttmp9"
+   }
+  },
+  {
+   "text": "ttmp7",
+   "ok": {
+    "kind": "s",
+    "n": 115,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "ttmp7"
+   }
+  },
+  {
+   "text": "off",
+   "ok": {
+    "kind": "off",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "off"
+   }
+  },
+  {
+   "text": "-v37",
+   "ok": {
+    "kind": "v",
+    "n": 37,
+    "cnt": 1,
+    "neg": true,
+    "abs": false,
+    "val": null,
+    "text": "-v37"
+   }
+  },
+  {
+   "text": "--v37",
+   "refused": "`--v37`: one sign at most (neg is written once)"
+  },
+  {
+   "text": "|v37|",
+   "ok": {
+    "kind": "v",
+    "n": 37,
+    "cnt": 1,
+    "neg": false,
+    "abs": true,
+    "val": null,
+    "text": "|v37|"
+   }
+  },
+  {
+   "text": "-|v37|",
+   "ok": {
+    "kind": "v",
+    "n": 37,
+    "cnt": 1,
+    "neg": true,
+    "abs": true,
+    "val": null,
+    "text": "-|v37|"
+   }
+  },
+  {
+   "text": "|",
+   "refused": "operand not understood: `|`"
+  },
+  {
+   "text": "-37",
+   "ok": {
+    "kind": "int",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "-37"
+    },
+    "text": "-37"
+   }
+  },
+  {
+   "text": "-0x2b",
+   "ok": {
+    "kind": "int",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "-43"
+    },
+    "text": "-0x2b"
+   }
+  },
+  {
+   "text": "2.0",
+   "ok": {
+    "kind": "float",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "float": 2.0
+    },
+    "text": "2.0"
+   }
+  },
+  {
+   "text": "-3.75",
+   "ok": {
+    "kind": "float",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "float": -3.75
+    },
+    "text": "-3.75"
+   }
+  },
+  {
+   "text": "0.75",
+   "ok": {
+    "kind": "float",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "float": 0.75
+    },
+    "text": "0.75"
+   }
+  },
+  {
+   "text": ".Ltile",
+   "ok": {
+    "kind": "label",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "label": ".Ltile"
+    },
+    "text": ".Ltile"
+   }
+  },
+  {
+   "text": "tile",
+   "ok": {
+    "kind": "label",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "label": "tile"
+    },
+    "text": "tile"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_MISSING)",
+   "refused": "operand not understood: `hwreg(HW_REG_MISSING)` (hwreg ids: HW_REG_WAVE_MODE, HW_REG_WAVE_STATUS, HW_REG_WAVE_STATE_PRIV, HW_REG_WAVE_GPR_ALLOC, HW_REG_WAVE_LDS_ALLOC, HW_REG_PERF_SNAPSHOT_DATA, HW_REG_PERF_SNAPSHOT_PC_LO, HW_REG_PERF_SNAPSHOT_PC_HI, HW_REG_PERF_SNAPSHOT_DATA1, HW_REG_PERF_SNAPSHOT_DATA2, HW_REG_WAVE_EXCP_FLAG_PRIV, HW_REG_WAVE_EXCP_FLAG_USER, HW_REG_WAVE_TRAP_CTRL, HW_REG_WAVE_SCRATCH_BASE_LO, HW_REG_WAVE_SCRATCH_BASE_HI, HW_REG_WAVE_HW_ID1, HW_REG_WAVE_HW_ID2, HW_REG_SHADER_CYCLES_LO, HW_REG_SHADER_CYCLES_HI, HW_REG_IB_STS2)"
+  },
+  {
+   "text": "gpr_idx(SRC1,SRC2)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "6"
+    },
+    "text": "gpr_idx(SRC1,SRC2)"
+   }
+  },
+  {
+   "text": "gpr_idx(SRC4)",
+   "refused": "gpr_idx `gpr_idx(SRC4)`: SRC0, SRC1, SRC2, DST"
+  },
+  {
+   "text": "gpr_idx(DST",
+   "refused": "`gpr_idx(DST`: gpr_idx(...) ends with `)`"
+  },
+  {
+   "text": "s[30:31",
+   "refused": "operand not understood: `s[30:31`"
+  },
+  {
+   "text": "v[row:col]",
+   "refused": "operand not understood: `v[row:col]`"
+  },
+  {
+   "text": "!",
+   "refused": "operand not understood: `!`"
+  },
+  {
+   "text": "2e4",
+   "refused": "operand not understood: `2e4`"
+  },
+  {
+   "text": "-Tile7",
+   "refused": "`-Tile7`: a label takes no neg or abs"
+  },
+  {
+   "text": "vccz",
+   "ok": {
+    "kind": "s",
+    "n": 251,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "vccz"
+   }
+  },
+  {
+   "text": "execz",
+   "ok": {
+    "kind": "s",
+    "n": 252,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "execz"
+   }
+  },
+  {
+   "text": "exec",
+   "ok": {
+    "kind": "s",
+    "n": 126,
+    "cnt": 2,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "exec"
+   }
+  },
+  {
+   "text": "-.75",
+   "ok": {
+    "kind": "float",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "float": -0.75
+    },
+    "text": "-.75"
+   }
+  },
+  {
+   "text": "|Tile7|",
+   "refused": "`|Tile7|`: a label takes no neg or abs"
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_MODE)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63489"
+    },
+    "text": "hwreg(HW_REG_WAVE_MODE)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_STATUS)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63490"
+    },
+    "text": "hwreg(HW_REG_WAVE_STATUS)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_STATE_PRIV)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63492"
+    },
+    "text": "hwreg(HW_REG_WAVE_STATE_PRIV)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_GPR_ALLOC)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63493"
+    },
+    "text": "hwreg(HW_REG_WAVE_GPR_ALLOC)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_LDS_ALLOC)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63494"
+    },
+    "text": "hwreg(HW_REG_WAVE_LDS_ALLOC)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63498"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_LO)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63499"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_LO)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_HI)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63500"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_HI)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA1)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63503"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA1)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA2)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63504"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA2)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_PRIV)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63505"
+    },
+    "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_PRIV)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_USER)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63506"
+    },
+    "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_USER)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_TRAP_CTRL)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63507"
+    },
+    "text": "hwreg(HW_REG_WAVE_TRAP_CTRL)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_LO)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63508"
+    },
+    "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_LO)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_HI)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63509"
+    },
+    "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_HI)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_HW_ID1)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63511"
+    },
+    "text": "hwreg(HW_REG_WAVE_HW_ID1)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_HW_ID2)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63512"
+    },
+    "text": "hwreg(HW_REG_WAVE_HW_ID2)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_SHADER_CYCLES_LO)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63517"
+    },
+    "text": "hwreg(HW_REG_SHADER_CYCLES_LO)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_SHADER_CYCLES_HI)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63518"
+    },
+    "text": "hwreg(HW_REG_SHADER_CYCLES_HI)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_IB_STS2)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "63516"
+    },
+    "text": "hwreg(HW_REG_IB_STS2)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_MODE, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12353"
+    },
+    "text": "hwreg(HW_REG_WAVE_MODE, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_STATUS, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12354"
+    },
+    "text": "hwreg(HW_REG_WAVE_STATUS, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_STATE_PRIV, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12356"
+    },
+    "text": "hwreg(HW_REG_WAVE_STATE_PRIV, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_GPR_ALLOC, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12357"
+    },
+    "text": "hwreg(HW_REG_WAVE_GPR_ALLOC, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_LDS_ALLOC, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12358"
+    },
+    "text": "hwreg(HW_REG_WAVE_LDS_ALLOC, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12362"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_LO, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12363"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_LO, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_HI, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12364"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_PC_HI, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA1, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12367"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA1, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA2, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12368"
+    },
+    "text": "hwreg(HW_REG_PERF_SNAPSHOT_DATA2, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_PRIV, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12369"
+    },
+    "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_PRIV, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_USER, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12370"
+    },
+    "text": "hwreg(HW_REG_WAVE_EXCP_FLAG_USER, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_TRAP_CTRL, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12371"
+    },
+    "text": "hwreg(HW_REG_WAVE_TRAP_CTRL, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_LO, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12372"
+    },
+    "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_LO, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_HI, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12373"
+    },
+    "text": "hwreg(HW_REG_WAVE_SCRATCH_BASE_HI, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_HW_ID1, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12375"
+    },
+    "text": "hwreg(HW_REG_WAVE_HW_ID1, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_WAVE_HW_ID2, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12376"
+    },
+    "text": "hwreg(HW_REG_WAVE_HW_ID2, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_SHADER_CYCLES_LO, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12381"
+    },
+    "text": "hwreg(HW_REG_SHADER_CYCLES_LO, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_SHADER_CYCLES_HI, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12382"
+    },
+    "text": "hwreg(HW_REG_SHADER_CYCLES_HI, 1, 7)"
+   }
+  },
+  {
+   "text": "hwreg(HW_REG_IB_STS2, 1, 7)",
+   "ok": {
+    "kind": "simm",
+    "n": 0,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": {
+     "int": "12380"
+    },
+    "text": "hwreg(HW_REG_IB_STS2, 1, 7)"
+   }
+  },
+  {
+   "text": "exec",
+   "ok": {
+    "kind": "s",
+    "n": 126,
+    "cnt": 2,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "exec"
+   }
+  },
+  {
+   "text": "exec_lo",
+   "ok": {
+    "kind": "s",
+    "n": 126,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "exec_lo"
+   }
+  },
+  {
+   "text": "exec_hi",
+   "ok": {
+    "kind": "s",
+    "n": 127,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "exec_hi"
+   }
+  },
+  {
+   "text": "vcc",
+   "ok": {
+    "kind": "s",
+    "n": 106,
+    "cnt": 2,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "vcc"
+   }
+  },
+  {
+   "text": "vcc_lo",
+   "ok": {
+    "kind": "s",
+    "n": 106,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "vcc_lo"
+   }
+  },
+  {
+   "text": "vcc_hi",
+   "ok": {
+    "kind": "s",
+    "n": 107,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "vcc_hi"
+   }
+  },
+  {
+   "text": "m0",
+   "ok": {
+    "kind": "s",
+    "n": 125,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "m0"
+   }
+  },
+  {
+   "text": "scc",
+   "ok": {
+    "kind": "s",
+    "n": 253,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "scc"
+   }
+  },
+  {
+   "text": "ttmp7",
+   "ok": {
+    "kind": "s",
+    "n": 115,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "ttmp7"
+   }
+  },
+  {
+   "text": "ttmp9",
+   "ok": {
+    "kind": "s",
+    "n": 117,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "ttmp9"
+   }
+  },
+  {
+   "text": "null",
+   "ok": {
+    "kind": "s",
+    "n": 124,
+    "cnt": 1,
+    "neg": false,
+    "abs": false,
+    "val": null,
+    "text": "null"
+   }
+  }
+ ],
+ "lines": [
+  {
+   "line": "v_mul_f32 v42, v43, v44",
+   "mnemonic": "v_mul_f32",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 42,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v42"
+    },
+    {
+     "kind": "v",
+     "n": 43,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v43"
+    },
+    {
+     "kind": "v",
+     "n": 44,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v44"
+    }
+   ],
+   "modifiers": []
+  },
+  {
+   "line": "s_xor_b32 s30, s31, 0x35",
+   "mnemonic": "s_xor_b32",
+   "operands": [
+    {
+     "kind": "s",
+     "n": 30,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "s30"
+    },
+    {
+     "kind": "s",
+     "n": 31,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "s31"
+    },
+    {
+     "kind": "int",
+     "n": 0,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": {
+      "int": "53"
+     },
+     "text": "0x35"
+    }
+   ],
+   "modifiers": []
+  },
+  {
+   "line": "global_load_b64 v[36:37], v38, s[40:41] offset:-32 th:TH_LOAD_RT scope:SCOPE_SYS",
+   "mnemonic": "global_load_b64",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 36,
+     "cnt": 2,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v[36:37]"
+    },
+    {
+     "kind": "v",
+     "n": 38,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v38"
+    },
+    {
+     "kind": "s",
+     "n": 40,
+     "cnt": 2,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "s[40:41]"
+    }
+   ],
+   "modifiers": [
+    [
+     "offset",
+     "-32"
+    ],
+    [
+     "th",
+     "256"
+    ],
+    [
+     "scope",
+     "3"
+    ]
+   ]
+  },
+  {
+   "line": "global_load_b64 v[36:37], v38, s[40:41] offset:-32 offset:64",
+   "refused": "modifier offset given twice in `global_load_b64 v[36:37], v38, s[40:41] offset:-32 offset:64`"
+  },
+  {
+   "line": "ds_store_b64 v52, v[54:55] offset:65535",
+   "mnemonic": "ds_store_b64",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 52,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v52"
+    },
+    {
+     "kind": "v",
+     "n": 54,
+     "cnt": 2,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v[54:55]"
+    }
+   ],
+   "modifiers": [
+    [
+     "offset",
+     "65535"
+    ]
+   ]
+  },
+  {
+   "line": "v_mul_f32_dpp v60, v61, v62 quad_perm:[2,3,0,1] row_mask:0x7 bank_mask:0xb bound_ctrl:0",
+   "mnemonic": "v_mul_f32_dpp",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 60,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v60"
+    },
+    {
+     "kind": "v",
+     "n": 61,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v61"
+    },
+    {
+     "kind": "v",
+     "n": 62,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v62"
+    }
+   ],
+   "modifiers": [
+    [
+     "quad_perm",
+     [
+      "2",
+      "3",
+      "0",
+      "1"
+     ]
+    ],
+    [
+     "row_mask",
+     "7"
+    ],
+    [
+     "bank_mask",
+     "11"
+    ],
+    [
+     "bound_ctrl",
+     "0"
+    ]
+   ]
+  },
+  {
+   "line": "v_mul_f32_dpp v60, v61, v62 row_mirror",
+   "mnemonic": "v_mul_f32_dpp",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 60,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v60"
+    },
+    {
+     "kind": "v",
+     "n": 61,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v61"
+    },
+    {
+     "kind": "v",
+     "n": 62,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v62"
+    }
+   ],
+   "modifiers": [
+    [
+     "row_mirror",
+     "1"
+    ]
+   ]
+  },
+  {
+   "line": "v_pk_mul_f16 v64, v65, v66 op_sel:[0,1] op_sel_hi:[1,0] clamp",
+   "mnemonic": "v_pk_mul_f16",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 64,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v64"
+    },
+    {
+     "kind": "v",
+     "n": 65,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v65"
+    },
+    {
+     "kind": "v",
+     "n": 66,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v66"
+    }
+   ],
+   "modifiers": [
+    [
+     "op_sel",
+     [
+      "0",
+      "1"
+     ]
+    ],
+    [
+     "op_sel_hi",
+     [
+      "1",
+      "0"
+     ]
+    ],
+    [
+     "clamp",
+     "1"
+    ]
+   ]
+  },
+  {
+   "line": "s_wait_alu depctr_hold_cnt(1) depctr_va_vdst(0)",
+   "mnemonic": "s_wait_alu",
+   "operands": [],
+   "modifiers": [
+    [
+     "depctr_hold_cnt",
+     "1"
+    ],
+    [
+     "depctr_va_vdst",
+     "0"
+    ]
+   ]
+  },
+  {
+   "line": "s_wait_alu depctr_hold_cnt(1)&depctr_va_vdst(0x0)",
+   "mnemonic": "s_wait_alu",
+   "operands": [],
+   "modifiers": [
+    [
+     "depctr_hold_cnt",
+     "1"
+    ],
+    [
+     "depctr_va_vdst",
+     "0"
+    ]
+   ]
+  },
+  {
+   "line": "s_wait_alu depctr_hold_cnt(1),depctr_va_vdst(0)",
+   "mnemonic": "s_wait_alu",
+   "operands": [],
+   "modifiers": [
+    [
+     "depctr_hold_cnt",
+     "1"
+    ],
+    [
+     "depctr_va_vdst",
+     "0"
+    ]
+   ]
+  },
+  {
+   "line": "s_wait_alu 0xfff7",
+   "mnemonic": "s_wait_alu",
+   "operands": [],
+   "modifiers": [
+    [
+     "simm16",
+     "65527"
+    ]
+   ]
+  },
+  {
+   "line": "s_wait_alu depctr_hold_cnt(0) depctr_hold_cnt(1)",
+   "refused": "s_wait_alu: depctr_hold_cnt given twice"
+  },
+  {
+   "line": "s_wait_alu lgkmcnt(0)",
+   "refused": "s_wait_alu: `lgkmcnt(0)` is not one of depctr_hold_cnt(n), depctr_sa_sdst(n), depctr_va_vdst(n), depctr_va_sdst(n), depctr_va_ssrc(n), depctr_va_vcc(n), depctr_vm_vsrc(n)"
+  },
+  {
+   "line": "s_wait_alu depctr_va_vdst(-3)",
+   "refused": "s_wait_alu: `depctr_va_vdst(-3)` is not one of depctr_hold_cnt(n), depctr_sa_sdst(n), depctr_va_vdst(n), depctr_va_sdst(n), depctr_va_ssrc(n), depctr_va_vcc(n), depctr_vm_vsrc(n)"
+  },
+  {
+   "line": "s_wait_loadcnt 0",
+   "mnemonic": "s_wait_loadcnt",
+   "operands": [
+    {
+     "kind": "int",
+     "n": 0,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": {
+      "int": "0"
+     },
+     "text": "0"
+    }
+   ],
+   "modifiers": []
+  },
+  {
+   "line": "s_endpgm",
+   "mnemonic": "s_endpgm",
+   "operands": [],
+   "modifiers": []
+  },
+  {
+   "line": "s_cbranch_scc1 .Ltile",
+   "mnemonic": "s_cbranch_scc1",
+   "operands": [
+    {
+     "kind": "label",
+     "n": 0,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": {
+      "label": ".Ltile"
+     },
+     "text": ".Ltile"
+    }
+   ],
+   "modifiers": []
+  },
+  {
+   "line": "v_mul_f32 v42, v43, v44 discarded",
+   "refused": "modifier not understood `discarded` in `v_mul_f32 v42, v43, v44 discarded`"
+  },
+  {
+   "line": "v_mul_f32 v42, v43, v44 Audit:3",
+   "mnemonic": "v_mul_f32",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 42,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v42"
+    },
+    {
+     "kind": "v",
+     "n": 43,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v43"
+    },
+    {
+     "kind": "v",
+     "n": 44,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v44"
+    }
+   ],
+   "modifiers": [
+    [
+     "Audit",
+     "3"
+    ]
+   ]
+  },
+  {
+   "line": "v_mul_f32 v42, v43, v44 scope:SCOPE_INVALID",
+   "refused": "scope:SCOPE_INVALID: not an integer (in `v_mul_f32 v42, v43, v44 scope:SCOPE_INVALID`)"
+  },
+  {
+   "line": "v_mul_f32 v42, v43, v44 Indices:[0,z]",
+   "refused": "Indices:[0,z]: not an integer (in `v_mul_f32 v42, v43, v44 Indices:[0,z]`)"
+  },
+  {
+   "line": "s_getreg_b32 s36, hwreg(HW_REG_MISSING, 3, 2)",
+   "refused": "operand not understood: `hwreg(HW_REG_MISSING, 3, 2)` (hwreg ids: HW_REG_WAVE_MODE, HW_REG_WAVE_STATUS, HW_REG_WAVE_STATE_PRIV, HW_REG_WAVE_GPR_ALLOC, HW_REG_WAVE_LDS_ALLOC, HW_REG_PERF_SNAPSHOT_DATA, HW_REG_PERF_SNAPSHOT_PC_LO, HW_REG_PERF_SNAPSHOT_PC_HI, HW_REG_PERF_SNAPSHOT_DATA1, HW_REG_PERF_SNAPSHOT_DATA2, HW_REG_WAVE_EXCP_FLAG_PRIV, HW_REG_WAVE_EXCP_FLAG_USER, HW_REG_WAVE_TRAP_CTRL, HW_REG_WAVE_SCRATCH_BASE_LO, HW_REG_WAVE_SCRATCH_BASE_HI, HW_REG_WAVE_HW_ID1, HW_REG_WAVE_HW_ID2, HW_REG_SHADER_CYCLES_LO, HW_REG_SHADER_CYCLES_HI, HW_REG_IB_STS2)"
+  },
+  {
+   "line": "v_mov_b32 v39, s[44:45]",
+   "mnemonic": "v_mov_b32",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 39,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v39"
+    },
+    {
+     "kind": "s",
+     "n": 44,
+     "cnt": 2,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "s[44:45]"
+    }
+   ],
+   "modifiers": []
+  },
+  {
+   "line": "s_load_b64 s[36:37], s[38:39], 0x8 offset:12 offen idxen",
+   "mnemonic": "s_load_b64",
+   "operands": [
+    {
+     "kind": "s",
+     "n": 36,
+     "cnt": 2,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "s[36:37]"
+    },
+    {
+     "kind": "s",
+     "n": 38,
+     "cnt": 2,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "s[38:39]"
+    },
+    {
+     "kind": "int",
+     "n": 0,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": {
+      "int": "8"
+     },
+     "text": "0x8"
+    }
+   ],
+   "modifiers": [
+    [
+     "offset",
+     "12"
+    ],
+    [
+     "offen",
+     "1"
+    ],
+    [
+     "idxen",
+     "1"
+    ]
+   ]
+  },
+  {
+   "line": "v_sub_f32 v62, -v63, |v64|",
+   "mnemonic": "v_sub_f32",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 62,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v62"
+    },
+    {
+     "kind": "v",
+     "n": 63,
+     "cnt": 1,
+     "neg": true,
+     "abs": false,
+     "val": null,
+     "text": "-v63"
+    },
+    {
+     "kind": "v",
+     "n": 64,
+     "cnt": 1,
+     "neg": false,
+     "abs": true,
+     "val": null,
+     "text": "|v64|"
+    }
+   ],
+   "modifiers": []
+  },
+  {
+   "line": "v_sub_f32 v70,v71,,,v72",
+   "mnemonic": "v_sub_f32",
+   "operands": [
+    {
+     "kind": "v",
+     "n": 70,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v70"
+    },
+    {
+     "kind": "v",
+     "n": 71,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v71"
+    },
+    {
+     "kind": "v",
+     "n": 72,
+     "cnt": 1,
+     "neg": false,
+     "abs": false,
+     "val": null,
+     "text": "v72"
+    }
+   ],
+   "modifiers": []
+  }
+ ],
+ "assemble": [
+  {
+   "name": "loop_and_forward_exit",
+   "items": [
+    [
+     "label",
+     ".Lbegin"
+    ],
+    [
+     "ins",
+     "s_xor_b32 s20, s21, 1"
+    ],
+    [
+     "ins",
+     "s_cbranch_scc1 .Lbegin"
+    ],
+    [
+     "ins",
+     "s_branch .Lfinish"
+    ],
+    [
+     "label",
+     ".Lfinish"
+    ],
+    [
+     "ins",
+     "v_mul_f32 v42, v43, v44"
+    ],
+    [
+     "ins",
+     "s_endpgm"
+    ]
+   ],
+   "hex": "1581148dfeffa2bf0000a0bf2b5954100000b0bf"
+  },
+  {
+   "name": "aligned_vector_body",
+   "items": [
+    [
+     "ins",
+     "v_mul_f32 v42, v43, v44"
+    ],
+    [
+     "align",
+     5
+    ],
+    [
+     "label",
+     ".Laligned"
+    ],
+    [
+     "ins",
+     "s_endpgm"
+    ]
+   ],
+   "hex": "2b595410000080bf000080bf000080bf000080bf000080bf000080bf000080bf0000b0bf"
+  },
+  {
+   "name": "aligned_literal",
+   "items": [
+    [
+     "ins",
+     "s_and_b32 s34, s35, 0x5a00f"
+    ],
+    [
+     "align",
+     4
+    ],
+    [
+     "ins",
+     "s_endpgm"
+    ]
+   ],
+   "hex": "23ff228b0fa00500000080bf000080bf0000b0bf"
+  },
+  {
+   "name": "unresolved_branch",
+   "items": [
+    [
+     "ins",
+     "s_nop 3"
+    ],
+    [
+     "ins",
+     "s_branch .Lmissing_tile"
+    ]
+   ],
+   "refused": "undefined label .Lmissing_tile"
+  },
+  {
+   "name": "duplicate_label",
+   "items": [
+    [
+     "label",
+     ".Ltile"
+    ],
+    [
+     "ins",
+     "s_nop 3"
+    ],
+    [
+     "label",
+     ".Ltile"
+    ]
+   ],
+   "refused": "line 3: label .Ltile defined twice"
+  },
+  {
+   "name": "unsupported_opcode",
+   "items": [
+    [
+     "ins",
+     "s_nop 3"
+    ],
+    [
+     "ins",
+     "v_no_such_instruction v54"
+    ]
+   ],
+   "refused": "line 2: v_no_such_instruction v54: v_no_such_instruction: not a gfx1201 mnemonic"
+  },
+  {
+   "name": "alignment_then_missing_label",
+   "items": [
+    [
+     "ins",
+     "s_branch .Lgap"
+    ],
+    [
+     "align",
+     11
+    ],
+    [
+     "align",
+     11
+    ],
+    [
+     "align",
+     12
+    ],
+    [
+     "ins",
+     "s_nop 3"
+    ]
+   ],
+   "refused": "undefined label .Lgap"
+  },
+  {
+   "name": "forward_boundary_32768_end_True",
+   "items": [
+    [
+     "ins",
+     "s_branch .Lpadding_end"
+    ],
+    [
+     "repeat",
+     32768,
+     "s_nop 3"
+    ],
+    [
+     "label",
+     ".Lpadding_end"
+    ],
+    [
+     "ins",
+     "s_endpgm"
+    ]
+   ],
+   "refused": "branch out of range: s_branch .Lpadding_end"
+  },
+  {
+   "name": "forward_boundary_32767_end_False",
+   "items": [
+    [
+     "ins",
+     "s_branch .Lpadding_end"
+    ],
+    [
+     "repeat",
+     32767,
+     "s_nop 3"
+    ],
+    [
+     "label",
+     ".Lpadding_end"
+    ]
+   ],
+   "first_word_hex": "ff7fa0bf",
+   "bytes": 131072
+  },
+  {
+   "name": "forward_boundary_32767_end_True",
+   "items": [
+    [
+     "ins",
+     "s_branch .Lpadding_end"
+    ],
+    [
+     "repeat",
+     32767,
+     "s_nop 3"
+    ],
+    [
+     "label",
+     ".Lpadding_end"
+    ],
+    [
+     "ins",
+     "s_endpgm"
+    ]
+   ],
+   "first_word_hex": "ff7fa0bf",
+   "bytes": 131076
+  }
+ ]
+}

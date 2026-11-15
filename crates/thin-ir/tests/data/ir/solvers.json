@@ -1,0 +1,551 @@
+{
+ "notation": "Authored gfx1201 notation: vN/sN and v[a:b]/s[a:b] name values placed at physical registers; named physical registers, integer immediates and @label operands are supported. {name=value|...} gives fields. '; m0_set=C' and '; waves=0bMASK' attach IR attributes. Abstract stream op/br/brw/jmp/end/label tokens denote concrete native instructions. Native results are entry states unless their key says otherwise. A caps block-length sums at 10; B increments with widening after patience 2; C follows only forward block edges; D unions visited blocks over all blocks; E is the backward union. visits is the native transfer evaluation order.",
+ "cases": [
+  {
+   "name": "loop_fixpoint",
+   "stream": [
+    "loop_head:",
+    "op",
+    "op",
+    "br loop_head",
+    "end"
+   ],
+   "behavior": "capping, widening, edge filtering, all-block and backward visits on a cycle",
+   "blocks": [
+    [
+     0,
+     4
+    ],
+    [
+     4,
+     5
+    ]
+   ],
+   "block_succ": [
+    [
+     0,
+     1
+    ],
+    []
+   ],
+   "A_forward_capped": {
+    "entry": [
+     10,
+     10
+    ],
+    "visits": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "B_forward_widened": {
+    "entry": [
+     1000,
+     1000
+    ],
+    "visits": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ]
+   },
+   "C_forward_follow": {
+    "entry": [
+     0,
+     4
+    ],
+    "visits": [
+     0,
+     1
+    ]
+   },
+   "D_forward_all": {
+    "entry": [
+     [
+      0
+     ],
+     [
+      0
+     ]
+    ],
+    "visits": [
+     0,
+     0,
+     1
+    ]
+   },
+   "E_backward": {
+    "before": [
+     [
+      0,
+      1
+     ],
+     [
+      1
+     ]
+    ],
+    "visits": [
+     1,
+     0,
+     0
+    ]
+   }
+  },
+  {
+   "name": "branch_merge",
+   "stream": [
+    "br arm",
+    "op",
+    "op",
+    "jmp merge",
+    "arm:",
+    "op",
+    "merge:",
+    "op",
+    "end"
+   ],
+   "behavior": "solver merges and visit order at a diamond join",
+   "blocks": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     4
+    ],
+    [
+     4,
+     6
+    ],
+    [
+     6,
+     9
+    ]
+   ],
+   "block_succ": [
+    [
+     2,
+     1
+    ],
+    [
+     3
+    ],
+    [
+     3
+    ],
+    []
+   ],
+   "A_forward_capped": {
+    "entry": [
+     0,
+     1,
+     1,
+     4
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     3
+    ]
+   },
+   "B_forward_widened": {
+    "entry": [
+     0,
+     1,
+     1,
+     2
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     3
+    ]
+   },
+   "C_forward_follow": {
+    "entry": [
+     0,
+     1,
+     1,
+     4
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     3
+    ]
+   },
+   "D_forward_all": {
+    "entry": [
+     [],
+     [
+      0
+     ],
+     [
+      0
+     ],
+     [
+      0,
+      1,
+      2
+     ]
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     3
+    ]
+   },
+   "E_backward": {
+    "before": [
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      3
+     ]
+    ],
+    "visits": [
+     3,
+     2,
+     1,
+     0
+    ]
+   }
+  },
+  {
+   "name": "two_nesting_levels",
+   "stream": [
+    "op",
+    "outside:",
+    "op",
+    "inside:",
+    "op",
+    "br inside",
+    "op",
+    "op",
+    "br outside",
+    "end"
+   ],
+   "behavior": "widening and backward propagation through nested cycles",
+   "blocks": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     3
+    ],
+    [
+     3,
+     6
+    ],
+    [
+     6,
+     9
+    ],
+    [
+     9,
+     10
+    ]
+   ],
+   "block_succ": [
+    [
+     1
+    ],
+    [
+     2
+    ],
+    [
+     2,
+     3
+    ],
+    [
+     1,
+     4
+    ],
+    []
+   ],
+   "A_forward_capped": {
+    "entry": [
+     0,
+     10,
+     10,
+     10,
+     10
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     2,
+     2,
+     2,
+     3,
+     1,
+     4
+    ]
+   },
+   "B_forward_widened": {
+    "entry": [
+     0,
+     1000,
+     1000,
+     1000,
+     1000
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     2,
+     2,
+     3,
+     1,
+     4
+    ]
+   },
+   "C_forward_follow": {
+    "entry": [
+     0,
+     1,
+     3,
+     6,
+     9
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ]
+   },
+   "D_forward_all": {
+    "entry": [
+     [],
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      0,
+      1,
+      2,
+      3
+     ],
+     [
+      0,
+      1,
+      2,
+      3
+     ]
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     2,
+     3,
+     1,
+     2,
+     3,
+     4
+    ]
+   },
+   "E_backward": {
+    "before": [
+     [
+      0,
+      1,
+      2,
+      3,
+      4
+     ],
+     [
+      1,
+      2,
+      3,
+      4
+     ],
+     [
+      1,
+      2,
+      3,
+      4
+     ],
+     [
+      1,
+      2,
+      3,
+      4
+     ],
+     [
+      4
+     ]
+    ],
+    "visits": [
+     4,
+     3,
+     2,
+     2,
+     1,
+     3,
+     2,
+     2,
+     1,
+     0
+    ]
+   }
+  },
+  {
+   "name": "unreached_blocks",
+   "stream": [
+    "jmp selected",
+    "op",
+    "op",
+    "ignored:",
+    "op",
+    "selected:",
+    "end",
+    "op",
+    "op"
+   ],
+   "behavior": "forward and backward behavior in blocks unreachable from entry",
+   "blocks": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     5
+    ],
+    [
+     5,
+     7
+    ],
+    [
+     7,
+     9
+    ]
+   ],
+   "block_succ": [
+    [
+     2
+    ],
+    [
+     2
+    ],
+    [],
+    []
+   ],
+   "A_forward_capped": {
+    "entry": [
+     0,
+     null,
+     1,
+     null
+    ],
+    "visits": [
+     0,
+     2
+    ]
+   },
+   "B_forward_widened": {
+    "entry": [
+     0,
+     null,
+     1,
+     null
+    ],
+    "visits": [
+     0,
+     2
+    ]
+   },
+   "C_forward_follow": {
+    "entry": [
+     0,
+     null,
+     1,
+     null
+    ],
+    "visits": [
+     0,
+     2
+    ]
+   },
+   "D_forward_all": {
+    "entry": [
+     [],
+     [],
+     [
+      0,
+      1
+     ],
+     []
+    ],
+    "visits": [
+     0,
+     1,
+     2,
+     3
+    ]
+   },
+   "E_backward": {
+    "before": [
+     [
+      0,
+      2
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ]
+    ],
+    "visits": [
+     3,
+     2,
+     1,
+     0
+    ]
+   }
+  }
+ ]
+}

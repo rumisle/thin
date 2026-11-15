@@ -1,0 +1,17 @@
+{
+ "bundle": {
+  "file": "AMD_GPU_MR_ISA_XML_2025_09_05.zip",
+  "url": "https://gpuopen.com/download/AMD_GPU_MR_ISA_XML_2025_09_05.zip",
+  "sha256": "6c656832cffa8198fe8db72007697d592fdeadc14194b9b4fbdcc8ec7f5c5223",
+  "member": "amdgpu_isa_rdna4.xml"
+ },
+ "isa_tables": {
+  "encodings": 50,
+  "ops": 1561,
+  "sha256_canonical_json": "c545af45e121860e0688dd2a8047bc2ff3e7859d72b72089c1062ce9fa55d468"
+ },
+ "operand_table": {
+  "forms": 1893,
+  "sha256_canonical_json": "916484099c4264cde386ee6c7118f3ed46218ee7b6d2c009703f97bbc716de7c"
+ }
+}

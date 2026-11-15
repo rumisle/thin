@@ -1,0 +1,2525 @@
+{
+ "notation": "Compile, Kernel and bind on gfx1201. `params`: the generator `gen_toy(BLOCK: int = 256, n: tuple = (1, 100), ablate=frozenset(), scale: float = 1.0, tag=None, name='a')` given parameters, each written as Python text (evaluated with np, Field, frozenset, set and object in scope; the text \"<class 'object'>\" is the class object), and `ok` its held pairs [name, repr of the held form], sorted by name; `refusals` are given parameters that are refused. `overriding`: gen_toy given BLOCK=128 inside overriding(BLOCK=64, scale=3.0), inside that and a nested overriding(BLOCK=32), and after both. `render_address`: addresses made from stand-in parts. `closures`: generator identities of written modules. `vadd`: examples.vadd's build_vadd at its defaults (z = x + y over n f32, BLOCK lanes a workgroup), compiled through a fresh store, and `store_round_trip` that store's behavior. `bind`: Kernel.bind calls on vadd (`grid` text evaluated with np in scope; `args` the names given, x, y, z as 4-element f32 arrays and n = 1000; `overread`/`co_resident` as Python text) and the Bound's grid, co_resident and overread or the refusal. `host`: vadd's own host given the three arrays and n = 1000 (`ok`, the grid) or n = 0 (refused). `accepts`: KernelDef.accepts on the given values (\"<array>\" a 4-element f32 array). `needs`: the `needy` kernel that asks co_resident (bind args x, c = 16, n = 2 at grid 2, with co_resident=True when `ok`), and `same_grid` the variant also asking the same grid on c. `kernarg`: the vadd Bound of grid 4 (n = 1000) packed with these pointer addresses. `ok` holds a result; `raises`/`message` an exception.",
+ "params": [
+  {
+   "given": {},
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "name": "'a'"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "BLOCK": "1024",
+    "n": "[2, 48]"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "1024"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(2, 48)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "ablate": "{'stores', 'lds', 'atomics'}"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "{'atomics', 'lds', 'stores'}"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "ablate": "frozenset({'waits', 'barriers'})"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "{'barriers', 'waits'}"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "ablate": "('waits', 'barriers')"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "('waits', 'barriers')"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "ablate": "frozenset()"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "tag": "()"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "()"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "ablate": "{9, 10}"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "{10, 9}"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "scale": "7"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "7"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "scale": "0.25"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "0.25"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "scale": "-0.0"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "-0.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "tag": "None",
+    "scale": "1.0"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "tag": "False"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "False"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "tag": "0"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "0"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "name": "\"it's\""
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "\"it's\""
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "name": "'µs'"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(1, 100)"
+    ],
+    [
+     "name",
+     "'µs'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  },
+  {
+   "given": {
+    "n": "(4, [5, frozenset({7, 6})])"
+   },
+   "ok": [
+    [
+     "BLOCK",
+     "256"
+    ],
+    [
+     "ablate",
+     "set()"
+    ],
+    [
+     "n",
+     "(4, (5, {6, 7}))"
+    ],
+    [
+     "name",
+     "'a'"
+    ],
+    [
+     "scale",
+     "1.0"
+    ],
+    [
+     "tag",
+     "None"
+    ]
+   ]
+  }
+ ],
+ "refusals": [
+  {
+   "given": {
+    "scale": "Field(12, 0, 31)"
+   },
+   "raises": "TypeError",
+   "message": "build parameter scale = 12 (served 0 .. 31): a run-time field's value; the kernel serves its range - pass scale.range (or .lo, .hi) to compile and the value to bind"
+  },
+  {
+   "given": {
+    "ablate": "{'k': 2}"
+   },
+   "raises": "TypeError",
+   "message": "build parameter ablate = {'k': 2}: None, a bool, an int, a float, a str, a tuple / set of them, or a function, class or module with a source file"
+  },
+  {
+   "given": {
+    "name": "bytes(2)"
+   },
+   "raises": "TypeError",
+   "message": "build parameter name = b'\\x00\\x00': None, a bool, an int, a float, a str, a tuple / set of them, or a function, class or module with a source file"
+  },
+  {
+   "given": {
+    "n": "(1, np.float32(0.5))"
+   },
+   "raises": "TypeError",
+   "message": "build parameter n = np.float32(0.5): None, a bool, an int, a float, a str, a tuple / set of them, or a function, class or module with a source file"
+  },
+  {
+   "given": {
+    "WARPS": "2",
+    "BLOCK": "64"
+   },
+   "raises": "TypeError",
+   "message": "gen_toy: got an unexpected keyword argument 'WARPS'"
+  },
+  {
+   "given": {
+    "tag": "int"
+   },
+   "raises": "TypeError",
+   "message": "build parameter tag is a type with no source file (a builtin, a C function, or code made by exec or eval): it cannot be held"
+  },
+  {
+   "given": {
+    "tag": "<class 'object'>"
+   },
+   "raises": "TypeError",
+   "message": "build parameter tag is a type with no source file (a builtin, a C function, or code made by exec or eval): it cannot be held"
+  },
+  {
+   "given": {
+    "tag": "len"
+   },
+   "raises": "TypeError",
+   "message": "build parameter tag is a builtin_function_or_method with no source file (a builtin, a C function, or code made by exec or eval): it cannot be held"
+  },
+  {
+   "given": {
+    "tag": "object()"
+   },
+   "raises": "TypeError",
+   "message": "build parameter tag is a object whose repr carries a memory address: it has no held form (capture a held value, a function, a class or a module)"
+  }
+ ],
+ "overriding": {
+  "outer": [
+   [
+    "BLOCK",
+    "64"
+   ],
+   [
+    "ablate",
+    "set()"
+   ],
+   [
+    "n",
+    "(1, 100)"
+   ],
+   [
+    "name",
+    "'a'"
+   ],
+   [
+    "scale",
+    "3.0"
+   ],
+   [
+    "tag",
+    "None"
+   ]
+  ],
+  "inner": [
+   [
+    "BLOCK",
+    "32"
+   ],
+   [
+    "ablate",
+    "set()"
+   ],
+   [
+    "n",
+    "(1, 100)"
+   ],
+   [
+    "name",
+    "'a'"
+   ],
+   [
+    "scale",
+    "3.0"
+   ],
+   [
+    "tag",
+    "None"
+   ]
+  ],
+  "after": [
+   [
+    "BLOCK",
+    "128"
+   ],
+   [
+    "ablate",
+    "set()"
+   ],
+   [
+    "n",
+    "(1, 100)"
+   ],
+   [
+    "name",
+    "'a'"
+   ],
+   [
+    "scale",
+    "1.0"
+   ],
+   [
+    "tag",
+    "None"
+   ]
+  ]
+ },
+ "render_address": {
+  "notation": "address(\"render\", format, identity, held, options, target, packages_digest) of the parts as given (tuples written as lists). `options` are the output options' (name, repr) pairs of the Options in force under `using`, sorted by name; the identity's sha and the packages digest are stand-ins (sha256 of labels).",
+  "cases": [
+   {
+    "what": "the default options",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/bbf7c72cca8a016c1d1e0973a599fc9b8f702c7e6a9a2e527207b29ff4bab54b"
+   },
+   {
+    "what": "using(audit=True): another address",
+    "using": {
+     "audit": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "True"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/f296ecfbf5974af8a3d0e7ff4f140af6d67bd9d7da4fa72a3b0b7401db32caf6"
+   },
+   {
+    "what": "using(keep_dead=True): another address",
+    "using": {
+     "keep_dead": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "True"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/8c744026770da472d6e4150ea920d1d400f891c2a2425446951b07296a37ffb9"
+   },
+   {
+    "what": "using(safe_barrier=True): another address",
+    "using": {
+     "safe_barrier": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "True"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/3e1d034c2ced60f747777f4b0033a5c45e3012c2f132701c16e123a41a0a4e9c"
+   },
+   {
+    "what": "using(waits_unique=True): another address",
+    "using": {
+     "waits_unique": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "True"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/05104d00dda32fb4e8870b7b161aea5bccbb85da06ae3c1dbdccd481dba3dc35"
+   },
+   {
+    "what": "using(safe_waits=True): another address",
+    "using": {
+     "safe_waits": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "True"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/137c204d23244b48716c421c555abd58e8d1b9a5c314684f44e567d828b056ef"
+   },
+   {
+    "what": "using(regions=False): another address",
+    "using": {
+     "regions": false
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "False"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/2cfea64a0b2b0fe4cd7263abcd0277939c5ed7c5918580dddc434c993302daff"
+   },
+   {
+    "what": "using(lds_wave_order=False): another address",
+    "using": {
+     "lds_wave_order": false
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "False"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/0a0fb1103f95cab13b49defaadf38bbffa339d91189403e560f94a9823895378"
+   },
+   {
+    "what": "using(peak_report=True): the defaults' address (it changes no output)",
+    "using": {
+     "peak_report": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/bbf7c72cca8a016c1d1e0973a599fc9b8f702c7e6a9a2e527207b29ff4bab54b"
+   },
+   {
+    "what": "using(pressure=True, peak_list=3): the defaults' address",
+    "using": {
+     "pressure": true,
+     "peak_list": 3
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/bbf7c72cca8a016c1d1e0973a599fc9b8f702c7e6a9a2e527207b29ff4bab54b"
+   },
+   {
+    "what": "using(pressure=True, safe_waits=True): safe_waits' address",
+    "using": {
+     "pressure": true,
+     "safe_waits": true
+    },
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "True"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/137c204d23244b48716c421c555abd58e8d1b9a5c314684f44e567d828b056ef"
+   },
+   {
+    "what": "a closure capturing lanes = 32",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     [
+      [
+       "lanes",
+       "32"
+      ]
+     ]
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/d666be64120498a0265ce285c0b025bccffd33c4941acb0b216d401848fc7c3e"
+   },
+   {
+    "what": "the same factory's closure capturing lanes = 96: another address",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     [
+      [
+       "lanes",
+       "96"
+      ]
+     ]
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/d74d4f2b85fc982633768db6b907df85cc4278bd8f6dcf9f965dae4efa83b4a7"
+   },
+   {
+    "what": "two captures in name order, a list held as a tuple",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     [
+      [
+       "lanes",
+       "32"
+      ],
+      [
+       "tile",
+       "(4, 8)"
+      ]
+     ]
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/aa7525a9880f073adc9b212cb9599493f3ac3fff39b8306608c177edd8bd849e"
+   },
+   {
+    "what": "the same qualified name defined at line 53: another address",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     53,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/f84188ee7f37c4c5d058eb5e17746da331c870368504692696089d99c36f8ca2"
+   },
+   {
+    "what": "another held parameter value: another address",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "4"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/a76b954e9fd85df71b6a32c9200759ceec2ca9fb2d45dfdd0232c4f8c338dfaf"
+   },
+   {
+    "what": "another target name: another address",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1100",
+    "packages_digest": "163dfeb8a5c3125d94c90d4c68d55781f9ecd091c8f15e1bad3ce53b3177c5a7",
+    "address": "render/990aa2e1c63faf856bed383ee669178f0d14a1aefacfa4d61302ad694f941a5d"
+   },
+   {
+    "what": "another packages digest: another address",
+    "using": {},
+    "format": 2,
+    "identity": [
+     "make_saxpy",
+     "58bfd34f7ef5d658ba99e30e63a3dbb33f1db7b3b74a22d4b2b6c5cdf75bbbb8",
+     17,
+     []
+    ],
+    "held": [
+     [
+      "BLOCK",
+      "128"
+     ],
+     [
+      "unroll",
+      "2"
+     ]
+    ],
+    "options": [
+     [
+      "audit",
+      "False"
+     ],
+     [
+      "keep_dead",
+      "False"
+     ],
+     [
+      "lds_wave_order",
+      "True"
+     ],
+     [
+      "regions",
+      "True"
+     ],
+     [
+      "safe_barrier",
+      "False"
+     ],
+     [
+      "safe_waits",
+      "False"
+     ],
+     [
+      "waits_unique",
+      "False"
+     ]
+    ],
+    "target": "gfx1201",
+    "packages_digest": "00668cd2fac3641e59d889b730c2f8e6193770a76eb3153703026059b273749c",
+    "address": "render/4c6be45d1e6025eb05d65125ed7eefaa79c17f158be8bffa1b9f0a3da13330b2"
+   }
+  ]
+ },
+ "store_round_trip": {
+  "same_object_in_process": true,
+  "counts": {
+   "render.miss.absent": 1,
+   "render.computed": 1,
+   "render.published": 1,
+   "render.hit": 1
+  },
+  "equal_after_forgetting": true,
+  "entry_members": [
+   "co",
+   "s"
+  ]
+ },
+ "vadd": {
+  "params": {
+   "BLOCK": "256",
+   "n": "(1, 1073741823)",
+   "laps": "False"
+  },
+  "name": "vadd_b256",
+  "address_name": "render",
+  "address_hex_len": 64,
+  "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"x\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"y\", \"offset\": 8}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"z\", \"offset\": 16}, {\"bytes\": 4, \"hi\": 1073741823, \"kind\": \"u32\", \"lo\": 1, \"name\": \"n\", \"offset\": 24}], \"build\": {\"BLOCK\": \"256\", \"laps\": \"False\", \"n\": \"(1, 1073741823)\"}, \"grid\": [], \"kernarg_bytes\": 28, \"lds\": 0, \"max_grid\": [4194304], \"mix\": {\"salu\": 3, \"smem\": 3, \"valu\": 4, \"vmem\": 3, \"wait\": 2}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:n#1, s:kargx2, 0x18\", \"base\": 0, \"peak\": 10, \"phase\": \"(derived)\", \"size\": null, \"used\": 10}], \"v\": [{\"at\": \"global_load_b32 v:c#1, v:off#1, s:args#1+2x2\", \"base\": 0, \"peak\": 3, \"phase\": \"(derived)\", \"size\": null, \"used\": 3}]}, \"resident\": 8, \"sgpr\": 10, \"symbol\": \"vadd_b256\", \"vgpr\": 3, \"wgsize\": 256, \"wgy\": 0}",
+  "args": {
+   "x": [
+    0,
+    8,
+    "ptr",
+    null,
+    null
+   ],
+   "y": [
+    8,
+    8,
+    "ptr",
+    null,
+    null
+   ],
+   "z": [
+    16,
+    8,
+    "ptr",
+    null,
+    null
+   ],
+   "n": [
+    24,
+    4,
+    "u32",
+    1,
+    1073741823
+   ]
+  },
+  "kernarg_bytes": 28,
+  "grid": [],
+  "max_grid": [
+   4194304
+  ],
+  "build": {
+   "BLOCK": "256",
+   "laps": "False",
+   "n": "(1, 1073741823)"
+  },
+  "s_sha256": "cc43cd6782c9ca4036e2fdc4a5062f86180c948cb1d8bbcb12d8c7b4ed679cb4",
+  "co_sha256": "5cb28f4f1c908277ac9cae4e1e6ebb02db5fbd3fb95389324b8c70a03c8eabcd"
+ },
+ "bind": [
+  {
+   "what": "a grid of 9",
+   "call": {
+    "grid": "9",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "ok": {
+    "grid": [
+     9,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "a 3-d grid",
+   "call": {
+    "grid": "(6, 1, 1)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "ok": {
+    "grid": [
+     6,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "a list grid",
+   "call": {
+    "grid": "[3, 1]",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "ok": {
+    "grid": [
+     3,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "a numpy uint32 grid",
+   "call": {
+    "grid": "np.uint32(5)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "ok": {
+    "grid": [
+     5,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "a numpy int16 in a grid",
+   "call": {
+    "grid": "(np.int16(2), 1)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "ok": {
+    "grid": [
+     2,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "a float in y of the grid",
+   "call": {
+    "grid": "(3, 1.0)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid (3, 1.0): one to three positive ints"
+  },
+  {
+   "what": "the grid at max_grid",
+   "call": {
+    "grid": "-(-((1 << 30) - 1) // 256)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "ok": {
+    "grid": [
+     4194304,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "one past max_grid",
+   "call": {
+    "grid": "(-(-((1 << 30) - 1) // 256) + 1, 1)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid (4194305, 1, 1) past the kernel's max_grid (4194304,) (its ranges are proven for that)"
+  },
+  {
+   "what": "z past max_grid's absent z (1)",
+   "call": {
+    "grid": "(1, 1, 2)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid (1, 1, 2) past the kernel's max_grid (4194304,) (its ranges are proven for that)"
+  },
+  {
+   "what": "a zero y",
+   "call": {
+    "grid": "(7, 0)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid (7, 0): one to three positive ints"
+  },
+  {
+   "what": "a negative grid",
+   "call": {
+    "grid": "-2",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid -2: one to three positive ints"
+  },
+  {
+   "what": "four grid dimensions",
+   "call": {
+    "grid": "(2, 1, 1, 1)",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid (2, 1, 1, 1): one to three positive ints"
+  },
+  {
+   "what": "no grid dimensions",
+   "call": {
+    "grid": "()",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid (): one to three positive ints"
+  },
+  {
+   "what": "a bool grid",
+   "call": {
+    "grid": "True",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid True: one to three positive ints"
+  },
+  {
+   "what": "no grid and none in the manifest",
+   "call": {
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "TypeError",
+   "message": "vadd_b256: no grid given and none in the manifest"
+  },
+  {
+   "what": "two pointers missing",
+   "call": {
+    "grid": "2",
+    "args": [
+     "n",
+     "y"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: arguments ['n', 'x', 'y', 'z'], given ['n', 'y'] (missing ['x', 'z'], unknown [])"
+  },
+  {
+   "what": "an overread of z",
+   "call": {
+    "grid": "3",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "overread": "{'z': 64}"
+   },
+   "ok": {
+    "grid": [
+     3,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {
+     "z": 64
+    }
+   }
+  },
+  {
+   "what": "overreads of two pointers",
+   "call": {
+    "grid": "3",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "overread": "{'y': 4, 'z': 12}"
+   },
+   "ok": {
+    "grid": [
+     3,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {
+     "y": 4,
+     "z": 12
+    }
+   }
+  },
+  {
+   "what": "an overread of n",
+   "call": {
+    "grid": "3",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "overread": "{'n': 8}"
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: overread {'n': 8}: a pointer argument's bytes past its end, a positive int"
+  },
+  {
+   "what": "an overread of 0 bytes of y",
+   "call": {
+    "grid": "3",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "overread": "{'y': 0}"
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: overread {'y': 0}: a pointer argument's bytes past its end, a positive int"
+  },
+  {
+   "what": "an overread of True bytes",
+   "call": {
+    "grid": "3",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "overread": "{'x': True}"
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: overread {'x': True}: a pointer argument's bytes past its end, a positive int"
+  },
+  {
+   "what": "an overread of a name vadd lacks",
+   "call": {
+    "grid": "3",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "overread": "{'out': 4}"
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: overread {'out': 4}: a pointer argument's bytes past its end, a positive int"
+  },
+  {
+   "what": "co_resident given as 1, no need asked",
+   "call": {
+    "grid": "5",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "co_resident": "1"
+   },
+   "ok": {
+    "grid": [
+     5,
+     1,
+     1
+    ],
+    "co_resident": true,
+    "overread": {}
+   }
+  },
+  {
+   "what": "co_resident=False",
+   "call": {
+    "grid": "5",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ],
+    "co_resident": "False"
+   },
+   "ok": {
+    "grid": [
+     5,
+     1,
+     1
+    ],
+    "co_resident": false,
+    "overread": {}
+   }
+  },
+  {
+   "what": "a scalar float grid",
+   "call": {
+    "grid": "4.0",
+    "args": [
+     "n",
+     "x",
+     "y",
+     "z"
+    ]
+   },
+   "raises": "LaunchError",
+   "message": "vadd_b256: grid 4.0: one to three positive ints"
+  }
+ ],
+ "host": [
+  {
+   "what": "k(**given) runs the host",
+   "ok": [
+    4,
+    1,
+    1
+   ]
+  },
+  {
+   "what": "the host's bind refuses",
+   "raises": "LaunchError",
+   "message": "vadd_b256: argument n = 0: outside its range 1 .. 1073741823"
+  }
+ ],
+ "accepts": [
+  {
+   "given": {
+    "n": 1
+   },
+   "ok": null
+  },
+  {
+   "given": {
+    "n": 1073741823
+   },
+   "ok": null
+  },
+  {
+   "given": {
+    "n": 0
+   },
+   "ok": "vadd_b256: argument n = 0: outside its range 1 .. 1073741823"
+  },
+  {
+   "given": {
+    "n": -7
+   },
+   "ok": "vadd_b256: argument n = -7: outside its range 1 .. 1073741823"
+  },
+  {
+   "given": {
+    "n": 1073741824
+   },
+   "ok": "vadd_b256: argument n = 1073741824: outside its range 1 .. 1073741823"
+  },
+  {
+   "given": {
+    "x": "<array>",
+    "y": "<array>",
+    "z": "<array>",
+    "n": 77
+   },
+   "ok": null
+  },
+  {
+   "given": {
+    "x": "<array>",
+    "n": 9
+   },
+   "ok": null
+  },
+  {
+   "given": {
+    "x": "<array>",
+    "y": 7.5,
+    "z": "<array>",
+    "n": 9
+   },
+   "ok": "vadd_b256: argument y is a pointer: a buffer, not float"
+  },
+  {
+   "given": {
+    "z": 12,
+    "n": 9
+   },
+   "ok": "vadd_b256: argument z is a pointer: a buffer, not int"
+  },
+  {
+   "given": {},
+   "raises": "TypeError",
+   "message": "build_vadd.<locals>.host() missing 1 required positional argument: 'n'"
+  },
+  {
+   "given": {
+    "n": 3,
+    "w": 1
+   },
+   "raises": "TypeError",
+   "message": "build_vadd.<locals>.host() got an unexpected keyword argument 'w'"
+  }
+ ],
+ "needs": {
+  "needs": {
+   "co_resident": "its workgroups wait for each other"
+  },
+  "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"x\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"c\", \"offset\": 8, \"owned\": \"kept\"}, {\"bytes\": 4, \"hi\": 64, \"kind\": \"u32\", \"lo\": 1, \"name\": \"n\", \"offset\": 16}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 20, \"lds\": 0, \"max_grid\": [8, 2], \"mix\": {}, \"needs\": {\"co_resident\": \"its workgroups wait for each other\"}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"; nothing\", \"base\": 0, \"peak\": 0, \"phase\": \"(derived)\", \"size\": null, \"used\": 2}], \"v\": [{\"at\": \"; nothing\", \"base\": 0, \"peak\": 0, \"phase\": \"(derived)\", \"size\": null, \"used\": 1}]}, \"resident\": 64, \"sgpr\": 2, \"symbol\": \"needy\", \"vgpr\": 1, \"wgsize\": 32, \"wgy\": 0}",
+  "bind": [
+   {
+    "what": "needs co_resident, not given",
+    "raises": "LaunchError",
+    "message": "needy: needs co_resident (its workgroups wait for each other): bind(..., co_resident=True) - a cooperative launch"
+   },
+   {
+    "what": "needs co_resident, given",
+    "ok": [
+     2,
+     1,
+     1
+    ]
+   }
+  ],
+  "no_host": {
+   "raises": "TypeError",
+   "message": "needy: no host function (KernelDef(host=)): bind it by hand, bind(grid=, args=)"
+  }
+ },
+ "same_grid": {
+  "needs": {
+   "same_grid": {
+    "c": "its count words are per workgroup"
+   }
+  }
+ },
+ "kernarg": {
+  "addresses": {
+   "x": 139887085879296,
+   "y": 139887085895680,
+   "z": 139887086927936
+  },
+  "hex": "000010003a7f0000004010003a7f0000400020003a7f0000e8030000"
+ },
+ "closures": {
+  "notation": "Each `src` is written byte for byte (UTF-8) as closure_gen.py in a fresh folder, with `files` beside it; the folder goes first on the module path and closure_gen is imported. `call` then runs with the module's names plus thin.runtime's `generator_identity`. `ok` is r as [qualified name, sha256 of closure_gen.py's bytes, the generator's first line, its captures as [name, held text] pairs]; a module captured from `files` is held by that file's sha256. `raises`/`message`: the refusal.",
+  "cases": [
+   {
+    "what": "a captured helper function, held by its own identity and its captured lane count",
+    "src": "def make_family(lanes):\n    def stride_of(wave):\n        return wave * lanes\n\n    def gen(WAVES: int = 4):\n        return stride_of(WAVES)\n\n    return gen\n\n\nfamily = make_family(32)\n",
+    "call": "r = generator_identity(family)",
+    "ok": [
+     "make_family.<locals>.gen",
+     "fd9b7a156941c2416f7d7ba4c23998e7e61661f878cba95600d76e573b9d6ba2",
+     5,
+     [
+      [
+       "stride_of",
+       "function('make_family.<locals>.stride_of', 'fd9b7a156941c2416f7d7ba4c23998e7e61661f878cba95600d76e573b9d6ba2', 2, (lanes=32))"
+      ]
+     ]
+    ]
+   },
+   {
+    "what": "three captured functions calling round a cycle: each cut at its first repeat by name",
+    "src": "def build_walkers():\n    def red(k):\n        return k > 0 and green(k - 1)\n\n    def green(k):\n        return k > 0 and blue(k - 1)\n\n    def blue(k):\n        return k <= 0 or red(k - 1)\n\n    def gen(DEPTH: int = 9):\n        return red(DEPTH)\n\n    return gen\n\n\nwalker = build_walkers()\n",
+    "call": "r = generator_identity(walker)",
+    "ok": [
+     "build_walkers.<locals>.gen",
+     "cbf2f088eada17897392eeb54965304df6f95047651a314e49770c8cebfb0c1c",
+     11,
+     [
+      [
+       "red",
+       "function('build_walkers.<locals>.red', 'cbf2f088eada17897392eeb54965304df6f95047651a314e49770c8cebfb0c1c', 2, (green=function('build_walkers.<locals>.green', 'cbf2f088eada17897392eeb54965304df6f95047651a314e49770c8cebfb0c1c', 5, (blue=function('build_walkers.<locals>.blue', 'cbf2f088eada17897392eeb54965304df6f95047651a314e49770c8cebfb0c1c', 8, (red=function-ref('build_walkers.<locals>.red')))))))"
+      ]
+     ]
+    ]
+   },
+   {
+    "what": "a captured function that calls itself: a cycle of one",
+    "src": "def build_counter():\n    def countdown(k):\n        return 0 if k == 0 else countdown(k - 1)\n\n    def gen(DEPTH: int = 3):\n        return countdown(DEPTH)\n\n    return gen\n\n\ncounter = build_counter()\n",
+    "call": "r = generator_identity(counter)",
+    "ok": [
+     "build_counter.<locals>.gen",
+     "a80092d36fa6f5bb9de901a9fc591a489cb351f26487f8ee468568e3b6539e8d",
+     5,
+     [
+      [
+       "countdown",
+       "function('build_counter.<locals>.countdown', 'a80092d36fa6f5bb9de901a9fc591a489cb351f26487f8ee468568e3b6539e8d', 2, (countdown=function-ref('build_counter.<locals>.countdown')))"
+      ]
+     ]
+    ]
+   },
+   {
+    "what": "a captured local class and a captured module from a file beside it",
+    "src": "def build_tiles():\n    import tile_consts\n\n    class Layout:\n        pad = 4\n\n    def gen(TILE: int = 64):\n        return tile_consts.ROWS * Layout.pad + TILE\n\n    return gen\n\n\ntiles = build_tiles()\n",
+    "files": {
+     "tile_consts.py": "ROWS = 16\nCOLS = 8\n"
+    },
+    "call": "r = generator_identity(tiles)",
+    "ok": [
+     "build_tiles.<locals>.gen",
+     "50201e04430a113a26fe1afd4bdf6b7d418a525305c3b5d54efb6810c9483b73",
+     7,
+     [
+      [
+       "Layout",
+       "class('build_tiles.<locals>.Layout', '50201e04430a113a26fe1afd4bdf6b7d418a525305c3b5d54efb6810c9483b73')"
+      ],
+      [
+       "tile_consts",
+       "module('tile_consts', '508ff8dfbb44f4ede3f69759a204498b855798134560d9752cbdf1af7633a064')"
+      ]
+     ]
+    ]
+   },
+   {
+    "what": "held captures in name order: a set sorted by text, a nested list as tuples, None",
+    "src": "def build_mixed(dims):\n    flags = {\"wide\", \"dense\", \"async\"}\n    spare = None\n\n    def gen(N: int = 2):\n        return (dims, flags, spare, N)\n\n    return gen\n\n\nmixed = build_mixed([2, [3, 4]])\n",
+    "call": "r = generator_identity(mixed)",
+    "ok": [
+     "build_mixed.<locals>.gen",
+     "5a7b65daf44f526a3848d6e067586ab2491d17cb5c1ccb777a552fb66312ee81",
+     5,
+     [
+      [
+       "dims",
+       "(2, (3, 4))"
+      ],
+      [
+       "flags",
+       "{'async', 'dense', 'wide'}"
+      ],
+      [
+       "spare",
+       "None"
+      ]
+     ]
+    ]
+   },
+   {
+    "what": "a module-level generator captures nothing",
+    "src": "def gen_plain(BLOCK: int = 64):\n    return BLOCK\n",
+    "call": "r = generator_identity(gen_plain)",
+    "ok": [
+     "gen_plain",
+     "4e30f538cf6833b290928c9bdaff7f0c11400e80cfa1b6f8c1e58fae9ef098fe",
+     1,
+     []
+    ]
+   },
+   {
+    "what": "a captured dict of modes",
+    "src": "def build_from(options):\n    def gen(MODE: str = \"fast\"):\n        return options[MODE]\n\n    return gen\n\n\npicked = build_from({\"fast\": 1, \"slow\": 2})\n",
+    "call": "r = generator_identity(picked)",
+    "raises": "TypeError",
+    "message": "build_from.<locals>.gen: captured options = {'fast': 1, 'slow': 2}: a generator's captured values are held as its build parameters are (None, a bool, an int, a float, a str, a tuple / set of them, or a function, class or module with a source file)"
+   },
+   {
+    "what": "a captured list holding a dict: the refusal names the capture and the member",
+    "src": "def build_layers(layers):\n    def gen(N: int = 1):\n        return layers[N]\n\n    return gen\n\n\nstacked = build_layers([1, {\"k\": 3}])\n",
+    "call": "r = generator_identity(stacked)",
+    "raises": "TypeError",
+    "message": "build_layers.<locals>.gen: captured layers = {'k': 3}: a generator's captured values are held as its build parameters are (None, a bool, an int, a float, a str, a tuple / set of them, or a function, class or module with a source file)"
+   },
+   {
+    "what": "a captured builtin function",
+    "src": "def build_reducer():\n    reduce_with = max\n\n    def gen(N: int = 5):\n        return reduce_with(N, 1)\n\n    return gen\n\n\nreducer = build_reducer()\n",
+    "call": "r = generator_identity(reducer)",
+    "raises": "TypeError",
+    "message": "build_reducer.<locals>.gen: captured reduce_with is a builtin_function_or_method with no source file (a builtin, a C function, or code made by exec or eval): it cannot be held"
+   },
+   {
+    "what": "a captured function defined by exec",
+    "src": "def build_exec():\n    scope = {}\n    exec(\"def double(v):\\n    return 2 * v\\n\", scope)\n    double = scope[\"double\"]\n\n    def gen(N: int = 5):\n        return double(N)\n\n    return gen\n\n\ndoubled = build_exec()\n",
+    "call": "r = generator_identity(doubled)",
+    "raises": "TypeError",
+    "message": "build_exec.<locals>.gen: captured double is a function with no source file (a builtin, a C function, or code made by exec or eval): it cannot be held"
+   },
+   {
+    "what": "a captured instance of a plain class: its repr carries an address",
+    "src": "class Tuner:\n    def __init__(self, level):\n        self.level = level\n\n\ndef build_tuned():\n    knob = Tuner(3)\n\n    def gen(N: int = 5):\n        return knob.level * N\n\n    return gen\n\n\ntuned = build_tuned()\n",
+    "call": "r = generator_identity(tuned)",
+    "raises": "TypeError",
+    "message": "build_tuned.<locals>.gen: captured knob is a Tuner whose repr carries a memory address: it has no held form (capture a held value, a function, a class or a module)"
+   },
+   {
+    "what": "a captured bound method: its repr carries an address",
+    "src": "class Meter:\n    def read(self):\n        return 1\n\n\ndef build_metered():\n    probe = Meter().read\n\n    def gen(N: int = 5):\n        return probe() + N\n\n    return gen\n\n\nmetered = build_metered()\n",
+    "call": "r = generator_identity(metered)",
+    "raises": "TypeError",
+    "message": "build_metered.<locals>.gen: captured probe is a method whose repr carries a memory address: it has no held form (capture a held value, a function, a class or a module)"
+   },
+   {
+    "what": "a captured name deleted before the generator escapes",
+    "src": "def build_forgetful():\n    limit = 12\n\n    def gen(N: int = 5):\n        return min(N, limit)\n\n    del limit\n    return gen\n\n\nforgetful = build_forgetful()\n",
+    "call": "r = generator_identity(forgetful)",
+    "raises": "TypeError",
+    "message": "build_forgetful.<locals>.gen: captured limit is not bound yet (a closure's captured values are part of its identity)"
+   },
+   {
+    "what": "a captured run-time field value",
+    "src": "from thin.opspec import Field\n\n\ndef build_fielded():\n    width = Field(24, 8, 64)\n\n    def gen(N: int = 5):\n        return width + N\n\n    return gen\n\n\nfielded = build_fielded()\n",
+    "call": "r = generator_identity(fielded)",
+    "raises": "TypeError",
+    "message": "build_fielded.<locals>.gen: captured width = 24 (served 8 .. 64) is a run-time field's value; the kernel serves its range - capture width.range (or .lo, .hi)"
+   }
+  ]
+ }
+}

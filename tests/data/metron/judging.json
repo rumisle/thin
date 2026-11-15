@@ -1,0 +1,185 @@
+{
+ "notation": "Native correctness/memory judging after explicit synthetic fault actions.",
+ "cases": [
+  {
+   "case": "every copy right",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": null,
+   "check_calls": 1
+  },
+  {
+   "case": "every copy right, judged twice (memo)",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": null,
+   "check_calls": 1,
+   "again_same_outputs": {
+    "wrong": null,
+    "check_calls": 0
+   }
+  },
+  {
+   "case": "copy 2 wrong, others right",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "check: copy 2: z[3] wrong",
+   "check_calls": 2
+  },
+  {
+   "case": "two distinct wrong copies (1 and 3) and copy 0 right",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "check: copy 1: z[5] wrong",
+   "check_calls": 2
+  },
+  {
+   "case": "nothing written: copy 0 judged",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "check: copy 0: z[0] wrong",
+   "check_calls": 1
+  },
+  {
+   "case": "input copy 1 changed (and outputs wrong)",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "input:x: 1 of 4 copies changed",
+   "check_calls": 0
+  },
+  {
+   "case": "an input's gap written in copy 0",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "input:x: 1 of 4 copies changed",
+   "check_calls": 0
+  },
+  {
+   "case": "warm input changed",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "input:x: 1 of 1 copies changed",
+   "check_calls": 0
+  },
+  {
+   "case": "output gap written in every copy alike",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "bounds:z: the gap after 4 of 4 copies written",
+   "check_calls": 0
+  },
+  {
+   "case": "output gap written in copy 0 and copy 2 only",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "bounds:z: the gap after 2 of 4 copies written",
+   "check_calls": 0
+  },
+  {
+   "case": "output gap written in copy 3 only",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "bounds:z: the gap after 1 of 4 copies written",
+   "check_calls": 0
+  },
+  {
+   "case": "unchecked arm with wrong outputs",
+   "group": false,
+   "checked": false,
+   "copies": 4,
+   "wrong": null,
+   "check_calls": 0
+  },
+  {
+   "case": "unchecked arm whose output gap is written",
+   "group": false,
+   "checked": false,
+   "copies": 4,
+   "wrong": "bounds:z: the gap after 1 of 4 copies written",
+   "check_calls": 0
+  },
+  {
+   "case": "kept buffer left changed",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "kept:k: not left as found",
+   "check_calls": 1
+  },
+  {
+   "case": "kept pool changed outside the arm's buffers",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "kept:(outside its buffers): not left as found",
+   "check_calls": 1
+  },
+  {
+   "case": "owned pool gap written",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "bounds:owned: a gap after the owned memory written",
+   "check_calls": 1
+  },
+  {
+   "case": "scratch left dirty is fine",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": null,
+   "check_calls": 1
+  },
+  {
+   "case": "input changed and kept changed: input first",
+   "group": false,
+   "checked": true,
+   "copies": 4,
+   "wrong": "input:x: 1 of 4 copies changed",
+   "check_calls": 0
+  },
+  {
+   "case": "group: rank 1 copy 2 wrong",
+   "group": true,
+   "checked": true,
+   "copies": 4,
+   "wrong": "check: copy 2: rank 1: z[0] wrong",
+   "check_calls": 2
+  },
+  {
+   "case": "group: rank 1 input changed",
+   "group": true,
+   "checked": true,
+   "copies": 4,
+   "wrong": "input:x rank 1: 1 of 4 copies changed",
+   "check_calls": 0
+  },
+  {
+   "case": "group: rank 1 output gap",
+   "group": true,
+   "checked": true,
+   "copies": 4,
+   "wrong": "bounds:z rank 1: the gap after 1 of 4 copies written",
+   "check_calls": 0
+  },
+  {
+   "case": "group: rank 1 kept changed",
+   "group": true,
+   "checked": true,
+   "copies": 4,
+   "wrong": "kept:k: not left as found rank 1",
+   "check_calls": 1
+  }
+ ]
+}

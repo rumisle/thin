@@ -1,0 +1,2112 @@
+{
+ "notation": "union: combine(x, y, stat) of two record tags; problems lists the problems the pids name. float: the float-op transfer on one lane's 4 byte tags, same tags in every lane. Tags: 0 untagged; {mem:[buffer, offset]}; {rec:{m, n (int or column list), k (k32 blocks), stat, pid}}; {poison: reason}; {sum:[x, y]}.",
+ "problems": [
+  {
+   "pid": 0,
+   "K": 32,
+   "N": 64
+  },
+  {
+   "pid": 1,
+   "K": 64,
+   "record_operand": {
+    "side": "A",
+    "source": 0
+   }
+  },
+  {
+   "pid": 2,
+   "K": 32
+  },
+  {
+   "pid": 3,
+   "K": 32,
+   "N": 48
+  },
+  {
+   "pid": 4,
+   "K": 64,
+   "record_operand": {
+    "side": "A",
+    "source": 3
+   }
+  }
+ ],
+ "union": [
+  {
+   "case": "split-K partial sums join",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      1
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "shared k-blocks",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      1,
+      2
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "adds partial sums that share k-blocks [1] at (0, 0)"
+   }
+  },
+  {
+   "case": "shared k-blocks under max",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      1,
+      2
+     ],
+     "pid": 0
+    }
+   },
+   "stat": true,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0,
+      1,
+      2
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "the same record (add path)",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "adds the same partial sum twice at (0, 0)"
+   }
+  },
+  {
+   "case": "the same record under max",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": true,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "different rows",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 1,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "adds results of different rows: (0, 0) + (1, 0)"
+   }
+  },
+  {
+   "case": "two columns, same k",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1
+     ],
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "two columns under max: a statistic",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": true,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "tuple + column",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 2,
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   },
+   "stat": true,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1,
+      2
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "two columns, different k",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      1
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "combines columns 0 and 1 of row 0 with different k coverage"
+   }
+  },
+  {
+   "case": "value times a statistic of its group",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1,
+      2
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   }
+  },
+  {
+   "case": "value times a statistic not of its column",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 3,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1,
+      2
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "column(s) 3 of row 0 scaled by a statistic of columns not including them"
+   }
+  },
+  {
+   "case": "value times a statistic of another row",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 1,
+     "n": [
+      0,
+      1
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "row 0's value scaled by a statistic of row 1"
+   }
+  },
+  {
+   "case": "value times a statistic, other k",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 1,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": [
+      0,
+      1
+     ],
+     "k": [
+      0
+     ],
+     "stat": true,
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "column(s) 1 of row 0 scaled by a statistic with a different k coverage"
+   }
+  },
+  {
+   "case": "poison absorbs",
+   "x": {
+    "poison": "p1"
+   },
+   "y": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "p1"
+   }
+  },
+  {
+   "case": "poison absorbs (right)",
+   "x": {
+    "rec": {
+     "m": 0,
+     "n": 0,
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "y": {
+    "poison": "p2"
+   },
+   "stat": false,
+   "out": {
+    "poison": "p2"
+   }
+  },
+  {
+   "case": "normalizer covers",
+   "x": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 1
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 4,
+     "n": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63
+     ],
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 1
+    }
+   }
+  },
+  {
+   "case": "normalizer misses keys",
+   "x": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 1
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 4,
+     "n": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+     ],
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "row 4's value normalized by a reduction that does not cover its k-blocks [1] (the other problem's columns)"
+   }
+  },
+  {
+   "case": "normalizer of another row",
+   "x": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0
+     ],
+     "pid": 1
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 5,
+     "n": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63
+     ],
+     "k": [
+      0
+     ],
+     "pid": 0
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "row 4's value normalized by a reduction of row 5"
+   }
+  },
+  {
+   "case": "normalizer, N bounds the last block",
+   "x": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 4
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 4,
+     "n": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47
+     ],
+     "k": [
+      0
+     ],
+     "pid": 3
+    }
+   },
+   "stat": false,
+   "out": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0,
+      1
+     ],
+     "pid": 4
+    }
+   }
+  },
+  {
+   "case": "unrelated problems",
+   "x": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0
+     ],
+     "pid": 1
+    }
+   },
+   "y": {
+    "rec": {
+     "m": 4,
+     "n": 3,
+     "k": [
+      0
+     ],
+     "pid": 2
+    }
+   },
+   "stat": false,
+   "out": {
+    "poison": "combines results of two unrelated problems: (4, 3) and (4, 3)"
+   }
+  }
+ ],
+ "float": [
+  {
+   "case": "record x memory",
+   "x": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    }
+   ],
+   "stat": false,
+   "add": false,
+   "out": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "memory + memory: untagged",
+   "x": [
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    }
+   ],
+   "y": [
+    {
+     "mem": [
+      0,
+      4
+     ]
+    },
+    {
+     "mem": [
+      0,
+      4
+     ]
+    },
+    {
+     "mem": [
+      0,
+      4
+     ]
+    },
+    {
+     "mem": [
+      0,
+      4
+     ]
+    }
+   ],
+   "stat": false,
+   "add": true,
+   "out": [
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "case": "memory x untagged: untagged",
+   "x": [
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    }
+   ],
+   "y": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "stat": false,
+   "add": false,
+   "out": [
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "case": "same record in a product: kept",
+   "x": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "stat": false,
+   "add": false,
+   "out": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "same record in an add: poison",
+   "x": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "stat": false,
+   "add": true,
+   "out": [
+    {
+     "poison": "adds the same partial sum twice at (0, 0)"
+    },
+    {
+     "poison": "adds the same partial sum twice at (0, 0)"
+    },
+    {
+     "poison": "adds the same partial sum twice at (0, 0)"
+    },
+    {
+     "poison": "adds the same partial sum twice at (0, 0)"
+    }
+   ]
+  },
+  {
+   "case": "same record under max: kept",
+   "x": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "stat": true,
+   "add": false,
+   "out": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "max of record and constant: a clamp",
+   "x": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "stat": true,
+   "add": false,
+   "out": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "record in the high half only",
+   "x": [
+    0,
+    0,
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    },
+    {
+     "mem": [
+      0,
+      0
+     ]
+    }
+   ],
+   "stat": false,
+   "add": false,
+   "out": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "two records, split-K add",
+   "x": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "y": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       1
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       1
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       1
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       1
+      ],
+      "pid": 0
+     }
+    }
+   ],
+   "stat": false,
+   "add": true,
+   "out": [
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0,
+       1
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0,
+       1
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0,
+       1
+      ],
+      "pid": 0
+     }
+    },
+    {
+     "rec": {
+      "m": 0,
+      "n": 0,
+      "k": [
+       0,
+       1
+      ],
+      "pid": 0
+     }
+    }
+   ]
+  },
+  {
+   "case": "Product of two distinct sum records (sum mode)",
+   "x": [
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    }
+   ],
+   "y": [
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        8
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        8
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        8
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        8
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    }
+   ],
+   "stat": false,
+   "add": false,
+   "sum_mode": true,
+   "error": "a product / max of two different sum-record values: unsupported multiplication of distinct sum records"
+  },
+  {
+   "case": "sum record x untagged (sum mode, product)",
+   "x": [
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    }
+   ],
+   "y": [
+    0,
+    0,
+    0,
+    0
+   ],
+   "stat": false,
+   "add": false,
+   "sum_mode": true,
+   "out": [
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    },
+    {
+     "sum": [
+      {
+       "mem": [
+        0,
+        0
+       ]
+      },
+      {
+       "mem": [
+        0,
+        4
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

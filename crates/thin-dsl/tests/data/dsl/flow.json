@@ -1,0 +1,1459 @@
+{
+ "notation": "Each case is a DSL snippet (`src`) run on a fresh Builder for gfx1201, with `b` the Builder, `V`, `S` its files and every name of the language imported. `built` is the stream the Builder made, before any pass: one line per instruction, `<form name> <operands> {fields}; <attributes>`. A register operand is written as VReg repr (`<file>:<value name>[<index in group>]x<dwords>` and `+<lo>` when lo != 0); a named register by its name; an immediate as its value, with the writer's spelling in quotes when it has one (`16'0x10'`); a block as `@label`. Source modifiers are written `-x`, `|x|`. Fields are in stored order. Attributes in a fixed order: comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset: none or var, ordered), m0_set, waves_taken, fence. `values` lists the program's values in id order: `id file name n= align= [index=] [pin=] [same_as=]`. `records` holds the Program's lane regions and loops, the deferred records' kinds, each file's entered / pinned groups and lanes-covered names, and the wave index. `error` is the refusal (exception class and message) raised while the snippet ran. `render` (the whole pipeline's output) is the final.s; `render_error` a refusal of the pipeline's passes.",
+ "cases": [
+  {
+   "name": "if_elif_else_chain",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nout = S.u32(name=\"out\")\nwith b.when(sel < 2):\n    out[...] = 100\nwith b.elif_(sel == 5):\n    out[...] = 200\nwith b.otherwise():\n    out[...] = sel + 7\nout += sel",
+   "built": [
+    "s_cmp_lt_u32 s:sel#1[0]x1, 2 ; comment=\"sel < 2\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:out#1[0]x1, 100 ; comment=\"out = 100\"",
+    "s_branch @.Lif_end_2",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 5 ; comment=\"sel == 5\"",
+    "s_cbranch_scc0 @.Lif_3",
+    "s_mov_b32 s:out#1[0]x1, 200 ; comment=\"out = 200\"",
+    "s_branch @.Lif_end_2",
+    "ir.label {name=.Lif_3}",
+    "s_add_co_u32 s:out#1[0]x1, s:sel#1[0]x1, 7 ; comment=\"out = sel + 7\"",
+    "ir.label {name=.Lif_end_2}",
+    "s_add_co_u32 s:out#1[0]x1, s:out#1[0]x1, s:sel#1[0]x1 ; comment=\"out = out + sel\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s out#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_cmp_lt_u32 s3, 2                                           // sel < 2",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 100                                            // out = 100",
+    "\ts_branch .Lif_end_2",
+    ".Lif_1:",
+    "\ts_cmp_eq_u32 s3, 5                                           // sel == 5",
+    "\ts_cbranch_scc0 .Lif_3",
+    "\ts_mov_b32 s0, 200                                            // out = 200",
+    "\ts_branch .Lif_end_2",
+    ".Lif_3:",
+    "\ts_add_co_u32 s0, s3, 7                                       // out = sel + 7",
+    ".Lif_end_2:",
+    "\ts_add_co_u32 s0, s0, s3                                      // out = out + sel"
+   ]
+  },
+  {
+   "name": "unless_then_lone_when",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nout = S.u32(5, name=\"out\")\nwith b.unless(sel != 9):\n    out[...] = 6\nwith b.when(sel >= 12):\n    out[...] = 8\nout += 2",
+   "built": [
+    "s_mov_b32 s:out#1[0]x1, 5 ; comment=\"out = 5\"",
+    "s_cmp_lg_u32 s:sel#1[0]x1, 9 ; comment=\"sel != 9\"",
+    "s_cbranch_scc1 @.Lif_1",
+    "s_mov_b32 s:out#1[0]x1, 6 ; comment=\"out = 6\"",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_ge_u32 s:sel#1[0]x1, 12 ; comment=\"sel >= 12\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_mov_b32 s:out#1[0]x1, 8 ; comment=\"out = 8\"",
+    "ir.label {name=.Lif_2}",
+    "s_add_co_u32 s:out#1[0]x1, s:out#1[0]x1, 2 ; comment=\"out = out + 2\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s out#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 5                                              // out = 5",
+    "\ts_cmp_lg_u32 s3, 9                                           // sel != 9",
+    "\ts_cbranch_scc1 .Lif_1",
+    "\ts_mov_b32 s0, 6                                              // out = 6",
+    ".Lif_1:",
+    "\ts_cmp_ge_u32 s3, 12                                          // sel >= 12",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_mov_b32 s0, 8                                              // out = 8",
+    ".Lif_2:",
+    "\ts_add_co_u32 s0, s0, 2                                       // out = out + 2"
+   ]
+  },
+  {
+   "name": "elif_ladder_without_else",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nout = S.u32(1, name=\"out\")\nwith b.when(sel > 10):\n    out[...] = 4\nwith b.elif_(sel > 3):\n    out[...] = 9\nwith b.elif_(sel == 0):\n    out[...] = 16\nout ^= 5",
+   "built": [
+    "s_mov_b32 s:out#1[0]x1, 1 ; comment=\"out = 1\"",
+    "s_cmp_gt_u32 s:sel#1[0]x1, 10 ; comment=\"sel > 10\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:out#1[0]x1, 4 ; comment=\"out = 4\"",
+    "s_branch @.Lif_end_2",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_gt_u32 s:sel#1[0]x1, 3 ; comment=\"sel > 3\"",
+    "s_cbranch_scc0 @.Lif_3",
+    "s_mov_b32 s:out#1[0]x1, 9 ; comment=\"out = 9\"",
+    "s_branch @.Lif_end_2",
+    "ir.label {name=.Lif_3}",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 0 ; comment=\"sel == 0\"",
+    "s_cbranch_scc0 @.Lif_4",
+    "s_mov_b32 s:out#1[0]x1, 16 ; comment=\"out = 16\"",
+    "ir.label {name=.Lif_4}",
+    "ir.label {name=.Lif_end_2}",
+    "s_xor_b32 s:out#1[0]x1, s:out#1[0]x1, 5 ; comment=\"out = out ^ 5\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s out#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 1                                              // out = 1",
+    "\ts_cmp_gt_u32 s3, 10                                          // sel > 10",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 4                                              // out = 4",
+    "\ts_branch .Lif_end_2",
+    ".Lif_1:",
+    "\ts_cmp_gt_u32 s3, 3                                           // sel > 3",
+    "\ts_cbranch_scc0 .Lif_3",
+    "\ts_mov_b32 s0, 9                                              // out = 9",
+    "\ts_branch .Lif_end_2",
+    ".Lif_3:",
+    "\ts_cmp_eq_u32 s3, 0                                           // sel == 0",
+    "\ts_cbranch_scc0 .Lif_4",
+    "\ts_mov_b32 s0, 16                                             // out = 16",
+    ".Lif_4:",
+    ".Lif_end_2:",
+    "\ts_xor_b32 s0, s0, 5                                          // out = out ^ 5"
+   ]
+  },
+  {
+   "name": "junctions_both_senses",
+   "src": "p, q = S.u32(name=\"p\", at=1), S.u32(name=\"q\", at=2)\n\nr = S.u32(1, name=\"r\")\nwith b.unless((p != 3) | (q > 8)):\n    r[...] = 10\nwith b.when((p < 4) & (q == 0)):\n    r[...] = 20\nwith b.unless((p == 9) & (q != 2)):\n    r[...] = 30\nwith b.when((p >= 1) | (q <= 6)):\n    r[...] = 40\nr += q",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 1 ; comment=\"r = 1\"",
+    "s_cmp_lg_u32 s:p#1[0]x1, 3 ; comment=\"p != 3\"",
+    "s_cbranch_scc1 @.Lif_1",
+    "s_cmp_gt_u32 s:q#1[0]x1, 8 ; comment=\"q > 8\"",
+    "s_cbranch_scc1 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 10 ; comment=\"r = 10\"",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_lt_u32 s:p#1[0]x1, 4 ; comment=\"p < 4\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_cmp_eq_u32 s:q#1[0]x1, 0 ; comment=\"q == 0\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_mov_b32 s:r#1[0]x1, 20 ; comment=\"r = 20\"",
+    "ir.label {name=.Lif_2}",
+    "s_cmp_eq_u32 s:p#1[0]x1, 9 ; comment=\"p == 9\"",
+    "s_cbranch_scc0 @.Lj_4",
+    "s_cmp_lg_u32 s:q#1[0]x1, 2 ; comment=\"q != 2\"",
+    "s_cbranch_scc1 @.Lif_3",
+    "ir.label {name=.Lj_4}",
+    "s_mov_b32 s:r#1[0]x1, 30 ; comment=\"r = 30\"",
+    "ir.label {name=.Lif_3}",
+    "s_cmp_ge_u32 s:p#1[0]x1, 1 ; comment=\"p >= 1\"",
+    "s_cbranch_scc1 @.Lj_6",
+    "s_cmp_le_u32 s:q#1[0]x1, 6 ; comment=\"q <= 6\"",
+    "s_cbranch_scc0 @.Lif_5",
+    "ir.label {name=.Lj_6}",
+    "s_mov_b32 s:r#1[0]x1, 40 ; comment=\"r = 40\"",
+    "ir.label {name=.Lif_5}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, s:q#1[0]x1 ; comment=\"r = r + q\""
+   ],
+   "values": [
+    "0 s p#1 n=1 align=1 pin=1",
+    "1 s q#1 n=1 align=1 pin=2",
+    "2 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "p#1",
+     "q#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 1                                              // r = 1",
+    "\ts_cmp_lg_u32 s1, 3                                           // p != 3",
+    "\ts_cbranch_scc1 .Lif_1",
+    "\ts_cmp_gt_u32 s2, 8                                           // q > 8",
+    "\ts_cbranch_scc1 .Lif_1",
+    "\ts_mov_b32 s0, 10                                             // r = 10",
+    ".Lif_1:",
+    "\ts_cmp_lt_u32 s1, 4                                           // p < 4",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_cmp_eq_u32 s2, 0                                           // q == 0",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_mov_b32 s0, 20                                             // r = 20",
+    ".Lif_2:",
+    "\ts_cmp_eq_u32 s1, 9                                           // p == 9",
+    "\ts_cbranch_scc0 .Lj_4",
+    "\ts_cmp_lg_u32 s2, 2                                           // q != 2",
+    "\ts_cbranch_scc1 .Lif_3",
+    ".Lj_4:",
+    "\ts_mov_b32 s0, 30                                             // r = 30",
+    ".Lif_3:",
+    "\ts_cmp_ge_u32 s1, 1                                           // p >= 1",
+    "\ts_cbranch_scc1 .Lj_6",
+    "\ts_cmp_le_u32 s2, 6                                           // q <= 6",
+    "\ts_cbranch_scc0 .Lif_5",
+    ".Lj_6:",
+    "\ts_mov_b32 s0, 40                                             // r = 40",
+    ".Lif_5:",
+    "\ts_add_co_u32 s0, s0, s2                                      // r = r + q"
+   ]
+  },
+  {
+   "name": "junction_three_and",
+   "src": "p, q = S.u32(name=\"p\", at=1), S.u32(name=\"q\", at=2)\n\nr = S.u32(2, name=\"r\")\nwith b.when((q > 1) & (p != q) & (p == 6)):\n    r[...] = 3\nr += 1",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 2 ; comment=\"r = 2\"",
+    "s_cmp_gt_u32 s:q#1[0]x1, 1 ; comment=\"q > 1\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_cmp_lg_u32 s:p#1[0]x1, s:q#1[0]x1 ; comment=\"p != q\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_cmp_eq_u32 s:p#1[0]x1, 6 ; comment=\"p == 6\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 3 ; comment=\"r = 3\"",
+    "ir.label {name=.Lif_1}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 1 ; comment=\"r = r + 1\""
+   ],
+   "values": [
+    "0 s p#1 n=1 align=1 pin=1",
+    "1 s q#1 n=1 align=1 pin=2",
+    "2 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "p#1",
+     "q#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 2                                              // r = 2",
+    "\ts_cmp_gt_u32 s2, 1                                           // q > 1",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_cmp_lg_u32 s1, s2                                          // p != q",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_cmp_eq_u32 s1, 6                                           // p == 6",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 3                                              // r = 3",
+    ".Lif_1:",
+    "\ts_add_co_u32 s0, s0, 1                                       // r = r + 1"
+   ]
+  },
+  {
+   "name": "junction_three_or_nested",
+   "src": "p, q = S.u32(name=\"p\", at=1), S.u32(name=\"q\", at=2)\n\nr = S.u32(2, name=\"r\")\nwith b.when((p == 2) | (q == 4) | (p > q)):\n    r[...] = 5\nwith b.when(((p == 7) | (q < 2)) & (q != p)):\n    r[...] = 6\nr += 1",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 2 ; comment=\"r = 2\"",
+    "s_cmp_eq_u32 s:p#1[0]x1, 2 ; comment=\"p == 2\"",
+    "s_cbranch_scc1 @.Lj_2",
+    "s_cmp_eq_u32 s:q#1[0]x1, 4 ; comment=\"q == 4\"",
+    "s_cbranch_scc1 @.Lj_2",
+    "s_cmp_gt_u32 s:p#1[0]x1, s:q#1[0]x1 ; comment=\"p > q\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "ir.label {name=.Lj_2}",
+    "s_mov_b32 s:r#1[0]x1, 5 ; comment=\"r = 5\"",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_eq_u32 s:p#1[0]x1, 7 ; comment=\"p == 7\"",
+    "s_cbranch_scc1 @.Lj_4",
+    "s_cmp_lt_u32 s:q#1[0]x1, 2 ; comment=\"q < 2\"",
+    "s_cbranch_scc0 @.Lif_3",
+    "ir.label {name=.Lj_4}",
+    "s_cmp_lg_u32 s:q#1[0]x1, s:p#1[0]x1 ; comment=\"q != p\"",
+    "s_cbranch_scc0 @.Lif_3",
+    "s_mov_b32 s:r#1[0]x1, 6 ; comment=\"r = 6\"",
+    "ir.label {name=.Lif_3}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 1 ; comment=\"r = r + 1\""
+   ],
+   "values": [
+    "0 s p#1 n=1 align=1 pin=1",
+    "1 s q#1 n=1 align=1 pin=2",
+    "2 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "p#1",
+     "q#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 2                                              // r = 2",
+    "\ts_cmp_eq_u32 s1, 2                                           // p == 2",
+    "\ts_cbranch_scc1 .Lj_2",
+    "\ts_cmp_eq_u32 s2, 4                                           // q == 4",
+    "\ts_cbranch_scc1 .Lj_2",
+    "\ts_cmp_gt_u32 s1, s2                                          // p > q",
+    "\ts_cbranch_scc0 .Lif_1",
+    ".Lj_2:",
+    "\ts_mov_b32 s0, 5                                              // r = 5",
+    ".Lif_1:",
+    "\ts_cmp_eq_u32 s1, 7                                           // p == 7",
+    "\ts_cbranch_scc1 .Lj_4",
+    "\ts_cmp_lt_u32 s2, 2                                           // q < 2",
+    "\ts_cbranch_scc0 .Lif_3",
+    ".Lj_4:",
+    "\ts_cmp_lg_u32 s2, s1                                          // q != p",
+    "\ts_cbranch_scc0 .Lif_3",
+    "\ts_mov_b32 s0, 6                                              // r = 6",
+    ".Lif_3:",
+    "\ts_add_co_u32 s0, s0, 1                                       // r = r + 1"
+   ]
+  },
+  {
+   "name": "wave_reductions_and_bit_test",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nkeep = S.mask(name=\"keep\", at=6)\n\nword = S.u32(name=\"word\", at=1)\nr = S.u32(0, name=\"r\")\nwith b.when(all(col != 0)):\n    r[...] = 1\nwith b.when(any(keep)):\n    r[...] = 2\nwith b.when((word & 1 << 9) == 0):\n    r[...] = 3\nwith b.when(all(O.VCC)):\n    r[...] = 4\nwith b.when(any(val >= 12)):\n    r[...] = 5\nr += 3",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "v_cmp_ne_u32 vcc_lo, 0, v:col#1[0]x1 ; comment=\"all(col != 0)\"",
+    "s_cmp_eq_u32 vcc_lo, exec_lo",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 1 ; comment=\"r = 1\"",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_lg_u32 s:keep#1[0]x1, 0 ; comment=\"any(keep)\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_mov_b32 s:r#1[0]x1, 2 ; comment=\"r = 2\"",
+    "ir.label {name=.Lif_2}",
+    "s_bitcmp0_b32 s:word#1[0]x1, 9 ; comment=\"(word & 512) == 0\"",
+    "s_cbranch_scc0 @.Lif_3",
+    "s_mov_b32 s:r#1[0]x1, 3 ; comment=\"r = 3\"",
+    "ir.label {name=.Lif_3}",
+    "s_cmp_eq_u32 vcc_lo, exec_lo ; comment=\"all(vcc)\"",
+    "s_cbranch_scc0 @.Lif_4",
+    "s_mov_b32 s:r#1[0]x1, 4 ; comment=\"r = 4\"",
+    "ir.label {name=.Lif_4}",
+    "v_cmp_le_u32 vcc_lo, 12, v:val#1[0]x1 ; comment=\"any(val >= 12)\"",
+    "s_cmp_lg_u32 vcc_lo, 0",
+    "s_cbranch_scc0 @.Lif_5",
+    "s_mov_b32 s:r#1[0]x1, 5 ; comment=\"r = 5\"",
+    "ir.label {name=.Lif_5}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 3 ; comment=\"r = r + 3\""
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3",
+    "2 s keep#1 n=1 align=1 pin=6",
+    "3 s word#1 n=1 align=1 pin=1",
+    "4 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ],
+    "s.pinned": [
+     "keep#1",
+     "word#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\tv_cmp_ne_u32 vcc_lo, 0, v2                                   // all(col != 0)",
+    "\ts_cmp_eq_u32 vcc_lo, exec_lo",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 1                                              // r = 1",
+    ".Lif_1:",
+    "\ts_cmp_lg_u32 s6, 0                                           // any(keep)",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_mov_b32 s0, 2                                              // r = 2",
+    ".Lif_2:",
+    "\ts_bitcmp0_b32 s1, 9                                          // (word & 512) == 0",
+    "\ts_cbranch_scc0 .Lif_3",
+    "\ts_mov_b32 s0, 3                                              // r = 3",
+    ".Lif_3:",
+    "\ts_cmp_eq_u32 vcc_lo, exec_lo                                 // all(vcc)",
+    "\ts_cbranch_scc0 .Lif_4",
+    "\ts_mov_b32 s0, 4                                              // r = 4",
+    ".Lif_4:",
+    "\tv_cmp_le_u32 vcc_lo, 12, v3                                  // any(val >= 12)",
+    "\ts_cmp_lg_u32 vcc_lo, 0",
+    "\ts_cbranch_scc0 .Lif_5",
+    "\ts_mov_b32 s0, 5                                              // r = 5",
+    ".Lif_5:",
+    "\ts_add_co_u32 s0, s0, 3                                       // r = r + 3"
+   ]
+  },
+  {
+   "name": "scalar_compare_instructions",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nr = S.u32(0, name=\"r\")\nwith b.when(O.op(\"s_cmp_lg_u32\", sel, 12)):\n    r[...] = 1\nwith b.unless(O.op(\"s_bitcmp0_b32\", sel, 6)):\n    r[...] = 2\nwith b.when(O.op(\"s_cmp_lt_i32\", sel, -3)):\n    r[...] = 3\nr += 1",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_lg_u32 s:sel#1[0]x1, 12",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 1 ; comment=\"r = 1\"",
+    "ir.label {name=.Lif_1}",
+    "s_bitcmp0_b32 s:sel#1[0]x1, 6",
+    "s_cbranch_scc1 @.Lif_2",
+    "s_mov_b32 s:r#1[0]x1, 2 ; comment=\"r = 2\"",
+    "ir.label {name=.Lif_2}",
+    "s_cmp_lt_i32 s:sel#1[0]x1, -3",
+    "s_cbranch_scc0 @.Lif_3",
+    "s_mov_b32 s:r#1[0]x1, 3 ; comment=\"r = 3\"",
+    "ir.label {name=.Lif_3}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 1 ; comment=\"r = r + 1\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_lg_u32 s3, 12",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 1                                              // r = 1",
+    ".Lif_1:",
+    "\ts_bitcmp0_b32 s3, 6",
+    "\ts_cbranch_scc1 .Lif_2",
+    "\ts_mov_b32 s0, 2                                              // r = 2",
+    ".Lif_2:",
+    "\ts_cmp_lt_i32 s3, -3",
+    "\ts_cbranch_scc0 .Lif_3",
+    "\ts_mov_b32 s0, 3                                              // r = 3",
+    ".Lif_3:",
+    "\ts_add_co_u32 s0, s0, 1                                       // r = r + 1"
+   ]
+  },
+  {
+   "name": "middle_arm_terminates",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nr = S.u32(0, name=\"r\")\nwith b.when(sel == 1):\n    r[...] = 7\nwith b.elif_(sel == 2):\n    b.emit(O.op(\"s_endpgm\"))\nwith b.otherwise():\n    r[...] = 9\nr += 4",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 1 ; comment=\"sel == 1\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 7 ; comment=\"r = 7\"",
+    "s_branch @.Lif_end_2",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 2 ; comment=\"sel == 2\"",
+    "s_cbranch_scc0 @.Lif_3",
+    "s_endpgm",
+    "ir.label {name=.Lif_3}",
+    "s_mov_b32 s:r#1[0]x1, 9 ; comment=\"r = 9\"",
+    "ir.label {name=.Lif_end_2}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 4 ; comment=\"r = r + 4\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_eq_u32 s3, 1                                           // sel == 1",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 7                                              // r = 7",
+    "\ts_branch .Lif_end_2",
+    ".Lif_1:",
+    "\ts_cmp_eq_u32 s3, 2                                           // sel == 2",
+    "\ts_cbranch_scc0 .Lif_3",
+    "\ts_endpgm",
+    ".Lif_3:",
+    "\ts_mov_b32 s0, 9                                              // r = 9",
+    ".Lif_end_2:",
+    "\ts_add_co_u32 s0, s0, 4                                       // r = r + 4"
+   ]
+  },
+  {
+   "name": "first_arm_terminates",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nr = S.u32(0, name=\"r\")\nwith b.unless(sel > 6):\n    b.emit(O.op(\"s_endpgm\"))\nwith b.otherwise():\n    r[...] = 11\nr += 1",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_gt_u32 s:sel#1[0]x1, 6 ; comment=\"sel > 6\"",
+    "s_cbranch_scc1 @.Lif_1",
+    "s_endpgm",
+    "ir.label {name=.Lif_1}",
+    "s_mov_b32 s:r#1[0]x1, 11 ; comment=\"r = 11\"",
+    "ir.label {name=.Lif_end_2}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 1 ; comment=\"r = r + 1\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_gt_u32 s3, 6                                           // sel > 6",
+    "\ts_cbranch_scc1 .Lif_1",
+    "\ts_endpgm",
+    ".Lif_1:",
+    "\ts_mov_b32 s0, 11                                             // r = 11",
+    ".Lif_end_2:",
+    "\ts_add_co_u32 s0, s0, 1                                       // r = r + 1"
+   ]
+  },
+  {
+   "name": "named_join_label",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nr = S.u32(0, name=\"r\")\nwith b.unless(sel == 4, end=\".Ljoin\"):\n    r[...] = 8\nwith b.otherwise():\n    r[...] = 12\nr += sel",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 4 ; comment=\"sel == 4\"",
+    "s_cbranch_scc1 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 8 ; comment=\"r = 8\"",
+    "s_branch @.Ljoin",
+    "ir.label {name=.Lif_1}",
+    "s_mov_b32 s:r#1[0]x1, 12 ; comment=\"r = 12\"",
+    "ir.label {name=.Ljoin}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, s:sel#1[0]x1 ; comment=\"r = r + sel\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_eq_u32 s3, 4                                           // sel == 4",
+    "\ts_cbranch_scc1 .Lif_1",
+    "\ts_mov_b32 s0, 8                                              // r = 8",
+    "\ts_branch .Ljoin",
+    ".Lif_1:",
+    "\ts_mov_b32 s0, 12                                             // r = 12",
+    ".Ljoin:",
+    "\ts_add_co_u32 s0, s0, s3                                      // r = r + sel"
+   ]
+  },
+  {
+   "name": "comment_closes_chain",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nr = S.u32(0, name=\"r\")\nwith b.when(sel != 0):\n    r[...] = 3\nb.comment(\"two separate chains\")\nwith b.when(sel < 8):\n    r[...] = 4\nr += 6",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_lg_u32 s:sel#1[0]x1, 0 ; comment=\"sel != 0\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 3 ; comment=\"r = 3\"",
+    "ir.label {name=.Lif_1}",
+    "ir.comment {text=; two separate chains}",
+    "s_cmp_lt_u32 s:sel#1[0]x1, 8 ; comment=\"sel < 8\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_mov_b32 s:r#1[0]x1, 4 ; comment=\"r = 4\"",
+    "ir.label {name=.Lif_2}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 6 ; comment=\"r = r + 6\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_lg_u32 s3, 0                                           // sel != 0",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 3                                              // r = 3",
+    ".Lif_1:",
+    "; two separate chains",
+    "\ts_cmp_lt_u32 s3, 8                                           // sel < 8",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_mov_b32 s0, 4                                              // r = 4",
+    ".Lif_2:",
+    "\ts_add_co_u32 s0, s0, 6                                       // r = r + 6"
+   ]
+  },
+  {
+   "name": "instruction_closes_chain",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nr = S.u32(0, name=\"r\")\nwith b.when(sel == 3):\n    r[...] = 5\nr += 2\nwith b.when(sel == 4):\n    r[...] = 6\nr += 1",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 3 ; comment=\"sel == 3\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 5 ; comment=\"r = 5\"",
+    "ir.label {name=.Lif_1}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 2 ; comment=\"r = r + 2\"",
+    "s_cmp_eq_u32 s:sel#1[0]x1, 4 ; comment=\"sel == 4\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_mov_b32 s:r#1[0]x1, 6 ; comment=\"r = 6\"",
+    "ir.label {name=.Lif_2}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 1 ; comment=\"r = r + 1\""
+   ],
+   "values": [
+    "0 s sel#1 n=1 align=1 pin=3",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_eq_u32 s3, 3                                           // sel == 3",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 5                                              // r = 5",
+    ".Lif_1:",
+    "\ts_add_co_u32 s0, s0, 2                                       // r = r + 2",
+    "\ts_cmp_eq_u32 s3, 4                                           // sel == 4",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_mov_b32 s0, 6                                              // r = 6",
+    ".Lif_2:",
+    "\ts_add_co_u32 s0, s0, 1                                       // r = r + 1"
+   ]
+  },
+  {
+   "name": "nested_chain_in_first_arm",
+   "src": "p, q = S.u32(name=\"p\", at=1), S.u32(name=\"q\", at=2)\n\nr = S.u32(0, name=\"r\")\nwith b.when(p == 0):\n    with b.when(q < 5):\n        r[...] = 1\n    with b.elif_(q < 9):\n        r[...] = 2\nwith b.elif_(p == 1):\n    r[...] = 3\nwith b.otherwise():\n    with b.unless(q == 0):\n        r[...] = 4\nr += 1",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_eq_u32 s:p#1[0]x1, 0 ; comment=\"p == 0\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_cmp_lt_u32 s:q#1[0]x1, 5 ; comment=\"q < 5\"",
+    "s_cbranch_scc0 @.Lif_2",
+    "s_mov_b32 s:r#1[0]x1, 1 ; comment=\"r = 1\"",
+    "s_branch @.Lif_end_3",
+    "ir.label {name=.Lif_2}",
+    "s_cmp_lt_u32 s:q#1[0]x1, 9 ; comment=\"q < 9\"",
+    "s_cbranch_scc0 @.Lif_4",
+    "s_mov_b32 s:r#1[0]x1, 2 ; comment=\"r = 2\"",
+    "ir.label {name=.Lif_4}",
+    "ir.label {name=.Lif_end_3}",
+    "s_branch @.Lif_end_5",
+    "ir.label {name=.Lif_1}",
+    "s_cmp_eq_u32 s:p#1[0]x1, 1 ; comment=\"p == 1\"",
+    "s_cbranch_scc0 @.Lif_6",
+    "s_mov_b32 s:r#1[0]x1, 3 ; comment=\"r = 3\"",
+    "s_branch @.Lif_end_5",
+    "ir.label {name=.Lif_6}",
+    "s_cmp_eq_u32 s:q#1[0]x1, 0 ; comment=\"q == 0\"",
+    "s_cbranch_scc1 @.Lif_7",
+    "s_mov_b32 s:r#1[0]x1, 4 ; comment=\"r = 4\"",
+    "ir.label {name=.Lif_7}",
+    "ir.label {name=.Lif_end_5}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, 1 ; comment=\"r = r + 1\""
+   ],
+   "values": [
+    "0 s p#1 n=1 align=1 pin=1",
+    "1 s q#1 n=1 align=1 pin=2",
+    "2 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "p#1",
+     "q#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_eq_u32 s1, 0                                           // p == 0",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_cmp_lt_u32 s2, 5                                           // q < 5",
+    "\ts_cbranch_scc0 .Lif_2",
+    "\ts_mov_b32 s0, 1                                              // r = 1",
+    "\ts_branch .Lif_end_3",
+    ".Lif_2:",
+    "\ts_cmp_lt_u32 s2, 9                                           // q < 9",
+    "\ts_cbranch_scc0 .Lif_4",
+    "\ts_mov_b32 s0, 2                                              // r = 2",
+    ".Lif_4:",
+    ".Lif_end_3:",
+    "\ts_branch .Lif_end_5",
+    ".Lif_1:",
+    "\ts_cmp_eq_u32 s1, 1                                           // p == 1",
+    "\ts_cbranch_scc0 .Lif_6",
+    "\ts_mov_b32 s0, 3                                              // r = 3",
+    "\ts_branch .Lif_end_5",
+    ".Lif_6:",
+    "\ts_cmp_eq_u32 s2, 0                                           // q == 0",
+    "\ts_cbranch_scc1 .Lif_7",
+    "\ts_mov_b32 s0, 4                                              // r = 4",
+    ".Lif_7:",
+    ".Lif_end_5:",
+    "\ts_add_co_u32 s0, s0, 1                                       // r = r + 1"
+   ]
+  },
+  {
+   "name": "counted_loop_named",
+   "src": "trips = S.u32(name=\"trips\", at=5)\ntotal = V.u32(3, name=\"total\")\nfor it in b.loop(trips, name=\"row\"):\n    total += it.i * 3",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 3 ; comment=\"total = 3\"",
+    "s_mov_b32 s:row.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:row.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lrow_end_2",
+    "ir.label {name=.Lrow_1}",
+    "s_mul_i32 s:t#1[0]x1, s:row.i#1[0]x1, 3 ; comment=\"total = total + (row.i * 3)\"",
+    "v_add_nc_u32 v:total#1[0]x1, s:t#1[0]x1, v:total#1[0]x1",
+    "s_add_co_u32 s:row.i#1[0]x1, s:row.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:row.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc1 @.Lrow_1",
+    "ir.label {name=.Lrow_end_2}"
+   ],
+   "values": [
+    "0 s trips#1 n=1 align=1 pin=5",
+    "1 v total#1 n=1 align=1",
+    "2 s row.i#1 n=1 align=1",
+    "3 s t#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "row: `s_mul_i32 s:t#1[0]x1, s:row.i#1[0]x1, 3 ; comment=\"total = total + (row.i * 3)\"` .. `v_add_nc_u32 v:total#1[0]x1, s:t#1[0]x1, v:total#1[0]x1` conservative=False"
+    ],
+    "s.pinned": [
+     "trips#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 3                                              // total = 3",
+    "\ts_mov_b32 s0, 0",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc0 .Lrow_end_2",
+    ".Lrow_1:",
+    "\ts_mul_i32 s1, s0, 3                                          // total = total + (row.i * 3)",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\tv_add_nc_u32 v0, s1, v0",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc1 .Lrow_1",
+    ".Lrow_end_2:"
+   ]
+  },
+  {
+   "name": "constant_count_with_start",
+   "src": "total = V.u32(1, name=\"total\")\nfor it in b.loop(6, start=2):\n    total += it.i + 5",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 1 ; comment=\"total = 1\"",
+    "s_mov_b32 s:loop.i#1[0]x1, 2",
+    "ir.label {name=.Lloop_1}",
+    "s_add_co_u32 s:t#1[0]x1, s:loop.i#1[0]x1, 5 ; comment=\"total = total + (loop.i + 5)\"",
+    "v_add_nc_u32 v:total#1[0]x1, s:t#1[0]x1, v:total#1[0]x1",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, 6",
+    "s_cbranch_scc1 @.Lloop_1"
+   ],
+   "values": [
+    "0 v total#1 n=1 align=1",
+    "1 s loop.i#1 n=1 align=1",
+    "2 s t#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `s_add_co_u32 s:t#1[0]x1, s:loop.i#1[0]x1, 5 ; comment=\"total = total + (loop.i + 5)\"` .. `v_add_nc_u32 v:total#1[0]x1, s:t#1[0]x1, v:total#1[0]x1` conservative=False"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 1                                              // total = 1",
+    "\ts_mov_b32 s0, 2",
+    ".Lloop_1:",
+    "\ts_add_co_u32 s1, s0, 5                                       // total = total + (loop.i + 5)",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\tv_add_nc_u32 v0, s1, v0",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, 6",
+    "\ts_cbranch_scc1 .Lloop_1"
+   ]
+  },
+  {
+   "name": "loop_own_index",
+   "src": "trips = S.u32(name=\"trips\", at=5)\ncol = S.u32(name=\"col\")\ntotal = V.u32(0, name=\"total\")\nfor it in b.loop(trips, i=col, start=1):\n    total += col",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 0 ; comment=\"total = 0\"",
+    "s_mov_b32 s:col#1[0]x1, 1",
+    "s_cmp_lt_u32 s:col#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "ir.label {name=.Lloop_1}",
+    "v_add_nc_u32 v:total#1[0]x1, s:col#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + col\"",
+    "s_add_co_u32 s:col#1[0]x1, s:col#1[0]x1, 1",
+    "s_cmp_lt_u32 s:col#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc1 @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}"
+   ],
+   "values": [
+    "0 s trips#1 n=1 align=1 pin=5",
+    "1 s col#1 n=1 align=1",
+    "2 v total#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `v_add_nc_u32 v:total#1[0]x1, s:col#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + col\"` .. `v_add_nc_u32 v:total#1[0]x1, s:col#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + col\"` conservative=False"
+    ],
+    "s.pinned": [
+     "trips#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 0                                              // total = 0",
+    "\ts_mov_b32 s0, 1",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc0 .Lloop_end_2",
+    ".Lloop_1:",
+    "\tv_add_nc_u32 v0, s0, v0                                      // total = total + col",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc1 .Lloop_1",
+    ".Lloop_end_2:"
+   ]
+  },
+  {
+   "name": "until_with_break",
+   "src": "lim = S.u32(name=\"lim\", at=1)\nv = S.u32(1, name=\"v\")\nfor it in b.loop(until=v > 90):\n    v += 11\n    it.break_when(v >= lim)",
+   "built": [
+    "s_mov_b32 s:v#1[0]x1, 1 ; comment=\"v = 1\"",
+    "ir.label {name=.Luntil_1}",
+    "s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 11 ; comment=\"v = v + 11\"",
+    "s_cmp_ge_u32 s:v#1[0]x1, s:lim#1[0]x1 ; comment=\"v >= lim\"",
+    "s_cbranch_scc1 @.Luntil_end_2",
+    "s_cmp_gt_u32 s:v#1[0]x1, 90 ; comment=\"v > 90\"",
+    "s_cbranch_scc0 @.Luntil_1",
+    "ir.label {name=.Luntil_end_2}"
+   ],
+   "values": [
+    "0 s lim#1 n=1 align=1 pin=1",
+    "1 s v#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "until: `s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 11 ; comment=\"v = v + 11\"` .. `s_cbranch_scc1 @.Luntil_end_2` conservative=False"
+    ],
+    "s.pinned": [
+     "lim#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 1                                              // v = 1",
+    ".Luntil_1:",
+    "\ts_add_co_u32 s0, s0, 11                                      // v = v + 11",
+    "\ts_cmp_ge_u32 s0, s1                                          // v >= lim",
+    "\ts_cbranch_scc1 .Luntil_end_2",
+    "\ts_cmp_gt_u32 s0, 90                                          // v > 90",
+    "\ts_cbranch_scc0 .Luntil_1",
+    ".Luntil_end_2:"
+   ]
+  },
+  {
+   "name": "repeat_break_junction",
+   "src": "lim = S.u32(name=\"lim\", at=1)\nv = S.u32(2, name=\"v\")\nfor it in b.loop():\n    v += 5\n    it.break_when((v > 30) & (v != lim))\nv += 9",
+   "built": [
+    "s_mov_b32 s:v#1[0]x1, 2 ; comment=\"v = 2\"",
+    "ir.label {name=.Lrepeat_1}",
+    "s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 5 ; comment=\"v = v + 5\"",
+    "s_cmp_gt_u32 s:v#1[0]x1, 30 ; comment=\"v > 30\"",
+    "s_cbranch_scc0 @.Lj_3",
+    "s_cmp_lg_u32 s:v#1[0]x1, s:lim#1[0]x1 ; comment=\"v != lim\"",
+    "s_cbranch_scc1 @.Lrepeat_end_2",
+    "ir.label {name=.Lj_3}",
+    "s_branch @.Lrepeat_1",
+    "ir.label {name=.Lrepeat_end_2}",
+    "s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 9 ; comment=\"v = v + 9\""
+   ],
+   "values": [
+    "0 s lim#1 n=1 align=1 pin=1",
+    "1 s v#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "repeat: `s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 5 ; comment=\"v = v + 5\"` .. `ir.label {name=.Lj_3}` conservative=False"
+    ],
+    "s.pinned": [
+     "lim#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 2                                              // v = 2",
+    ".Lrepeat_1:",
+    "\ts_add_co_u32 s0, s0, 5                                       // v = v + 5",
+    "\ts_cmp_gt_u32 s0, 30                                          // v > 30",
+    "\ts_cbranch_scc0 .Lj_3",
+    "\ts_cmp_lg_u32 s0, s1                                          // v != lim",
+    "\ts_cbranch_scc1 .Lrepeat_end_2",
+    ".Lj_3:",
+    "\ts_branch .Lrepeat_1",
+    ".Lrepeat_end_2:",
+    "\ts_add_co_u32 s0, s0, 9                                       // v = v + 9"
+   ]
+  },
+  {
+   "name": "repeat_break_or",
+   "src": "lim = S.u32(name=\"lim\", at=1)\nv = S.u32(0, name=\"v\")\nfor it in b.loop():\n    v += 4\n    it.break_when((v == lim) | (v >= 64), comment=\"enough\")\nv += 1",
+   "built": [
+    "s_mov_b32 s:v#1[0]x1, 0 ; comment=\"v = 0\"",
+    "ir.label {name=.Lrepeat_1}",
+    "s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 4 ; comment=\"v = v + 4\"",
+    "s_cmp_eq_u32 s:v#1[0]x1, s:lim#1[0]x1 ; comment=\"v == lim\"",
+    "s_cbranch_scc1 @.Lrepeat_end_2",
+    "s_cmp_ge_u32 s:v#1[0]x1, 64 ; comment=\"v >= 64\"",
+    "s_cbranch_scc1 @.Lrepeat_end_2",
+    "s_branch @.Lrepeat_1",
+    "ir.label {name=.Lrepeat_end_2}",
+    "s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 1 ; comment=\"v = v + 1\""
+   ],
+   "values": [
+    "0 s lim#1 n=1 align=1 pin=1",
+    "1 s v#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "repeat: `s_add_co_u32 s:v#1[0]x1, s:v#1[0]x1, 4 ; comment=\"v = v + 4\"` .. `s_cbranch_scc1 @.Lrepeat_end_2` conservative=False"
+    ],
+    "s.pinned": [
+     "lim#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // v = 0",
+    ".Lrepeat_1:",
+    "\ts_add_co_u32 s0, s0, 4                                       // v = v + 4",
+    "\ts_cmp_eq_u32 s0, s1                                          // v == lim",
+    "\ts_cbranch_scc1 .Lrepeat_end_2",
+    "\ts_cmp_ge_u32 s0, 64                                          // v >= 64",
+    "\ts_cbranch_scc1 .Lrepeat_end_2",
+    "\ts_branch .Lrepeat_1",
+    ".Lrepeat_end_2:",
+    "\ts_add_co_u32 s0, s0, 1                                       // v = v + 1"
+   ]
+  },
+  {
+   "name": "peeled_counted",
+   "src": "trips = S.u32(name=\"trips\", at=5)\ntotal = V.u32(0, name=\"total\")\nfor it in b.loop(trips, peel=2, name=\"pk\"):\n    total += it.i",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 0 ; comment=\"total = 0\"",
+    "s_mov_b32 s:pk.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:pk.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lpk_end_2",
+    "v_add_nc_u32 v:total#1[0]x1, s:pk.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + pk.i\"",
+    "s_add_co_u32 s:pk.i#1[0]x1, s:pk.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:pk.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lpk_end_2",
+    "v_add_nc_u32 v:total#1[0]x1, s:pk.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + pk.i\"",
+    "s_add_co_u32 s:pk.i#1[0]x1, s:pk.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:pk.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lpk_end_2",
+    "v_add_nc_u32 v:total#1[0]x1, s:pk.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + pk.i\"",
+    "s_add_co_u32 s:pk.i#1[0]x1, s:pk.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:pk.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lpk_end_2",
+    "v_add_nc_u32 v:total#1[0]x1, s:pk.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total + pk.i\"",
+    "s_add_co_u32 s:pk.i#1[0]x1, s:pk.i#1[0]x1, 1",
+    "s_branch @.Lpk_1",
+    "ir.label {name=.Lpk_end_2}"
+   ],
+   "values": [
+    "0 s trips#1 n=1 align=1 pin=5",
+    "1 v total#1 n=1 align=1",
+    "2 s pk.i#1 n=1 align=1"
+   ],
+   "records": {
+    "deferred": [
+     "peel"
+    ],
+    "s.pinned": [
+     "trips#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 0                                              // total = 0",
+    "\ts_mov_b32 s0, 0",
+    ".Lpk_1:",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc0 .Lpk_end_2",
+    "\tv_add_nc_u32 v0, s0, v0                                      // total = total + pk.i",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_branch .Lpk_1",
+    ".Lpk_end_2:"
+   ]
+  },
+  {
+   "name": "peeled_once",
+   "src": "trips = S.u32(name=\"trips\", at=5)\ntotal = V.u32(4, name=\"total\")\nfor it in b.loop(trips, peel=1):\n    total ^= it.i",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 4 ; comment=\"total = 4\"",
+    "s_mov_b32 s:loop.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "v_xor_b32 v:total#1[0]x1, s:loop.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total ^ loop.i\"",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "v_xor_b32 v:total#1[0]x1, s:loop.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total ^ loop.i\"",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "v_xor_b32 v:total#1[0]x1, s:loop.i#1[0]x1, v:total#1[0]x1 ; comment=\"total = total ^ loop.i\"",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_branch @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}"
+   ],
+   "values": [
+    "0 s trips#1 n=1 align=1 pin=5",
+    "1 v total#1 n=1 align=1",
+    "2 s loop.i#1 n=1 align=1"
+   ],
+   "records": {
+    "deferred": [
+     "peel"
+    ],
+    "s.pinned": [
+     "trips#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 4                                              // total = 4",
+    "\ts_mov_b32 s0, 0",
+    ".Lloop_1:",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc0 .Lloop_end_2",
+    "\tv_xor_b32 v0, s0, v0                                         // total = total ^ loop.i",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_branch .Lloop_1",
+    ".Lloop_end_2:"
+   ]
+  },
+  {
+   "name": "value_made_in_body",
+   "src": "trips = S.u32(name=\"trips\", at=5)\ntotal = V.u32(0, name=\"total\")\nfor it in b.loop(trips):\n    sq = V.u32(it.i + 4, name=\"sq\")\n    total += sq",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 0 ; comment=\"total = 0\"",
+    "s_mov_b32 s:loop.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "ir.label {name=.Lloop_1}",
+    "s_add_co_u32 s:t#1[0]x1, s:loop.i#1[0]x1, 4 ; comment=\"sq = loop.i + 4\"",
+    "v_mov_b32 v:sq#1[0]x1, s:t#1[0]x1",
+    "v_add_nc_u32 v:total#1[0]x1, v:total#1[0]x1, v:sq#1[0]x1 ; comment=\"total = total + sq\"",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc1 @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}"
+   ],
+   "values": [
+    "0 s trips#1 n=1 align=1 pin=5",
+    "1 v total#1 n=1 align=1",
+    "2 s loop.i#1 n=1 align=1",
+    "3 v sq#1 n=1 align=1",
+    "4 s t#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `s_add_co_u32 s:t#1[0]x1, s:loop.i#1[0]x1, 4 ; comment=\"sq = loop.i + 4\"` .. `v_add_nc_u32 v:total#1[0]x1, v:total#1[0]x1, v:sq#1[0]x1 ; comment=\"total = total + sq\"` conservative=False"
+    ],
+    "s.pinned": [
+     "trips#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 0                                              // total = 0",
+    "\ts_mov_b32 s0, 0",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc0 .Lloop_end_2",
+    ".Lloop_1:",
+    "\ts_add_co_u32 s1, s0, 4                                       // sq = loop.i + 4",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\tv_mov_b32 v1, s1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_nc_u32 v0, v0, v1                                      // total = total + sq",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc1 .Lloop_1",
+    ".Lloop_end_2:"
+   ]
+  },
+  {
+   "name": "exit_when_to_labels",
+   "src": "code = S.u32(name=\"code\", at=2)\nr = S.u32(0, name=\"r\")\nb.exit_when(code > 40)\nr[...] = 5\nb.exit_when((code == 3) | (code == 8), to=\".Lfinish\")\nr += code\nb.put_label(\"L_end\", from_branches=True)\nb.put_label(\".Lfinish\", from_branches=True)\nb.emit(O.op(\"s_endpgm\"))",
+   "built": [
+    "s_mov_b32 s:r#1[0]x1, 0 ; comment=\"r = 0\"",
+    "s_cmp_gt_u32 s:code#1[0]x1, 40 ; comment=\"code > 40\"",
+    "s_cbranch_scc1 @L_end",
+    "s_mov_b32 s:r#1[0]x1, 5 ; comment=\"r = 5\"",
+    "s_cmp_eq_u32 s:code#1[0]x1, 3 ; comment=\"code == 3\"",
+    "s_cbranch_scc1 @.Lfinish",
+    "s_cmp_eq_u32 s:code#1[0]x1, 8 ; comment=\"code == 8\"",
+    "s_cbranch_scc1 @.Lfinish",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, s:code#1[0]x1 ; comment=\"r = r + code\"",
+    "ir.label {name=L_end}",
+    "ir.label {name=.Lfinish}",
+    "s_endpgm"
+   ],
+   "values": [
+    "0 s code#1 n=1 align=1 pin=2",
+    "1 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "code#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 0                                              // r = 0",
+    "\ts_cmp_gt_u32 s2, 40                                          // code > 40",
+    "\ts_cbranch_scc1 L_end",
+    "\ts_mov_b32 s0, 5                                              // r = 5",
+    "\ts_cmp_eq_u32 s2, 3                                           // code == 3",
+    "\ts_cbranch_scc1 .Lfinish",
+    "\ts_cmp_eq_u32 s2, 8                                           // code == 8",
+    "\ts_cbranch_scc1 .Lfinish",
+    "\ts_add_co_u32 s0, s0, s2                                      // r = r + code",
+    "L_end:",
+    ".Lfinish:",
+    "\ts_endpgm"
+   ]
+  },
+  {
+   "name": "loop_reads_arguments",
+   "src": "k = b.entry(Args(cnt=u32, step=u32))\ncnt, step = k.load()\ntotal = V.u32(0, name=\"total\")\nfor it in b.loop(cnt):\n    total += step",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b64 s:args#1[0]x2, s:karg[0]x2, 0'0x0' ; comment=\"cnt, step\"",
+    "v_mov_b32 v:total#1[0]x1, 0 ; comment=\"total = 0\"",
+    "ir.wait_regs s:args#1[0]x2 {counter=load, said=the kernel arguments, before loop loop, regions=()}",
+    "ir.wait_regs s:args#1[0]x2 {counter=store, said=the kernel arguments, before loop loop, regions=()}",
+    "ir.wait_regs s:args#1[0]x2 {counter=ds, said=the kernel arguments, before loop loop, regions=()}",
+    "ir.wait_regs s:args#1[0]x2 {counter=km, said=the kernel arguments, before loop loop, regions=()}",
+    "s_mov_b32 s:loop.i#1[0]x1, 0 ; wait_uses=[s:args#1[0]x2]",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:args#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "ir.label {name=.Lloop_1}",
+    "v_add_nc_u32 v:total#1[0]x1, s:args#1[0]x1+1, v:total#1[0]x1 ; comment=\"total = total + step\"",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:args#1[0]x1",
+    "s_cbranch_scc1 @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}"
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s args#1 n=2 align=2",
+    "4 v total#1 n=1 align=1",
+    "5 s loop.i#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `v_add_nc_u32 v:total#1[0]x1, s:args#1[0]x1+1, v:total#1[0]x1 ; comment=\"total = total + step\"` .. `v_add_nc_u32 v:total#1[0]x1, s:args#1[0]x1+1, v:total#1[0]x1 ; comment=\"total = total + step\"` conservative=False"
+    ],
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b64 s[2:3], s[0:1], 0x0                               // cnt, step",
+    "\tv_mov_b32 v0, 0                                              // total = 0",
+    "\ts_wait_kmcnt 0                                               // the kernel arguments, before loop loop",
+    "\ts_mov_b32 s0, 0",
+    "\ts_cmp_lt_u32 s0, s2",
+    "\ts_cbranch_scc0 .Lloop_end_2",
+    ".Lloop_1:",
+    "\tv_add_nc_u32 v0, s3, v0                                      // total = total + step",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_cmp_lt_u32 s0, s2",
+    "\ts_cbranch_scc1 .Lloop_1",
+    ".Lloop_end_2:"
+   ]
+  },
+  {
+   "name": "audit_steady_loop",
+   "src": "import dataclasses\nb.options = dataclasses.replace(b.options, audit=True)\ntrips = S.u32(name=\"trips\", at=5)\ntotal = V.u32(9, name=\"total\")\nfor it in b.loop(trips):\n    total += it.i * 4",
+   "built": [
+    "v_mov_b32 v:total#1[0]x1, 9 ; comment=\"total = 9\"",
+    "s_mov_b32 s:loop.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "ir.label {name=.Lloop_1}",
+    "v_lshl_add_u32 v:total#1[0]x1, s:loop.i#1[0]x1, 2, v:total#1[0]x1 ; comment=\"total = total + (loop.i * 4)\"",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc1 @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}"
+   ],
+   "values": [
+    "0 s trips#1 n=1 align=1 pin=5",
+    "1 v total#1 n=1 align=1",
+    "2 s loop.i#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `v_lshl_add_u32 v:total#1[0]x1, s:loop.i#1[0]x1, 2, v:total#1[0]x1 ; comment=\"total = total + (loop.i * 4)\"` .. `v_lshl_add_u32 v:total#1[0]x1, s:loop.i#1[0]x1, 2, v:total#1[0]x1 ; comment=\"total = total + (loop.i * 4)\"` conservative=False"
+    ],
+    "s.pinned": [
+     "trips#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 9                                              // total = 9",
+    "\ts_mov_b32 s0, 0",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc0 .Lloop_end_2",
+    ".Lloop_1:",
+    "\tv_lshl_add_u32 v0, s0, 2, v0                                 // total = total + (loop.i * 4)",
+    "\ts_add_co_u32 s0, s0, 1",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_cmp_lt_u32 s0, s5",
+    "\ts_cbranch_scc1 .Lloop_1",
+    ".Lloop_end_2:"
+   ]
+  },
+  {
+   "name": "lane_cond_in_when",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nwith b.when(col >= 6):\n    pass",
+   "error": {
+    "class": "ExprError",
+    "message": "col >= 6: a lane condition in a branch (wave-uniform): any(c) or all(c), or an exec region (b.lanes)"
+   }
+  },
+  {
+   "name": "lane_cond_in_unless",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nwith b.unless(val != 0):\n    pass",
+   "error": {
+    "class": "ExprError",
+    "message": "val != 0: a lane condition in a branch (wave-uniform): any(c) or all(c), or an exec region (b.lanes)"
+   }
+  },
+  {
+   "name": "lane_compare_instruction",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nwith b.when(O.op(\"v_cmp_lt_u32\", O.VCC, 20, col)):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "when(<v_cmp_lt_u32 vcc_lo, Imm(value=20, text=''), v:col#1[0]x1>): `v_cmp_lt_u32 vcc_lo, 20, v:col#1` is a lane compare: a lane condition is an exec region (b.lanes), not a branch"
+   }
+  },
+  {
+   "name": "non_compare_instruction",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nwith b.when(O.op(\"s_and_b32\", sel, sel, 15)):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "when(<s_and_b32 s:sel#1[0]x1, s:sel#1[0]x1, Imm(value=15, text='')>): `s_and_b32 s:sel#1, s:sel#1, 15` is not a scalar compare (s_cmp* / s_bitcmp*)"
+   }
+  },
+  {
+   "name": "bare_register_condition",
+   "src": "word = S.u32(name=\"word\", at=1)\nwith b.when(word):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "when(s:word#1): s:word#1 is not a condition (an expr compare, or an s_cmp / s_bitcmp Instr)"
+   }
+  },
+  {
+   "name": "elif_first",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nwith b.elif_(sel != 2):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "elif_(sel != 2): no when / elif_ arm right before it (a comment, a label or an instruction closes the chain)"
+   }
+  },
+  {
+   "name": "otherwise_after_comment",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nwith b.when(sel > 1):\n    pass\nb.comment(\"closes it\")\nwith b.otherwise():\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "otherwise(): no when / elif_ arm right before it (a comment, a label or an instruction closes the chain)"
+   }
+  },
+  {
+   "name": "elif_after_label",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nwith b.when(sel > 1):\n    pass\nb.put_label(\".Lmid\")\nwith b.elif_(sel == 0):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "elif_(sel == 0): no when / elif_ arm right before it (a comment, a label or an instruction closes the chain)"
+   }
+  },
+  {
+   "name": "elif_after_else",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nwith b.unless(sel == 3):\n    pass\nwith b.otherwise():\n    pass\nwith b.elif_(sel == 4):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "elif_(sel == 4): right after otherwise, which ends the chain (otherwise is its last arm)"
+   }
+  },
+  {
+   "name": "otherwise_twice",
+   "src": "sel = S.u32(name=\"sel\", at=3)\n\nwith b.when(sel == 3):\n    pass\nwith b.otherwise():\n    pass\nwith b.otherwise():\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "otherwise(): right after otherwise, which ends the chain (otherwise is its last arm)"
+   }
+  },
+  {
+   "name": "count_and_until",
+   "src": "trips = S.u32(name=\"trips\", at=5)\nv = S.u32(name=\"v\", at=1)\nfor it in b.loop(trips, until=v == 3):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "loop (loop): a count or a condition, not both"
+   }
+  },
+  {
+   "name": "repeat_with_start",
+   "src": "for it in b.loop(start=3):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "loop (repeat): i= and start= are a counted loop's (n=)"
+   }
+  },
+  {
+   "name": "until_with_index",
+   "src": "v = S.u32(name=\"v\", at=1)\nj = S.u32(name=\"j\")\nfor it in b.loop(until=v > 2, i=j):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "loop (until): i= and start= are a counted loop's (n=)"
+   }
+  },
+  {
+   "name": "peel_with_until",
+   "src": "v = S.u32(name=\"v\", at=1)\nfor it in b.loop(until=v != 0, peel=2):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "loop (until): peel= is a counted loop's or one left by its breaks (no until=)"
+   }
+  },
+  {
+   "name": "zero_trips",
+   "src": "for it in b.loop(5, start=5):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "loop (loop): 0 trips (n 5, start 5): write nothing"
+   }
+  },
+  {
+   "name": "negative_trips",
+   "src": "for it in b.loop(3, start=7):\n    pass",
+   "error": {
+    "class": "FlowError",
+    "message": "loop (loop): -4 trips (n 3, start 7): write nothing"
+   }
+  },
+  {
+   "name": "python_break_then_instruction",
+   "src": "trips = S.u32(name=\"trips\", at=5)\nv = S.u32(0, name=\"v\")\nfor it in b.loop(trips):\n    v += 1\n    break\nv += 2",
+   "error": {
+    "class": "FlowError",
+    "message": "loop loop: left by break (a loop's body runs once a pass; its back edge was never emitted)"
+   }
+  },
+  {
+   "name": "python_break_then_comment",
+   "src": "trips = S.u32(name=\"trips\", at=5)\nfor it in b.loop(trips, name=\"scan\"):\n    break\nb.comment(\"after\")",
+   "error": {
+    "class": "FlowError",
+    "message": "loop scan: left by break (a loop's body runs once a pass; its back edge was never emitted)"
+   }
+  },
+  {
+   "name": "body_value_width_changes",
+   "src": "import dataclasses\nb.options = dataclasses.replace(b.options, audit=True)\ntrips = S.u32(name=\"trips\", at=5)\nwidths = [2]\nfor it in b.loop(trips):\n    S.u32(0, n=widths[0], name=\"pair\")\n    widths[0] = 1",
+   "error": {
+    "class": "ValueError",
+    "message": "s:pair#1: made again as 1 dword(s), first as 2 - a loop body's passes must make the same values"
+   }
+  },
+  {
+   "name": "audit_body_drifts",
+   "src": "import dataclasses\nb.options = dataclasses.replace(b.options, audit=True)\ntrips = S.u32(name=\"trips\", at=5)\ntotal = V.u32(1, name=\"total\")\nstep = [4]\nfor it in b.loop(trips):\n    total += step[0]\n    step[0] *= 2",
+   "error": {
+    "class": "ScheduleError",
+    "message": "loop body loop has no steady state: its second iteration differs at 0: ['v_add_nc_u32 v:total#1, 4, v:total#1'] vs ['v_add_nc_u32 v:total#1, 8, v:total#1']"
+   }
+  },
+  {
+   "name": "lane_junction_in_when",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nwith b.when((col > 2) | (col < 1)):\n    pass",
+   "error": {
+    "class": "ExprError",
+    "message": "(col > 2) | (col < 1): a lane condition in a branch (wave-uniform): any(c) or all(c), or an exec region (b.lanes)"
+   }
+  },
+  {
+   "name": "mixed_junction_in_when",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nsel = S.u32(name=\"sel\", at=3)\n\nwith b.when((sel == 0) & (val < 4)):\n    pass",
+   "error": {
+    "class": "ExprError",
+    "message": "(sel == 0) & (val < 4): a lane condition in a branch (wave-uniform): any(c) or all(c), or an exec region (b.lanes)"
+   }
+  },
+  {
+   "name": "junction_as_mask",
+   "src": "p, q = S.u32(name=\"p\", at=1), S.u32(name=\"q\", at=2)\nS.mask((p != 0) | (q < 3))",
+   "built": [
+    "s_cmp_lg_u32 s:p#1[0]x1, 0 ; comment=\"t#1 = (p != 0) | (q < 3)\"",
+    "s_cselect_b32 s:t#2[0]x1, -1, 0",
+    "s_cmp_lt_u32 s:q#1[0]x1, 3",
+    "s_cselect_b32 s:t#3[0]x1, -1, 0",
+    "s_or_b32 s:t#1[0]x1, s:t#2[0]x1, s:t#3[0]x1"
+   ],
+   "values": [
+    "0 s p#1 n=1 align=1 pin=1",
+    "1 s q#1 n=1 align=1 pin=2",
+    "2 s t#1 n=1 align=1",
+    "3 s t#2 n=1 align=1",
+    "4 s t#3 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "p#1",
+     "q#1"
+    ]
+   },
+   "render": [
+    "\ts_cmp_lg_u32 s1, 0                                           // t#1 = (p != 0) | (q < 3)",
+    "\ts_cselect_b32 s0, -1, 0",
+    "\ts_cmp_lt_u32 s2, 3",
+    "\ts_cselect_b32 s1, -1, 0",
+    "\ts_or_b32 s2, s0, s1"
+   ]
+  },
+  {
+   "name": "and_junction_as_named_mask",
+   "src": "p, q = S.u32(name=\"p\", at=1), S.u32(name=\"q\", at=2)\nS.mask((p > 4) & (q == p), name=\"both\")",
+   "built": [
+    "s_cmp_gt_u32 s:p#1[0]x1, 4 ; comment=\"both = (p > 4) & (q == p)\"",
+    "s_cselect_b32 s:t#1[0]x1, -1, 0",
+    "s_cmp_eq_u32 s:q#1[0]x1, s:p#1[0]x1",
+    "s_cselect_b32 s:t#2[0]x1, -1, 0",
+    "s_and_b32 s:both#1[0]x1, s:t#1[0]x1, s:t#2[0]x1"
+   ],
+   "values": [
+    "0 s p#1 n=1 align=1 pin=1",
+    "1 s q#1 n=1 align=1 pin=2",
+    "2 s both#1 n=1 align=1",
+    "3 s t#1 n=1 align=1",
+    "4 s t#2 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "p#1",
+     "q#1"
+    ]
+   },
+   "render": [
+    "\ts_cmp_gt_u32 s1, 4                                           // both = (p > 4) & (q == p)",
+    "\ts_cselect_b32 s0, -1, 0",
+    "\ts_cmp_eq_u32 s2, s1",
+    "\ts_cselect_b32 s1, -1, 0",
+    "\ts_and_b32 s2, s0, s1"
+   ]
+  }
+ ]
+}

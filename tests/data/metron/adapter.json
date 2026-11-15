@@ -1,0 +1,165 @@
+{
+ "notation": "Thin-compiled operation points, arms and adapter refusal boundaries.",
+ "points": [
+  {
+   "op": "example.vadd{n=1000}",
+   "seed": 0,
+   "dist": null,
+   "key": "example.vadd{n=1000} seed 0",
+   "inputs": {
+    "x": {
+     "dtype": "float32",
+     "shape": [
+      1000
+     ],
+     "device": "cpu"
+    },
+    "y": {
+     "dtype": "float32",
+     "shape": [
+      1000
+     ],
+     "device": "cpu"
+    }
+   },
+   "outputs": {
+    "z": {
+     "dtype": "float32",
+     "shape": [
+      1000
+     ],
+     "device": "meta"
+    }
+   },
+   "check_right": null,
+   "check_wrong": "z[0] = 0.0, want 1.3096320629119873 (1000 wrong)"
+  },
+  {
+   "op": "example.vadd{n=4096}",
+   "seed": 3,
+   "dist": {
+    "scale": 1e+30
+   },
+   "key": "example.vadd{n=4096} seed 3 dist {'scale': 1e+30}",
+   "inputs": {
+    "x": {
+     "dtype": "float32",
+     "shape": [
+      4096
+     ],
+     "device": "cpu"
+    },
+    "y": {
+     "dtype": "float32",
+     "shape": [
+      4096
+     ],
+     "device": "cpu"
+    }
+   },
+   "outputs": {
+    "z": {
+     "dtype": "float32",
+     "shape": [
+      4096
+     ],
+     "device": "meta"
+    }
+   },
+   "check_right": null,
+   "check_wrong": "z[0] = 0.0, want 9.460770122315116e+29 (4096 wrong)"
+  }
+ ],
+ "arms": [
+  {
+   "made_by": "impls(point)",
+   "name": "example.vadd/add {'BLOCK': 256}",
+   "owned": {},
+   "checked": true,
+   "read": [],
+   "fingerprint_words": 1
+  },
+  {
+   "made_by": "impls(point)",
+   "name": "example.vadd/add {'BLOCK': 512}",
+   "owned": {},
+   "checked": true,
+   "read": [],
+   "fingerprint_words": 1
+  },
+  {
+   "made_by": "impl(point, add, BLOCK=512, name='mine', checked=False)",
+   "name": "mine",
+   "owned": {},
+   "checked": false,
+   "read": [],
+   "fingerprint_words": 1
+  },
+  {
+   "made_by": "impl(point, add) (a tunable not given takes its first value)",
+   "name": "example.vadd/add {'BLOCK': 256}",
+   "owned": {},
+   "checked": true,
+   "read": [],
+   "fingerprint_words": 1
+  },
+  {
+   "made_by": "impl of an implementation of two kernels passing a buffer",
+   "name": "test.m_two/two {'BLOCK': 256}",
+   "owned": {
+    "buffer0": [
+     4000,
+     "scratch"
+    ]
+   },
+   "checked": true,
+   "read": [],
+   "fingerprint_words": 2
+  },
+  {
+   "made_by": "impl of an implementation overreading x by 4096 bytes (accepted)",
+   "name": "test.m_near/near {'BLOCK': 256}",
+   "owned": {},
+   "checked": true,
+   "read": [],
+   "fingerprint_words": 1
+  }
+ ],
+ "refusals": [
+  {
+   "case": "impl(point, add, build={build_vadd: {'n': (1, 4096)}}): the lowering's own refusal passes through",
+   "result": {
+    "error": "ValueError",
+    "message": "example.vadd/add {'BLOCK': 256} serves n 1 .. 1073741823, but vadd_b256 takes n in 1 .. 4096"
+   }
+  },
+  {
+   "case": "a kernel argument neither a tensor of the op nor a passed buffer",
+   "result": {
+    "error": "ValueError",
+    "message": "metron: test.m_own/own {'BLOCK': 256}: vadd_b256's argument x is no tensor of the op (nor a buffer buffer() made)"
+   }
+  },
+  {
+   "case": "an overread past the gap",
+   "result": {
+    "error": "ValueError",
+    "message": "metron: test.m_far/far {'BLOCK': 256}: vadd_b256 overreads {'x': 8192} bytes, past the gap of 4096"
+   }
+  },
+  {
+   "case": "a tensor written in place",
+   "result": {
+    "error": "NotImplementedError",
+    "message": "metron: tensors written in place ['x'] (test.m_inplace{n=4})"
+   }
+  },
+  {
+   "case": "laps of an arm none of whose kernels takes laps",
+   "result": {
+    "error": "ValueError",
+    "message": "example.vadd/add {'BLOCK': 256}: no kernel of it takes laps (build={generator: {'laps': True}})"
+   }
+  }
+ ]
+}

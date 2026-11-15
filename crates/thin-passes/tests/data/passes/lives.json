@@ -1,0 +1,968 @@
+{
+ "target": "gfx1201",
+ "notation": "new P/Q union and 16-element address programs; four-wave liveness uses wave_order; races use three waves and explicit byte maps",
+ "cases": [
+  {
+   "name": "two union members occupy separate barrier epochs",
+   "source": [
+    "store P[slot]",
+    "publish P and synchronize",
+    "read P[reverse]",
+    "synchronize P readers",
+    "store Q[slot]",
+    "publish Q"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  // publish P",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // publish P",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  // readers complete",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P readers",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v5                                             // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  // publish Q",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // publish Q"
+   ],
+   "table_lines": 5,
+   "report": [
+    "lds: union [0, 64) proven by the lives: P in 'entry', 'after publish P'; Q in 'after P readers'"
+   ],
+   "epochs": {
+    "P": [
+     "after publish P",
+     "entry"
+    ],
+    "Q": [
+     "after P readers"
+    ]
+   }
+  },
+  {
+   "name": "union members overlap without a barrier after the read",
+   "source": [
+    "store P[slot]",
+    "publish P",
+    "read P[reverse]",
+    "store Q[slot] before a new epoch"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  // publish P",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // publish P",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    [
+     "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+     "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+     "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4"
+    ],
+    "\tds_store_b32 v7, v5                                             // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  // publish Q",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // publish Q"
+   ],
+   "table_lines": 5,
+   "error": "P [0, 64) and Q [0, 64) share bytes and are both live in the epoch 'after publish P': P accessed 3 `ds_store_b32 P + slot * 4` .. 10 `ds_load_b32 P + (15 xor lane) * 4`, in it at 10 `ds_load_b32 P + (15 xor lane) * 4`; Q accessed 12 `ds_store_b32 Q + slot * 4` .. 12 `ds_store_b32 Q + slot * 4`, in it at 12 `ds_store_b32 Q + slot * 4`"
+  },
+  {
+   "name": "distant accesses still share the entry epoch",
+   "source": [
+    "store Q then read Q",
+    "store P then read P",
+    "no epoch boundary"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Q + slot * 4",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // Q + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v5                                             // P + slot * 4",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v10, v9                                             // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "table_lines": 5,
+   "error": "P [0, 64) and Q [0, 64) share bytes and are both live in the epoch 'entry': P accessed 12 `ds_store_b32 P + slot * 4` .. 16 `ds_load_b32 P + (15 xor lane) * 4`, in it at 12 `ds_store_b32 P + slot * 4`; Q accessed 3 `ds_store_b32 Q + slot * 4` .. 7 `ds_load_b32 Q + (15 xor lane) * 4`, in it at 3 `ds_store_b32 Q + slot * 4`"
+  },
+  {
+   "name": "unretired read extends its region through the next barrier",
+   "source": [
+    "publish P writes",
+    "read P[reverse]",
+    "barrier before read completes",
+    "store Q"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  // P stores visible",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P stores visible",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P read outstanding",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v11                                            // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  // Q complete",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // Q visible"
+   ],
+   "table_lines": 5,
+   "error": "P [0, 64) and Q [0, 64) share bytes and are both live in the epoch 'after P read outstanding': P accessed 3 `ds_store_b32 P + slot * 4` .. 10 `ds_load_b32 P + (15 xor lane) * 4`, in flight or live across it; Q accessed 16 `ds_store_b32 Q + slot * 4` .. 16 `ds_store_b32 Q + slot * 4`, in it at 16 `ds_store_b32 Q + slot * 4`"
+  },
+  {
+   "name": "loop back edge joins union lifetimes without an LDS fence",
+   "source": [
+    "repeat: publish/read P; publish/read Q; ordinary round barrier"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_mov_b32 s0, 5                                                 // rounds = 5",
+    ".Lrounds_4:",
+    "\ts_cmp_eq_u32 s0, 0                                              // rounds == 0",
+    "s_cbranch_scc1 .Lrounds_end_7",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  // P stores",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P stores",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  // P readers",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P readers",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v5                                             // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  // Q stores",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // Q stores",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v10, v9                                             // Q + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  // Q read",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // round complete",
+    "\ts_sub_co_u32 s0, s0, 1                                          // rounds = rounds - 1",
+    "s_branch .Lrounds_4",
+    ".Lrounds_end_7:"
+   ],
+   "table_lines": 5,
+   "error": "P [0, 64) and Q [0, 64) share bytes and are both live in the epoch 'entry': P accessed 7 `ds_store_b32 P + slot * 4` .. 14 `ds_load_b32 P + (15 xor lane) * 4`, in it at 7 `ds_store_b32 P + slot * 4`; Q accessed 21 `ds_store_b32 Q + slot * 4` .. 28 `ds_load_b32 Q + (15 xor lane) * 4`, in flight or live across it"
+  },
+  {
+   "name": "LDS fence at loop boundary ends both current member lifetimes",
+   "source": [
+    "repeat: publish/read P; publish/read Q; waited LDS fence"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_mov_b32 s0, 5                                                 // rounds = 5",
+    ".Lrounds_4:",
+    "\ts_cmp_eq_u32 s0, 0                                              // rounds == 0",
+    "s_cbranch_scc1 .Lrounds_end_7",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  // P stores",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P stores",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  // P readers",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P readers",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v5                                             // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  // Q stores",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // Q stores",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v10, v9                                             // Q + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  // Q read",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // [lds fence] round fence",
+    "\ts_sub_co_u32 s0, s0, 1                                          // rounds = rounds - 1",
+    "s_branch .Lrounds_4",
+    ".Lrounds_end_7:"
+   ],
+   "table_lines": 5,
+   "report": [
+    "lds: union [0, 64) proven by the lives: P in 'entry', 'after P stores', 'after [lds fence] round fence'; Q in 'after P readers', 'after Q stores'"
+   ],
+   "epochs": {
+    "P": [
+     "after P stores",
+     "after [lds fence] round fence",
+     "entry"
+    ],
+    "Q": [
+     "after P readers",
+     "after Q stores"
+    ]
+   }
+  },
+  {
+   "name": "LDS fence rejects an outstanding DS read",
+   "source": [
+    "repeat: publish/read P; publish/read Q; fence without final wait"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_mov_b32 s0, 5                                                 // rounds = 5",
+    ".Lrounds_4:",
+    "\ts_cmp_eq_u32 s0, 0                                              // rounds == 0",
+    "s_cbranch_scc1 .Lrounds_end_7",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  // P stores",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P stores",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  // P readers",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // P readers",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v5                                             // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  // Q stores",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // Q stores",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v10, v9                                             // Q + (15 xor lane) * 4",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // [lds fence] round fence",
+    "\ts_sub_co_u32 s0, s0, 1                                          // rounds = rounds - 1",
+    "s_branch .Lrounds_4",
+    ".Lrounds_end_7:"
+   ],
+   "table_lines": 5,
+   "error": "the LDS fence 30 `s_barrier_wait` with `ds_load_b32 Q + (15 xor lane) * 4` (instruction 28) in flight: an LDS fence needs every wave's LDS ops and DMAs done (a wait) before it"
+  },
+  {
+   "name": "store outstanding at barrier followed by a peer read is refused",
+   "source": [
+    "store R[slot]",
+    "barrier with no wait",
+    "read R[reverse]"
+   ],
+   "listing": [
+    "; lds: 128 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    ";       64     128     64  R                [16] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4 offset:64                                   // R + slot * 4",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // R store outstanding",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9 offset:64                                    // R + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "table_lines": 6,
+   "error": "`ds_store_b32 R + slot * 4` (instruction 3) is in flight at the barrier 'R store outstanding' (instruction 5), and `ds_load_b32 R + (15 xor lane) * 4` (instruction 9) accesses its bytes after it: another wave may run it before the op lands (wait before the barrier: b.wait(R))"
+  },
+  {
+   "name": "producer ordered annotation explains the same barrier protocol",
+   "source": [
+    "ds_write R[slot] (ordered: 'consumer sequence established')",
+    "barrier then read R"
+   ],
+   "listing": [
+    "; lds: 128 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    ";       64     128     64  R                [16] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4 offset:64                                   // R + slot * 4",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // R store outstanding",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9 offset:64                                    // R + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "table_lines": 6,
+   "report": [
+    "lds: union [0, 64) proven by the lives: P in never accessed; Q in never accessed",
+    "lds: never accessed: P, Q"
+   ],
+   "epochs": {
+    "P": [],
+    "Q": [],
+    "R": [
+     "after R store outstanding",
+     "entry"
+    ]
+   }
+  },
+  {
+   "name": "commuting returnless LDS atomics may remain in flight across barriers",
+   "source": [
+    "repeat three times: barrier; commuting atomic R[slot]",
+    "wait and publish final R"
+   ],
+   "listing": [
+    "; lds: 128 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    ";       64     128     64  R                [16] u32             4",
+    "\ts_mov_b32 s0, 0                                                 ",
+    ".Latomic_4:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // atomic slot",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_add_u32 v7, v4 offset:64                                     // R + slot * 4",
+    "\ts_add_co_u32 s0, s0, 2                                          ",
+    "\ts_cmp_lt_u32 s0, 6                                              ",
+    "s_cbranch_scc1 .Latomic_4",
+    "\ts_wait_dscnt 0                                                  // atomics retire",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // atomics visible"
+   ],
+   "table_lines": 6,
+   "report": [
+    "lds: union [0, 64) proven by the lives: P in never accessed; Q in never accessed",
+    "lds: never accessed: P, Q"
+   ],
+   "epochs": {
+    "P": [],
+    "Q": [],
+    "R": [
+     "after atomic slot",
+     "entry"
+    ]
+   }
+  },
+  {
+   "name": "a read of commuting atomic bytes makes the loop barrier unsafe",
+   "source": [
+    "repeat three times: barrier; read R; then commuting atomic R",
+    "wait and publish final R"
+   ],
+   "listing": [
+    "; lds: 128 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    ";       64     128     64  R                [16] u32             4",
+    "\ts_mov_b32 s0, 0                                                 ",
+    ".Latomic_4:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // atomic slot",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_load_b32 v5, v7 offset:64                                    // R + slot * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_add_u32 v7, v4 offset:64                                     // R + slot * 4",
+    "\ts_add_co_u32 s0, s0, 2                                          ",
+    "\ts_cmp_lt_u32 s0, 6                                              ",
+    "s_cbranch_scc1 .Latomic_4",
+    "\ts_wait_dscnt 0                                                  // atomics retire",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // atomics visible"
+   ],
+   "table_lines": 6,
+   "error": "`ds_add_u32 R + slot * 4` (instruction 12) is in flight at the barrier 'atomic slot' (instruction 3) (the previous iteration's, over the loop's back edge), and `ds_load_b32 R + slot * 4` (instruction 7) accesses its bytes after it: another wave may run it before the op lands (wait before the barrier: b.wait(R))"
+  },
+  {
+   "name": "wave exclusive branch creates unmatched barrier counts",
+   "source": [
+    "only wave zero enters",
+    "barrier inside that arm",
+    "barrier after join"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_cmp_lg_u32 s0, 0                                              ",
+    "s_cbranch_scc1 .Lwaves_11",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // wave zero private",
+    ".Lwaves_11:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // all waves"
+   ],
+   "table_lines": 5,
+   "error": "the wave-dependent branch `s_cbranch_scc1 .Lwaves_11` (instruction 1) rejoins at .Lwaves_11 (instruction 4) over paths passing 0 and 1 s_barrier: barriers pair by count, so the epochs between them would not be every wave's - give every path the same barriers"
+  },
+  {
+   "name": "uniform scalar predicate may skip a common barrier",
+   "source": [
+    "when p is zero, skip the common barrier",
+    "store D afterwards"
+   ],
+   "listing": [
+    "; lds: 128 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    ";       64     128     64  D                [16] u32             4",
+    "\ts_cmp_eq_u32 s1, 0                                              // p == 0",
+    "s_cbranch_scc0 .Luniform_12",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // zero p only",
+    ".Luniform_12:",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4 offset:64                                   // D + slot * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "table_lines": 6,
+   "report": [
+    "lds: union [0, 64) proven by the lives: P in never accessed; Q in never accessed",
+    "lds: never accessed: P, Q"
+   ],
+   "epochs": {
+    "P": [],
+    "Q": [],
+    "D": [
+     "after zero p only",
+     "entry"
+    ]
+   }
+  },
+  {
+   "name": "wave derived scalar predicates remain wave dependent",
+   "source": [
+    "compute alternating wave group",
+    "conditionally barrier",
+    "common barrier after join"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_xor_b32 s1, s0, 2                                             // wave group xor 2",
+    "\ts_cmp_eq_u32 s1, 2                                              ",
+    "s_cbranch_scc0 .Lderived_13",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // selected waves",
+    ".Lderived_13:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // all waves"
+   ],
+   "table_lines": 5,
+   "error": "the wave-dependent branch `s_cbranch_scc0 .Lderived_13` (instruction 2) rejoins at .Lderived_13 (instruction 5) over paths passing 0 and 1 s_barrier: barriers pair by count, so the epochs between them would not be every wave's - give every path the same barriers"
+  },
+  {
+   "name": "scalar assigned under wave branch taints a later branch",
+   "source": [
+    "flag=0",
+    "wave zero sets flag",
+    "flag controls a barrier",
+    "common barrier"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_mov_b32 s1, 0                                                 // flag = 0",
+    "\ts_cmp_eq_u32 s0, 0                                              // wave == 0",
+    "s_cbranch_scc0 .Lflag_skip_14",
+    "\ts_mov_b32 s1, 1                                                 // flag = 1",
+    ".Lflag_skip_14:",
+    "\ts_cmp_eq_u32 s1, 1                                              ",
+    "s_cbranch_scc0 .Lflag_join_14",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // flagged wave",
+    ".Lflag_join_14:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // all waves"
+   ],
+   "table_lines": 5,
+   "error": "the wave-dependent branch `s_cbranch_scc0 .Lflag_join_14` (instruction 6) rejoins at .Lflag_join_14 (instruction 9) over paths passing 0 and 1 s_barrier: barriers pair by count, so the epochs between them would not be every wave's - give every path the same barriers"
+  },
+  {
+   "name": "loop nested in a wave arm conflicts with the peer barrier count",
+   "source": [
+    "selected waves loop twice with barriers",
+    "other waves execute one barrier"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_cmp_eq_u32 s0, 2                                              ",
+    "s_cbranch_scc0 .Lwave_else_15",
+    "\ts_mov_b32 s0, 0                                                 ",
+    ".Linner_15:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // selected repeated",
+    "\ts_add_co_u32 s0, s0, 2                                          ",
+    "\ts_cmp_lt_u32 s0, 4                                              ",
+    "s_cbranch_scc1 .Linner_15",
+    "s_branch .Lwave_join_15",
+    ".Lwave_else_15:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // other waves once",
+    ".Lwave_join_15:"
+   ],
+   "table_lines": 5,
+   "error": "the wave-dependent branch `s_cbranch_scc0 .Lwave_else_15` (instruction 1) leads into a loop holding s_barrier before its join (instruction 13): waves would pass different numbers of barriers (barriers pair by count)"
+  },
+  {
+   "name": "paired wave arms form one epoch and expose overlapping union members",
+   "source": [
+    "wave zero: barrier A then P",
+    "other waves: paired barrier B then Q"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_cmp_eq_u32 s0, 0                                              ",
+    "s_cbranch_scc0 .Lpaired_else_16",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // barrier alpha",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    "s_branch .Lpaired_join_16",
+    ".Lpaired_else_16:",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // barrier beta",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Q + slot * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    ".Lpaired_join_16:"
+   ],
+   "table_lines": 5,
+   "error": "P [0, 64) and Q [0, 64) share bytes and are both live in the epoch 'after barrier alpha | after barrier beta': P accessed 7 `ds_store_b32 P + slot * 4` .. 7 `ds_store_b32 P + slot * 4`, in it at 7 `ds_store_b32 P + slot * 4`; Q accessed 16 `ds_store_b32 Q + slot * 4` .. 16 `ds_store_b32 Q + slot * 4`, in it at 16 `ds_store_b32 Q + slot * 4`"
+  },
+  {
+   "name": "wave order mode allows separated same-wave regions to share storage",
+   "source": [
+    "wave 2 only: complete P accesses",
+    "wave 2 only: complete Q accesses"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_cmp_lg_u32 s0, 2                                              ",
+    "s_cbranch_scc1 .Lwaves_2P",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    ".Lwaves_2P:",
+    "\ts_cmp_lg_u32 s0, 2                                              ",
+    "s_cbranch_scc1 .Lwaves_2Q",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Q + slot * 4",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // Q + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    ".Lwaves_2Q:"
+   ],
+   "table_lines": 5,
+   "report": [
+    "lds: union [0, 64) proven by the lives: P in 'entry'; Q in 'entry'"
+   ],
+   "epochs": {
+    "P": [
+     "entry"
+    ],
+    "Q": [
+     "entry"
+    ]
+   }
+  },
+  {
+   "name": "wave order mode retains an outstanding first member at the peer accesses",
+   "source": [
+    "wave 3 only: P read outstanding",
+    "wave 3 only: Q accesses",
+    "final wait"
+   ],
+   "listing": [
+    "; lds: 64 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      64     64  union",
+    ";        0      64     64    + P            [16] u32             4",
+    ";        0      64     64    | Q            [16] u32             4",
+    "\ts_cmp_lg_u32 s0, 3                                              ",
+    "s_cbranch_scc1 .Lwaves_3P",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // P + slot * 4",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // P + (15 xor lane) * 4",
+    ".Lwaves_3P:",
+    "\ts_cmp_lg_u32 s0, 3                                              ",
+    "s_cbranch_scc1 .Lwaves_3Q",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Q + slot * 4",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // Q + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    ".Lwaves_3Q:",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "table_lines": 5,
+   "error": "P [0, 64) and Q [0, 64) share bytes and are both live in the epoch 'entry': P accessed 5 `ds_store_b32 P + slot * 4` .. 9 `ds_load_b32 P + (15 xor lane) * 4`, in it at 5 `ds_store_b32 P + slot * 4`; Q accessed 16 `ds_store_b32 Q + slot * 4` .. 20 `ds_load_b32 Q + (15 xor lane) * 4`, in it at 16 `ds_store_b32 Q + slot * 4`"
+  }
+ ],
+ "races": [
+  {
+   "name": "same byte window written independently by all three waves",
+   "source": [
+    "slot = lane modulo 16",
+    "store Z[slot]",
+    "wait"
+   ],
+   "listing": [
+    "; lds: 256 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     256    256  Z                [64] u32             4",
+    "\tv_and_b32 v10, 15, v0                                           // slot = lane & 15",
+    "\ts_delay_alu 1                                                   ",
+    "\tv_lshlrev_b32 v11, 2, v10                                       // adr = slot * 4",
+    "\tds_store_b32 v11, v4                                            // Z + slot * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "wgsize": 96,
+   "wave_lanes": 32,
+   "per_wave_bytes": [
+    {
+     "3": [
+      0,
+      64
+     ]
+    },
+    {
+     "3": [
+      0,
+      64
+     ]
+    },
+    {
+     "3": [
+      0,
+      64
+     ]
+    }
+   ],
+   "error": "`ds_store_b32 Z + slot * 4` (instruction 3) in wave 0 and `ds_store_b32 Z + slot * 4` (instruction 3) in wave 1 may touch the same bytes ([0, 64) and [0, 64)) in the epoch 'entry', a write among them: the waves run apart there, either may go first (a barrier between them, or each wave's bytes its own; a block only some waves run: b.waves([...]) - a branch on the wave index is not read as one)"
+  },
+  {
+   "name": "disjoint per-wave store and load windows are race free",
+   "source": [
+    "store private Z lane window",
+    "read same private window"
+   ],
+   "listing": [
+    "; lds: 256 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     256    256  Z                [64] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Z + slot * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    "\tv_xor_b32 v8, 15, v0                                            // reverse = 15 xor lane",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v9, 2, v8                                         // adr = reverse * 4",
+    "\tds_load_b32 v5, v9                                              // Z + (15 xor lane) * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "wgsize": 96,
+   "wave_lanes": 32,
+   "per_wave_bytes": [
+    {
+     "3": [
+      0,
+      64
+     ],
+     "8": [
+      0,
+      64
+     ]
+    },
+    {
+     "3": [
+      64,
+      128
+     ],
+     "8": [
+      64,
+      128
+     ]
+    },
+    {
+     "3": [
+      128,
+      192
+     ],
+     "8": [
+      128,
+      192
+     ]
+    }
+   ],
+   "error": null
+  },
+  {
+   "name": "reversed peer reads race with another wave write before any barrier",
+   "source": [
+    "write own Z window",
+    "read reversed Z window without barrier"
+   ],
+   "listing": [
+    "; lds: 256 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     256    256  Z                [64] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Z + slot * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    "\tv_xor_b32 v12, 31, v0                                           // peer = 31 xor lane",
+    "\ts_delay_alu 1                                                   ",
+    "\tv_lshlrev_b32 v13, 2, v12                                       ",
+    "\tds_load_b32 v14, v13                                            // Z + peer * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "wgsize": 96,
+   "wave_lanes": 32,
+   "per_wave_bytes": [
+    {
+     "3": [
+      0,
+      64
+     ],
+     "8": [
+      128,
+      192
+     ]
+    },
+    {
+     "3": [
+      64,
+      128
+     ],
+     "8": [
+      64,
+      128
+     ]
+    },
+    {
+     "3": [
+      128,
+      192
+     ],
+     "8": [
+      0,
+      64
+     ]
+    }
+   ],
+   "error": "`ds_store_b32 Z + slot * 4` (instruction 3) in wave 0 and `ds_load_b32 Z + peer * 4` (instruction 8) in wave 2 may touch the same bytes ([0, 64) and [0, 64)) in the epoch 'entry', a write among them: the waves run apart there, either may go first (a barrier between them, or each wave's bytes its own; a block only some waves run: b.waves([...]) - a branch on the wave index is not read as one)"
+  },
+  {
+   "name": "common barrier orders the reversed peer reads after all writes",
+   "source": [
+    "write own Z window",
+    "publish all writes",
+    "read reversed Z window"
+   ],
+   "listing": [
+    "; lds: 256 B of a 4096 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     256    256  Z                [64] u32             4",
+    "\tv_and_b32 v6, 15, v0                                            // slot = lane & 15",
+    "\ts_delay_alu 1                                                   // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v7, 2, v6                                         // adr = slot * 4",
+    "\tds_store_b32 v7, v4                                             // Z + slot * 4",
+    "\ts_wait_dscnt 0                                                  ",
+    "\ts_barrier_signal -3                                             ",
+    "\ts_barrier_wait 65535                                            // all writes visible",
+    "\tv_xor_b32 v12, 31, v0                                           // peer = 31 xor lane",
+    "\ts_delay_alu 1                                                   ",
+    "\tv_lshlrev_b32 v13, 2, v12                                       ",
+    "\tds_load_b32 v14, v13                                            // Z + peer * 4",
+    "\ts_wait_dscnt 0                                                  "
+   ],
+   "wgsize": 96,
+   "wave_lanes": 32,
+   "per_wave_bytes": [
+    {
+     "3": [
+      0,
+      64
+     ],
+     "10": [
+      128,
+      192
+     ]
+    },
+    {
+     "3": [
+      64,
+      128
+     ],
+     "10": [
+      64,
+      128
+     ]
+    },
+    {
+     "3": [
+      128,
+      192
+     ],
+     "10": [
+      0,
+      64
+     ]
+    }
+   ],
+   "error": null
+  }
+ ]
+}

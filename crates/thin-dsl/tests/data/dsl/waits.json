@@ -1,0 +1,448 @@
+{
+ "notation": "Each case is a DSL snippet (`src`) run on a fresh Builder for gfx1201, with `b` the Builder, `V`, `S` its files and every name of the language imported. `built` is the stream the Builder made, before any pass: one line per instruction, `<form name> <operands> {fields}; <attributes>`. A register operand is written as VReg repr (`<file>:<value name>[<index in group>]x<dwords>` and `+<lo>` when lo != 0); a named register by its name; an immediate as its value, with the writer's spelling in quotes when it has one (`16'0x10'`); a block as `@label`. Source modifiers are written `-x`, `|x|`. Fields are in stored order. Attributes in a fixed order: comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset: none or var, ordered), m0_set, waves_taken, fence. `values` lists the program's values in id order: `id file name n= align= [index=] [pin=] [same_as=]`. `records` holds the Program's lane regions and loops, the deferred records' kinds, each file's entered / pinned groups and lanes-covered names, and the wave index. `error` is the refusal (exception class and message) raised while the snippet ran. `render` (the whole pipeline's output) is the final.s; `render_error` a refusal of the pipeline's passes.",
+ "cases": [
+  {
+   "name": "wait_values_each_counter",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nlo, hi = V.f32(name=\"lo\"), V.f32(name=\"hi\")\ncnt = S.u32(name=\"cnt\")\nb.emit(O.s_load(cnt, src, offset=12))\nb.emit(O.global_load(hi, idx, src, offset=32))\nb.emit(O.global_load(lo, idx, src))\nb.wait([hi, cnt], comment=\"hi and cnt\")\nhi[...] = hi + 0.5\nb.wait(lo, \"lo landed\")\nlo[...] = lo * hi",
+   "built": [
+    "s_load_b32 s:cnt#1[0]x1, s:src#1[0]x2, 12'0xc'",
+    "global_load_b32 v:hi#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=32}",
+    "global_load_b32 v:lo#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2",
+    "ir.wait_regs v:hi#1[0]x1, s:cnt#1[0]x1 {counter=load, said=hi and cnt, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1, s:cnt#1[0]x1 {counter=store, said=hi and cnt, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1, s:cnt#1[0]x1 {counter=ds, said=hi and cnt, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1, s:cnt#1[0]x1 {counter=km, said=hi and cnt, regions=()}",
+    "v_add_f32 v:hi#1[0]x1, 0.5, v:hi#1[0]x1 ; comment=\"hi = hi + 0.5\" wait_uses=[v:hi#1[0]x1, s:cnt#1[0]x1]",
+    "ir.wait_regs v:lo#1[0]x1 {counter=load, said=lo landed, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=store, said=lo landed, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=ds, said=lo landed, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=km, said=lo landed, regions=()}",
+    "v_mul_f32 v:lo#1[0]x1, v:lo#1[0]x1, v:hi#1[0]x1 ; comment=\"lo = lo * hi\" wait_uses=[v:lo#1[0]x1]"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 v lo#1 n=1 align=1",
+    "3 v hi#1 n=1 align=1",
+    "4 s cnt#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "idx#1"
+    ],
+    "s.pinned": [
+     "src#1"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s0, s[2:3], 0xc",
+    "\tglobal_load_b32 v0, v1, s[2:3] offset:32",
+    "\tglobal_load_b32 v2, v1, s[2:3]",
+    "\ts_wait_loadcnt 1                                             // hi and cnt",
+    "\ts_wait_kmcnt 0                                               // hi and cnt",
+    "\tv_add_f32 v0, 0.5, v0                                        // hi = hi + 0.5",
+    "\ts_wait_loadcnt 0                                             // lo landed",
+    "\tv_mul_f32 v2, v2, v0                                         // lo = lo * hi"
+   ]
+  },
+  {
+   "name": "wait_counters_and_left",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nlo = V.f32(name=\"lo\")\nb.emit(O.global_load(lo, idx, src, offset=4))\nb.wait(O.LGKM)\nb.wait(O.VM, left=2)\nb.wait(O.VM, comment=\"all vm\")",
+   "built": [
+    "global_load_b32 v:lo#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=4}",
+    "ir.wait_all {counter=ds, said=}",
+    "ir.wait_all {counter=km, said=}",
+    "ir.wait_left {counter=load, said=, left=2}",
+    "ir.wait_left {counter=store, said=, left=2}",
+    "ir.wait_all {counter=load, said=all vm}",
+    "ir.wait_all {counter=store, said=all vm}"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 v lo#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "idx#1"
+    ],
+    "s.pinned": [
+     "src#1"
+    ]
+   },
+   "render": [
+    "\tglobal_load_b32 v0, v1, s[2:3] offset:4",
+    "\ts_wait_loadcnt 0                                             // all vm"
+   ]
+  },
+  {
+   "name": "wait_tags",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nlo, hi = V.f32(name=\"lo\"), V.f32(name=\"hi\")\nb.emit(O.global_load(lo, idx, src, tag=(\"copy\", 3)))\nb.emit(O.global_load(hi, idx, src, offset=64, tag=(\"copy\", 4)))\nb.wait(tags=[(\"copy\", 4)], comment=\"second copy\")\nb.wait(tags=[(\"copy\", 3), (\"copy\", 4)], written=True)",
+   "built": [
+    "global_load_b32 v:lo#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 ; tag=('copy', 3)",
+    "global_load_b32 v:hi#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=64} ; tag=('copy', 4)",
+    "ir.wait_tags {counter=load, said=second copy, tags=(('copy', 4),)}",
+    "ir.wait_tags {counter=store, said=second copy, tags=(('copy', 4),)}",
+    "ir.wait_regs v:lo#1[0]x1, v:hi#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1, v:hi#1[0]x1 {counter=store, said=, regions=()}"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 v lo#1 n=1 align=1",
+    "3 v hi#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "idx#1"
+    ],
+    "s.pinned": [
+     "src#1"
+    ]
+   },
+   "render": [
+    "\tglobal_load_b32 v0, v1, s[2:3]",
+    "\tglobal_load_b32 v2, v1, s[2:3] offset:64",
+    "\ts_wait_loadcnt 0                                             // second copy"
+   ]
+  },
+  {
+   "name": "wait_region",
+   "src": "tid = V.u32(name=\"tid\", at=2)\nword = V.u32(name=\"word\", at=3)\nL = b.lds()\nT = L.region(\"T\", (128,), \"u32\")\nb.emit(O.ds_write(T.at(tid), word))\nb.wait(T)",
+   "built": [
+    "v_lshlrev_b32 v:adr#1[0]x1, 2, v:tid#1[0]x1 ; comment=\"adr = tid * 4\"",
+    "ds_store_b32 v:adr#1[0]x1, v:word#1[0]x1 ; comment=\"T + tid * 4\" lds=(T, \"ds_store_b32 T + tid * 4\", field=0, offset=var)",
+    "ir.wait_regs {counter=load, said=, regions=('T',)}",
+    "ir.wait_regs {counter=store, said=, regions=('T',)}",
+    "ir.wait_regs {counter=ds, said=, regions=('T',)}",
+    "ir.wait_regs {counter=km, said=, regions=('T',)}"
+   ],
+   "values": [
+    "0 v tid#1 n=1 align=1 pin=2",
+    "1 v word#1 n=1 align=1 pin=3",
+    "2 v adr#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "tid#1",
+     "word#1"
+    ],
+    "lds_table": [
+     "lds: 512 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     512    512  T                [128] u32            4"
+    ]
+   },
+   "render": [
+    "; lds: 512 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     512    512  T                [128] u32            4",
+    "\tv_lshlrev_b32 v0, 2, v2                                      // adr = tid * 4",
+    "\tds_store_b32 v0, v3                                          // T + tid * 4",
+    "\ts_wait_dscnt 0"
+   ]
+  },
+  {
+   "name": "wait_in_loop_for_later_load",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\ntrips = S.u32(name=\"trips\", at=5)\nlo = V.f32(name=\"lo\")\nb.emit(O.global_load(lo, idx, src, offset=16))\nfor it in b.loop(trips):\n    b.wait(lo)\n    lo[...] = lo - 3.0\n    b.emit(O.global_load(lo, idx, src, offset=16))",
+   "built": [
+    "global_load_b32 v:lo#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=16}",
+    "s_mov_b32 s:loop.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "ir.label {name=.Lloop_1}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=km, said=, regions=()}",
+    "v_subrev_f32 v:lo#1[0]x1, 1077936128, v:lo#1[0]x1 ; comment=\"lo = lo - 3.0\" wait_uses=[v:lo#1[0]x1]",
+    "global_load_b32 v:lo#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=16}",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc1 @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 s trips#1 n=1 align=1 pin=5",
+    "3 v lo#1 n=1 align=1",
+    "4 s loop.i#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `ir.wait_regs v:lo#1[0]x1 {counter=load, said=, regions=()}` .. `global_load_b32 v:lo#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=16}` conservative=False"
+    ],
+    "v.pinned": [
+     "idx#1"
+    ],
+    "s.pinned": [
+     "src#1",
+     "trips#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "`v_subrev_f32 v0, 1077936128, v0` (kernel.py:9): its value is written over on every path before a read (`global_load_b32 v0, v1, s[2:3] offset:16` (kernel.py:10) writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+   }
+  },
+  {
+   "name": "wait_deferred_to_later_load",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\ntrips = S.u32(name=\"trips\", at=5)\nhi = V.f32(1.0, name=\"hi\")\nfor it in b.loop(trips):\n    b.wait(hi, \"the previous trip's hi\")\n    hi[...] = hi * 4.0\n    b.emit(O.global_load(hi, idx, src, offset=24))\nb.wait(hi)",
+   "built": [
+    "v_mov_b32 v:hi#1[0]x1, 1.0 ; comment=\"hi = 1.0\"",
+    "s_mov_b32 s:loop.i#1[0]x1, 0",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc0 @.Lloop_end_2",
+    "ir.label {name=.Lloop_1}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=load, said=the previous trip's hi, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=store, said=the previous trip's hi, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=ds, said=the previous trip's hi, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=km, said=the previous trip's hi, regions=()}",
+    "v_mul_f32 v:hi#1[0]x1, 4.0, v:hi#1[0]x1 ; comment=\"hi = hi * 4.0\" wait_uses=[v:hi#1[0]x1]",
+    "global_load_b32 v:hi#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=24}",
+    "s_add_co_u32 s:loop.i#1[0]x1, s:loop.i#1[0]x1, 1",
+    "s_cmp_lt_u32 s:loop.i#1[0]x1, s:trips#1[0]x1",
+    "s_cbranch_scc1 @.Lloop_1",
+    "ir.label {name=.Lloop_end_2}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:hi#1[0]x1 {counter=km, said=, regions=()}"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 s trips#1 n=1 align=1 pin=5",
+    "3 v hi#1 n=1 align=1",
+    "4 s loop.i#1 n=1 align=1"
+   ],
+   "records": {
+    "loops": [
+     "loop: `ir.wait_regs v:hi#1[0]x1 {counter=load, said=the previous trip's hi, regions=()}` .. `global_load_b32 v:hi#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2 {offset=24}` conservative=False"
+    ],
+    "v.pinned": [
+     "idx#1"
+    ],
+    "s.pinned": [
+     "src#1",
+     "trips#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "`v_mul_f32 v0, 4.0, v0` (kernel.py:8): its value is written over on every path before a read (`global_load_b32 v0, v1, s[2:3] offset:24` (kernel.py:9) writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+   }
+  },
+  {
+   "name": "wait_ablated",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nlo = V.f32(name=\"lo\")\nb.ablate = {\"fetch\"}\nb.emit(O.global_load(lo, idx, src, offset=40), abl=(\"fetch\",))\nb.wait(lo, abl=(\"fetch\",), comment=\"dropped\")",
+   "built": [
+    "ir.wait_regs v:lo#1[0]x1 {counter=load, said=dropped, ablated=True, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=store, said=dropped, ablated=True, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=ds, said=dropped, ablated=True, regions=()}",
+    "ir.wait_regs v:lo#1[0]x1 {counter=km, said=dropped, ablated=True, regions=()}"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 v lo#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "idx#1"
+    ],
+    "s.pinned": [
+     "src#1"
+    ]
+   },
+   "render": []
+  },
+  {
+   "name": "arguments_waited_at_first_read",
+   "src": "k = b.entry(Args(buf=ptr, lim=u32, add=u32))\nbuf, lim, add = k.load()\nr = S.u32(name=\"r\")\nwith b.when(lim > 7):\n    r[...] = 4\nwith b.otherwise():\n    r[...] = add + 3\nr += lim",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b128 s:args#1[0]x4, s:karg[0]x2, 0'0x0' ; comment=\"buf, lim, add\"",
+    "ir.wait_regs s:args#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_cmp_gt_u32 s:args#1[0]x1+2, 7 ; comment=\"lim > 7\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_mov_b32 s:r#1[0]x1, 4 ; comment=\"r = 4\"",
+    "s_branch @.Lif_end_2",
+    "ir.label {name=.Lif_1}",
+    "ir.wait_regs s:args#1[0]x1+3 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+3 {counter=km, said=kernel arguments, regions=()}",
+    "s_add_co_u32 s:r#1[0]x1, s:args#1[0]x1+3, 3 ; comment=\"r = add + 3\"",
+    "ir.label {name=.Lif_end_2}",
+    "ir.wait_regs s:args#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, s:args#1[0]x1+2 ; comment=\"r = r + lim\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s args#1 n=4 align=4",
+    "4 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b128 s[4:7], s[0:1], 0x0                              // buf, lim, add",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_cmp_gt_u32 s6, 7                                           // lim > 7",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_mov_b32 s0, 4                                              // r = 4",
+    "\ts_branch .Lif_end_2",
+    ".Lif_1:",
+    "\ts_add_co_u32 s0, s7, 3                                       // r = add + 3",
+    ".Lif_end_2:",
+    "\ts_add_co_u32 s0, s0, s6                                      // r = r + lim"
+   ]
+  },
+  {
+   "name": "land_arguments",
+   "src": "k = b.entry(Args(lim=u32, add=u32, buf=ptr))\nlim, add, buf = k.load()\nr = S.u32(add + 2, name=\"r\")\nb.land_arguments(\"before the epilogue\")\nr += lim",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b128 s:args#1[0]x4, s:karg[0]x2, 0'0x0' ; comment=\"lim, add, buf\"",
+    "ir.wait_regs s:args#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "s_add_co_u32 s:r#1[0]x1, s:args#1[0]x1+1, 2 ; comment=\"r = add + 2\"",
+    "ir.wait_regs s:args#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_add_co_u32 s:r#1[0]x1, s:r#1[0]x1, s:args#1[0]x1 ; comment=\"r = r + lim\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s args#1 n=4 align=4",
+    "4 s r#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b128 s[4:7], s[0:1], 0x0                              // lim, add, buf",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_add_co_u32 s0, s5, 2                                       // r = add + 2",
+    "\ts_add_co_u32 s0, s0, s4                                      // r = r + lim"
+   ]
+  },
+  {
+   "name": "wait_for_nothing",
+   "src": "b.wait(comment=\"empty\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait(): what to wait for (values, regions, VM / LGKM, tags=)"
+   }
+  },
+  {
+   "name": "left_on_two_counters",
+   "src": "b.wait(O.LGKM, O.VM, left=2)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait(left=n): of one counter (VM or LGKM)"
+   }
+  },
+  {
+   "name": "wait_alu_value",
+   "src": "t = V.u32(5, name=\"t\")\nb.wait(t, \"t\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait: v:t#1[0]x1 (t) was written by no load"
+   }
+  },
+  {
+   "name": "wait_unwritten_scalar",
+   "src": "word = S.u32(name=\"word\", at=7)\nb.wait(word)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait: s:word#1[0]x1 was written by no load"
+   }
+  },
+  {
+   "name": "wait_on_number",
+   "src": "b.wait(7)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait(7): not a register, a value or a region"
+   }
+  },
+  {
+   "name": "deferred_never_loaded",
+   "src": "trips = S.u32(name=\"trips\", at=5)\nhi = V.f32(2.0, name=\"hi\")\nfor it in b.loop(trips, name=\"spin\"):\n    b.wait(hi, \"hi\")\n    hi[...] = hi - 1.0",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait: v:hi#1[0]x1 (hi) was written by no load (nor by one later in the loop spin it is in)"
+   }
+  },
+  {
+   "name": "counter_by_name",
+   "src": "b.wait(\"km\")\nb.wait(\"store\")",
+   "built": [
+    "ir.wait_all {counter=km, said=}",
+    "ir.wait_all {counter=store, said=}"
+   ],
+   "values": [],
+   "render": []
+  },
+  {
+   "name": "tag_never_issued",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nlo = V.f32(name=\"lo\")\nb.emit(O.global_load(lo, idx, src, tag=(\"copy\", 1)))\nb.wait(tags=[(\"copy\", 1), (\"copy\", 2)])",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait for DMA tags never issued: [('copy', 2)]"
+   }
+  },
+  {
+   "name": "unknown_counter",
+   "src": "b.wait(Counter(\"gds\"))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait(gds): gfx1201 counts on load, store, ds, km, vm, lgkm, smem"
+   }
+  },
+  {
+   "name": "region_without_ops",
+   "src": "tid = V.u32(name=\"tid\", at=2)\nL = b.lds()\nT = L.region(\"T\", (32,), \"u32\")\nU = L.region(\"U\", (32,), \"u32\")\nb.emit(O.ds_write(T.at(tid), tid))\nb.wait(U)",
+   "error": {
+    "class": "MemError",
+    "message": "wait(U): no op on it issued on any path to here (nothing to wait for)"
+   }
+  },
+  {
+   "name": "written_by_bare_store",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nb.emit(O.op(\"global_store_b32\", idx, idx, src, tag=(\"out\",)))\nb.wait(tags=[(\"out\",)], written=True)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "wait(tags=, written=True): `global_store_b32` writes no register and places no name, so it has nothing written to wait for (wait without written=, or place what it writes)"
+   }
+  }
+ ]
+}

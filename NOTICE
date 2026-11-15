@@ -1,0 +1,86 @@
+thin
+====
+
+Copyright 2026 rumisle. thin is licensed under the Functional Source
+License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.md.
+
+This product contains algorithms adapted from rocjitsu, AMD's GPU
+emulator (https://github.com/ROCm/rocm-systems/tree/develop/emulation/rocjitsu;
+https://github.com/ROCm/rocm-systems/blob/develop/emulation/rocjitsu/LICENSE.md):
+
+- the fixed-point cubics of gfx1201's f32 transcendental unit (v_rcp_f32,
+  v_rsq_f32, v_sqrt_f32, v_log_f32, v_exp_f32), with their coefficient
+  tables, in crates/thin-emu/src/machine/trans32/mod.rs;
+- the alignment and rounding of gfx1201's float dot unit (v_dot2_f32_bf16
+  and the f16 / bf16 WMMA steps), in crates/thin-emu/src/machine/dot.rs.
+
+thin's implementations are its own, in Rust, and were checked bit for bit
+on gfx1201 hardware. The one-ULP fix-up tables of
+crates/thin-emu/src/machine/trans32/fixups.rs were measured by thin.
+
+rocjitsu is distributed under the MIT License:
+
+  MIT License
+
+  Copyright (c) 2025-2026 Advanced Micro Devices, Inc.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+AMD machine-readable ISA tables
+===============================
+
+The gfx1201 ISA and operand tables in crates/thin-targets/data/gfx1201,
+and their golden copies under crates/thin-targets/tests/data/target, are
+generated from amdgpu_isa_rdna4.xml in AMD_GPU_MR_ISA_XML_2025_09_05.zip:
+https://gpuopen.com/download/AMD_GPU_MR_ISA_XML_2025_09_05.zip
+
+The XML's Document header declares License MIT and AMD Public Use.
+The following upstream copyright and permission notice applies to that data:
+
+  MIT License
+
+  Copyright (c) 2025 Advanced Micro Devices, Inc., or its affiliates.
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+LLVM encoding cross-checks
+==========================
+
+Golden encoder lines contain instruction encodings generated with llvm-mc
+for cross-checking. LLVM is distributed under Apache-2.0 WITH LLVM-exception:
+https://llvm.org/LICENSE.txt
+No LLVM source code is included in these generated test results.

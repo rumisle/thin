@@ -1,0 +1,89 @@
+{
+ "notation": "Authored public-API calls. build() runs src on a fresh gfx1201 Builder. Each call either evaluates ok_of to ok or records the actual exception class and message; placement seconds are masked as #.## s.",
+ "cases": [
+  {
+   "name": "bad_leading_digit",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\nslot = V.u32(k.tid * 4, name=\"slot\")\npayload = V.u32(k.tid + 9, name=\"payload\")\nb.emit(O.global_store(slot, payload, out))\n",
+   "call": "art = compile_kernel(derive(build), \"7authored\", wgsize=32, max_grid=(1,))",
+   "refused": "ValueError",
+   "message": "kernel name '7authored': the assembler takes [A-Za-z_.][A-Za-z0-9_.$]* only"
+  },
+  {
+   "name": "bad_leading_dollar",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\nslot = V.u32(k.tid * 4, name=\"slot\")\npayload = V.u32(k.tid + 9, name=\"payload\")\nb.emit(O.global_store(slot, payload, out))\n",
+   "call": "art = compile_kernel(derive(build), \"$authored\", wgsize=32, max_grid=(1,))",
+   "refused": "ValueError",
+   "message": "kernel name '$authored': the assembler takes [A-Za-z_.][A-Za-z0-9_.$]* only"
+  },
+  {
+   "name": "different_args",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\nslot = V.u32(k.tid * 4, name=\"slot\")\npayload = V.u32(k.tid + 9, name=\"payload\")\nb.emit(O.global_store(slot, payload, out))\n",
+   "call": "art = compile_kernel(derive(build), \"authored_k\", wgsize=32,\n    args=Args(out=ptr), max_grid=(1,))",
+   "refused": "ValueError",
+   "message": "authored_k: compile_kernel(args=) and Builder.entry's block differ (give it once, to entry)"
+  },
+  {
+   "name": "entry_args_reused",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\nslot = V.u32(k.tid * 4, name=\"slot\")\npayload = V.u32(k.tid + 9, name=\"payload\")\nb.emit(O.global_store(slot, payload, out))\n",
+   "call": "placed = derive(build)\nart = compile_kernel(placed, \"authored_k\", wgsize=32,\n    args=placed.entered.args, max_grid=(1,))",
+   "ok_of": "art.manifest.kernarg_bytes",
+   "ok": 8
+  },
+  {
+   "name": "wrong_lds_size",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=96)\n(out,) = k.load()\nlayout = b.lds()\nvalues = layout.region(\"values\", (96,), \"u32\")\nvalue = V.u32(k.tid + 3, name=\"value\")\nb.emit(O.ds_write(values.at(k.tid), value))\nb.wait(values)\n",
+   "call": "art = compile_kernel(derive(build), \"authored_lds\", wgsize=96, lds=768, max_grid=(1,))",
+   "refused": "ScheduleError",
+   "message": "compile_kernel(lds=768): the kernel's LDS is its layout's 384 B (b.lds)"
+  },
+  {
+   "name": "layout_lds_size",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=96)\n(out,) = k.load()\nlayout = b.lds()\nvalues = layout.region(\"values\", (96,), \"u32\")\nvalue = V.u32(k.tid + 3, name=\"value\")\nb.emit(O.ds_write(values.at(k.tid), value))\nb.wait(values)\n",
+   "call": "art = compile_kernel(derive(build), \"authored_lds\", wgsize=96, lds=384, max_grid=(1,))",
+   "ok_of": "art.manifest.lds",
+   "ok": 384
+  },
+  {
+   "name": "large_workgroup_budget",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=1024)\n(out,) = k.load()\nterms = [V.u32(k.tid ^ (j * 37 + 5), name=f\"term{j}\") for j in range(196)]\ntotal = V.u32(terms[0] * 3 + terms[1], name=\"total\")\nfor term in terms[2:]:\n    total[...] = total ^ term\nwhere = V.u32(k.tid * 4, name=\"where\")\nb.emit(O.global_store(where, total, out))\n",
+   "call": "art = compile_kernel(derive(build), \"authored_heavy\", wgsize=1024, max_grid=(1,))",
+   "refused": "ScheduleError",
+   "message": "authored_heavy: over budget: 216 VGPRs + AGPRs per wave, 8 waves per SIMD (WG 1024): max 192\n  v derived: 198 registers for a peak of 198 live at `v_mul_lo_u32 v:t#1@<string>:4, v:term0#1, 3` (200 values; #.## s)\n  s derived: 4 registers for a peak of 4 live at `s_load_b64 s:out#1x2, s:kargx2, 0x0` (3 values; #.## s)\n  (options.peak_report: the values live at the peak, widest first)"
+  },
+  {
+   "name": "audit_regular_waits",
+   "src": "k = b.entry(Args(left=ptr, right=ptr, result=ptr,\n                      count=u32.within(2, 1 << 24)), wg=1, wgsize=128)\nleft, right, result, count = k.load()\npos = V.u32(k.tid + k.wgid * 128, name=\"pos\")\nwith b.lanes(pos < count):\n    byte_at = V.u32(pos * 4, name=\"byte_at\")\n    x, y = V.f32(name=\"x\"), V.f32(name=\"y\")\n    b.emit(O.global_load(x, byte_at, left))\n    b.emit(O.global_load(y, byte_at, right))\n    b.wait(x, y, \"both input vectors ready\")\n    mixed = V.f32(x * 1.25 + y, name=\"mixed\")\n    b.emit(O.global_store(byte_at, mixed, result))\n",
+   "call": "with using(audit=True):\n    art = compile_kernel(derive(build), \"authored_scaled_merge\", wgsize=128,\n        max_grid=(32768,))",
+   "ok_of": "\"s_wait_loadcnt 0\" in art.text",
+   "ok": true
+  },
+  {
+   "name": "audit_alu_hazards",
+   "src": "k = b.entry(Args(out=ptr, count=u32.within(3, 1 << 19)), wg=1, wgsize=64)\nout, count = k.load()\nlane = V.u32(k.wgid * 64 + k.tid, name=\"lane\")\na = S.u32(count * 13 + 2, name=\"a\")\nc = S.u32(count * 5 + 7, name=\"c\")\nd = S.u32(count * 17 + 1, name=\"d\")\ne = S.u32(count * 3 + 11, name=\"e\")\nfirst = V.u32(lane + a, name=\"first\")\nsecond = V.u32(first + c, name=\"second\")\nthird = V.u32(second ^ d, name=\"third\")\nacc = V.u32(third + e, name=\"acc\")\nwith b.lanes(lane < count):\n    where = V.u32(lane * 4, name=\"where\")\n    b.emit(O.global_store(where, acc, out))\n",
+   "call": "with using(audit=True):\n    art = compile_kernel(derive(build), \"authored_scalar_reuse\", wgsize=64,\n        max_grid=(8192,))",
+   "ok_of": "\"s_wait_alu\" in art.text",
+   "ok": true
+  },
+  {
+   "name": "occupied_pin",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\naddress = V.u32(k.tid * 12, name=\"address\", at=3)\ndata = V.u32((k.tid + 1) * 12, name=\"data\", at=3)\nb.emit(O.global_store(address, data, out))\n",
+   "call": "art = compile_kernel(derive(build), \"authored_pin\", wgsize=32, max_grid=(1,))",
+   "refused": "AssignError",
+   "message": "v: no room for data#1[0] (1 dwords, align 1; occupied from `v_mul_lo_u32 v:data#1, v:t#1@<string>:4, 12` to `global_store_b32 v:address#1, v:data#1, s:out#1x2`): pinned at 3, which a pin before it holds. The peak: 3 dwords live at `v_add_nc_u32 v:t#1@<string>:4, 1, v:tid` (instruction 2); there: tid[0] 1, t#1[0] 1, address#1[0] 1"
+  },
+  {
+   "name": "pin_beyond_file",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\nwide = V.u32(n=4, name=\"wide\", at=254)\nfor j in range(4):\n    wide[j][...] = k.tid + j * 11\nwhere = V.u32(k.tid * 4, name=\"where\")\nb.emit(O.op(\"global_store_b128\", where, wide, out))\n",
+   "call": "art = compile_kernel(derive(build), \"authored_wide_pin\", wgsize=32, max_grid=(1,))",
+   "refused": "AssignError",
+   "message": "v: no room for wide#1[0] (4 dwords, align 4; occupied from `v_mov_b32 v:wide#1+0, v:tid` to `global_store_b128 v:where#1, v:wide#1x4, s:out#1x2`): pinned at 254, past the file's 256 registers. The peak: 6 dwords live at `v_lshlrev_b32 v:where#1, 2, v:tid` (instruction 5); there: wide#1[0] 4, where#1[0] 1, tid[0] 1"
+  },
+  {
+   "name": "same_as_moves_pin",
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=32)\n(out,) = k.load()\nsource = V.u32((k.tid ^ 3) * 4, name=\"source\")\nalias = V.u32(name=\"alias\", at=7, same_as=source)\nb.emit(O.global_store(source, alias, out))\n",
+   "call": "art = compile_kernel(derive(build), \"authored_alias\", wgsize=32, max_grid=(1,))",
+   "refused": "AssignError",
+   "message": "v:alias#1: pinned at 7, placed at [0]"
+  }
+ ]
+}

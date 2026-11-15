@@ -1,0 +1,1059 @@
+{
+ "notation": "Generated DSL programs for gfx1201. Each case's `src` runs on a fresh Builder `b`, with `V` and `S` its vector and scalar files and the whole language in scope. `built` lists the Builder's own stream before any pass, one instruction per line as `<form> <operands> {fields} ; <attributes>`: a register is its VReg repr (`<file>:<value>[<group index>]x<dwords>`, `+<lo>` for a nonzero lo), a physical register its name, an immediate its value with any written spelling quoted after it (`32'0x20'`), a block `@label`, a negated or absolute source `-x` or `|x|`; fields in stored order; attributes in the fixed order comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset none|var, ordered), m0_set, waves_taken, fence. `values` gives each value in id order as `id file name n= align=` then any `index=`, `pin=`, `same_as=`. `records` holds the lane regions, loops, deferred kinds, each file's entered/pinned/lanes-covered groups, needs, the LDS table and the wave index, when present. `error` is the class and message of a refusal while the program runs; otherwise `render` is the pipeline's final assembly lines, or `render_error` its refusal (class and the first line of its text, the program's file written kernel.py).",
+ "cases": [
+  {
+   "name": "table_budget_union_parts",
+   "src": "L = b.lds(budget=48 * 1024)\nHs = L.region(\"Hs\", (32, 48), \"f16\", pitch=112)\nwith L.union():\n    Acc = L.region(\"Acc\", (16, 16), f32)\n    Wt = L.region(\"Wt\", (128, 32), \"u8\")\n    Ix = L.region(\"Ix\", (40,), u32)\nSt = L.region(\"St\", (4, 8, 64), \"bf16\")\ns0, s1, s2, s3 = St.parts(\"s0\", \"s1\", \"s2\", \"s3\")",
+   "built": [],
+   "values": [],
+   "records": {
+    "lds_table": [
+     "lds: 11776 B of a 49152 B budget",
+     "  offset     end   size  region           shape                strides",
+     "       0    3584   3584  Hs               [32][48] f16         112 2",
+     "    3584    7680   4096  union",
+     "    3584    4608   1024    + Acc          [16][16] f32         64 4",
+     "    3584    7680   4096    | Wt           [128][32] u8         32 1",
+     "    3584    3744    160    | Ix           [40] u32             4",
+     "    7680   11776   4096  St               [4][8][64] bf16      1024 128 2",
+     "    7680    8704   1024    . s0           [8][64] bf16         128 2",
+     "    8704    9728   1024    . s1           [8][64] bf16         128 2",
+     "    9728   10752   1024    . s2           [8][64] bf16         128 2",
+     "   10752   11776   1024    . s3           [8][64] bf16         128 2"
+    ]
+   },
+   "render": [
+    "; lds: 11776 B of a 49152 B budget",
+    ";   offset     end   size  region           shape                strides",
+    ";        0    3584   3584  Hs               [32][48] f16         112 2",
+    ";     3584    7680   4096  union",
+    ";     3584    4608   1024    + Acc          [16][16] f32         64 4",
+    ";     3584    7680   4096    | Wt           [128][32] u8         32 1",
+    ";     3584    3744    160    | Ix           [40] u32             4",
+    ";     7680   11776   4096  St               [4][8][64] bf16      1024 128 2",
+    ";     7680    8704   1024    . s0           [8][64] bf16         128 2",
+    ";     8704    9728   1024    . s1           [8][64] bf16         128 2",
+    ";     9728   10752   1024    . s2           [8][64] bf16         128 2",
+    ";    10752   11776   1024    . s3           [8][64] bf16         128 2"
+   ]
+  },
+  {
+   "name": "table_groups_alignment_placement",
+   "src": "L = b.lds()\nwith L.struct(name=\"Hdr\", align=16):\n    Cnt = L.region(\"Cnt\", nbytes=6)\n    Flg = L.region(\"Flg\", (2,), \"u16\", align=8)\nPad = L.region(\"Pad\", (7,), \"i8\")\nwith L.union(name=\"Pool\", align=32):\n    Ring = L.region(\"Ring\", (3, 5), \"b32\", pitch={0: 24})\n    with L.struct(name=\"Pair\"):\n        Lo = L.region(\"Lo\", (3,), \"u64\")\n        Hi = L.region(\"Hi\", (9,), \"e4m3\")\nTail = L.region(\"Tail\", nbytes=12, at=512)\nCube = L.region(\"Cube\", (3, 2, 5), \"u16\", pitch={-2: 16, 0: 48})",
+   "built": [],
+   "values": [],
+   "records": {
+    "lds_table": [
+     "lds: 672 B",
+     "  offset     end   size  region           shape                strides",
+     "       0      12     12  Hdr (struct)",
+     "       0       6      6    Cnt            6 B                  -",
+     "       8      12      4    Flg            [2] u16              2",
+     "      16      23      7  Pad              [7] i8               1",
+     "      32     104     72  Pool (union)",
+     "      32     104     72    + Ring         [3][5] b32           24 4",
+     "      32      73     41    | Pair (struct)",
+     "      32      56     24      Lo           [3] u64              8",
+     "      64      73      9      Hi           [9] e4m3             1",
+     "     512     524     12  Tail             12 B                 -",
+     "     528     672    144  Cube             [3][2][5] u16        48 16 2"
+    ]
+   },
+   "render": [
+    "; lds: 672 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0      12     12  Hdr (struct)",
+    ";        0       6      6    Cnt            6 B                  -",
+    ";        8      12      4    Flg            [2] u16              2",
+    ";       16      23      7  Pad              [7] i8               1",
+    ";       32     104     72  Pool (union)",
+    ";       32     104     72    + Ring         [3][5] b32           24 4",
+    ";       32      73     41    | Pair (struct)",
+    ";       32      56     24      Lo           [3] u64              8",
+    ";       64      73      9      Hi           [9] e4m3             1",
+    ";      512     524     12  Tail             12 B                 -",
+    ";      528     672    144  Cube             [3][2][5] u16        48 16 2"
+   ]
+  },
+  {
+   "name": "pointer_moves_and_far_constant",
+   "src": "L = b.lds()\nTile = L.region(\"Tile\", (32, 96), \"u32\", pitch=400)\nr, c = V.u32(name=\"r\", at=3), V.u32(name=\"c\", at=5)\nacc = V.u32(n=4, name=\"acc\")\ncur = Tile.pointer(r, c, name=\"cur\")\nb.emit(O.ds_read(acc[0], cur.at(0, 3)))\nb.emit(O.ds_read(acc[1], cur.at(2, -1)))\nb.emit(O.ds_read(acc[2], Tile.at(r | 1, c + 2)))\nb.emit(O.ds_read(acc[3], Tile + 99996))\nb.wait(acc)\ntot = V.u32(acc[0] ^ acc[1] ^ acc[2] ^ acc[3], name=\"tot\")\nb.emit(O.ds_write(cur.at(1, 1), tot))",
+   "built": [
+    "v_mul_u32_u24 v:t#1[0]x1, 400, v:r#1[0]x1 ; comment=\"cur = mul24(r, 400) + (c * 4)\"",
+    "v_lshl_add_u32 v:cur#1[0]x1, v:c#1[0]x1, 2, v:t#1[0]x1",
+    "ds_load_b32 v:acc#1[0]x1, v:cur#1[0]x1 {offset=12} ; comment=\"Tile: cur + 12\" lds=(Tile, \"ds_load_b32 Tile: cur + 12\", field=12, offset=var)",
+    "ds_load_b32 v:acc#1[0]x1+1, v:cur#1[0]x1 {offset=796} ; comment=\"Tile: cur + 796\" lds=(Tile, \"ds_load_b32 Tile: cur + 796\", field=796, offset=var)",
+    "v_or_b32 v:t#3[0]x1, 1, v:r#1[0]x1 ; comment=\"adr = mul24(r | 1, 400) + (c * 4)\"",
+    "v_mul_u32_u24 v:t#2[0]x1, 400, v:t#3[0]x1",
+    "v_lshl_add_u32 v:adr#1[0]x1, v:c#1[0]x1, 2, v:t#2[0]x1",
+    "ds_load_b32 v:acc#1[0]x1+2, v:adr#1[0]x1 {offset=8} ; comment=\"Tile + (mul24(r | 1, 400) + (c * 4)) + 8\" lds=(Tile, \"ds_load_b32 Tile + (mul24(r | 1, 400) + (c * 4)) + 8\", field=8, offset=var)",
+    "v_mov_b32 v:adr#2[0]x1, 99996 ; comment=\"adr = 0x1869c\"",
+    "ds_load_b32 v:acc#1[0]x1+3, v:adr#2[0]x1 ; comment=\"Tile + 0x1869c\" lds=(Tile, \"ds_load_b32 Tile + 0x1869c\", field=0, offset=none)",
+    "ir.wait_regs v:acc#1[0]x4 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:acc#1[0]x4 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:acc#1[0]x4 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:acc#1[0]x4 {counter=km, said=, regions=()}",
+    "v_xor_b32 v:t#5[0]x1, v:acc#1[0]x1, v:acc#1[0]x1+1 ; comment=\"tot = ((acc[0] ^ acc[1]) ^ acc[2]) ^ acc[3]\" wait_uses=[v:acc#1[0]x4]",
+    "v_xor_b32 v:t#4[0]x1, v:t#5[0]x1, v:acc#1[0]x1+2",
+    "v_xor_b32 v:tot#1[0]x1, v:t#4[0]x1, v:acc#1[0]x1+3",
+    "ds_store_b32 v:cur#1[0]x1, v:tot#1[0]x1 {offset=404} ; comment=\"Tile: cur + 404\" lds=(Tile, \"ds_store_b32 Tile: cur + 404\", field=404, offset=var)"
+   ],
+   "values": [
+    "0 v r#1 n=1 align=1 pin=3",
+    "1 v c#1 n=1 align=1 pin=5",
+    "2 v acc#1 n=4 align=4",
+    "3 v cur#1 n=1 align=1",
+    "4 v t#1 n=1 align=1",
+    "5 v adr#1 n=1 align=1",
+    "6 v t#2 n=1 align=1",
+    "7 v t#3 n=1 align=1",
+    "8 v adr#2 n=1 align=1",
+    "9 v tot#1 n=1 align=1",
+    "10 v t#4 n=1 align=1",
+    "11 v t#5 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "r#1",
+     "c#1"
+    ],
+    "lds_table": [
+     "lds: 12800 B",
+     "  offset     end   size  region           shape                strides",
+     "       0   12800  12800  Tile             [32][96] u32         400 4"
+    ]
+   },
+   "render": [
+    "; lds: 12800 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0   12800  12800  Tile             [32][96] u32         400 4",
+    "\tv_mul_u32_u24 v0, 400, v3                                    // cur = mul24(r, 400) + (c * 4)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshl_add_u32 v1, v5, 2, v0",
+    "\tds_load_b32 v8, v1 offset:12                                 // Tile: cur + 12",
+    "\tds_load_b32 v9, v1 offset:796                                // Tile: cur + 796",
+    "\tv_or_b32 v0, 1, v3                                           // adr = mul24(r | 1, 400) + (c * 4)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_u32_u24 v2, 400, v0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshl_add_u32 v0, v5, 2, v2",
+    "\tds_load_b32 v10, v0 offset:8                                 // Tile + (mul24(r | 1, 400) + (c * 4)) + 8",
+    "\tv_mov_b32 v0, 99996                                          // adr = 0x1869c",
+    "\tds_load_b32 v11, v0                                          // Tile + 0x1869c",
+    "\ts_wait_dscnt 0",
+    "\tv_xor_b32 v0, v8, v9                                         // tot = ((acc[0] ^ acc[1]) ^ acc[2]) ^ acc[3]",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v2, v0, v10",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v0, v2, v11",
+    "\tds_store_b32 v1, v0 offset:404                               // Tile: cur + 404"
+   ]
+  },
+  {
+   "name": "split_shapes_one_destination_each",
+   "src": "L = b.lds()\nQ = L.region(\"Q\", (32, 4), \"u32\")\nv = V.u32(name=\"v\", at=2)\nk = V.i32(name=\"k\", at=9)\ngot = V.u32(n=12, name=\"got\")\nb.emit(O.ds_read(got[0], Q.at(v, 1)))\nb.emit(O.ds_read(got[1], Q + v * 4 + 28))\nb.emit(O.ds_read(got[2], Q + (v + 6) * 4))\nb.emit(O.ds_read(got[3], Q + (v - 5) * 4 + 8))\nb.emit(O.ds_read(got[4], Q + (127 - v) * 8))\nb.emit(O.ds_read(got[5], Q + k))\nb.emit(O.ds_read(got[6], (Q + v) - 20))\nb.emit(O.ds_read(got[7], Q + v))\nb.emit(O.ds_read(got[8], Q + v * 3 + 6))\nb.emit(O.ds_read(got[9], Q + (v + 1) * 4 - 4))\nb.emit(O.ds_read(got[10], Q.at(1, 1) + v))\nb.emit(O.ds_read(got[11], Q + 8, 36))\nb.wait(got)\nb.emit(O.ds_write(Q.at(5, 3), got[0], ordered=\"lane zero of wave one stores it\"))",
+   "built": [
+    "v_lshlrev_b32 v:adr#1[0]x1, 4, v:v#1[0]x1 ; comment=\"adr = v * 16\"",
+    "ds_load_b32 v:got#1[0]x1, v:adr#1[0]x1 {offset=4} ; comment=\"Q + (v * 16) + 4\" lds=(Q, \"ds_load_b32 Q + (v * 16) + 4\", field=4, offset=var)",
+    "v_lshlrev_b32 v:adr#2[0]x1, 2, v:v#1[0]x1 ; comment=\"adr = v * 4\"",
+    "ds_load_b32 v:got#1[0]x1+1, v:adr#2[0]x1 {offset=28} ; comment=\"Q + (v * 4) + 28\" lds=(Q, \"ds_load_b32 Q + (v * 4) + 28\", field=28, offset=var)",
+    "v_lshlrev_b32 v:adr#3[0]x1, 2, v:v#1[0]x1 ; comment=\"adr = v * 4\"",
+    "ds_load_b32 v:got#1[0]x1+2, v:adr#3[0]x1 {offset=24} ; comment=\"Q + (v + 6) * 4\" lds=(Q, \"ds_load_b32 Q + (v + 6) * 4\", field=24, offset=var)",
+    "v_lshl_add_u32 v:adr#4[0]x1, v:v#1[0]x1, 2, 4294967284 ; comment=\"adr = (v * 4) + -12\"",
+    "ds_load_b32 v:got#1[0]x1+3, v:adr#4[0]x1 ; comment=\"Q + ((v - 5) * 4) + 8\" lds=(Q, \"ds_load_b32 Q + ((v - 5) * 4) + 8\", field=0, offset=var)",
+    "v_sub_nc_u32 v:t#1[0]x1, 127, v:v#1[0]x1 ; comment=\"adr = (127 - v) * 8\"",
+    "v_lshlrev_b32 v:adr#5[0]x1, 3, v:t#1[0]x1",
+    "ds_load_b32 v:got#1[0]x1+4, v:adr#5[0]x1 ; comment=\"Q + (127 - v) * 8\" lds=(Q, \"ds_load_b32 Q + (127 - v) * 8\", field=0, offset=var)",
+    "ds_load_b32 v:got#1[0]x1+5, v:k#1[0]x1 ; comment=\"Q + k\" lds=(Q, \"ds_load_b32 Q + k\", field=0, offset=var)",
+    "v_add_nc_u32 v:adr#6[0]x1, 4294967276, v:v#1[0]x1 ; comment=\"adr = v + -20\"",
+    "ds_load_b32 v:got#1[0]x1+6, v:adr#6[0]x1 ; comment=\"Q + v - 20\" lds=(Q, \"ds_load_b32 Q + v - 20\", field=0, offset=var)",
+    "ds_load_b32 v:got#1[0]x1+7, v:v#1[0]x1 ; comment=\"Q + v\" lds=(Q, \"ds_load_b32 Q + v\", field=0, offset=var)",
+    "v_mul_lo_u32 v:adr#7[0]x1, v:v#1[0]x1, 3 ; comment=\"adr = v * 3\"",
+    "ds_load_b32 v:got#1[0]x1+8, v:adr#7[0]x1 {offset=6} ; comment=\"Q + (v * 3) + 6\" lds=(Q, \"ds_load_b32 Q + (v * 3) + 6\", field=6, offset=var)",
+    "v_lshlrev_b32 v:adr#8[0]x1, 2, v:v#1[0]x1 ; comment=\"adr = v * 4\"",
+    "ds_load_b32 v:got#1[0]x1+9, v:adr#8[0]x1 ; comment=\"Q + ((v + 1) * 4) - 4\" lds=(Q, \"ds_load_b32 Q + ((v + 1) * 4) - 4\", field=0, offset=var)",
+    "ds_load_b32 v:got#1[0]x1+10, v:v#1[0]x1 {offset=20} ; comment=\"Q + v + 20\" lds=(Q, \"ds_load_b32 Q + v + 20\", field=20, offset=var)",
+    "v_mov_b32 v:adr#9[0]x1, 0 ; comment=\"adr = 0\"",
+    "ds_load_b32 v:got#1[0]x1+11, v:adr#9[0]x1 {offset=44} ; comment=\"Q + 8 + 36\" lds=(Q, \"ds_load_b32 Q + 8 + 36\", field=44, offset=none)",
+    "ir.wait_regs v:got#1[0]x12 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:got#1[0]x12 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:got#1[0]x12 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:got#1[0]x12 {counter=km, said=, regions=()}",
+    "v_mov_b32 v:adr#10[0]x1, 0 ; comment=\"adr = 0\" wait_uses=[v:got#1[0]x12]",
+    "ds_store_b32 v:adr#10[0]x1, v:got#1[0]x1 {offset=92} ; comment=\"Q + 92\" lds=(Q, \"ds_store_b32 Q + 92\", field=92, offset=none, ordered=\"lane zero of wave one stores it\")"
+   ],
+   "values": [
+    "0 v v#1 n=1 align=1 pin=2",
+    "1 v k#1 n=1 align=1 pin=9",
+    "2 v got#1 n=12 align=4",
+    "3 v adr#1 n=1 align=1",
+    "4 v adr#2 n=1 align=1",
+    "5 v adr#3 n=1 align=1",
+    "6 v adr#4 n=1 align=1",
+    "7 v adr#5 n=1 align=1",
+    "8 v t#1 n=1 align=1",
+    "9 v adr#6 n=1 align=1",
+    "10 v adr#7 n=1 align=1",
+    "11 v adr#8 n=1 align=1",
+    "12 v adr#9 n=1 align=1",
+    "13 v adr#10 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "v#1",
+     "k#1"
+    ],
+    "lds_table": [
+     "lds: 512 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     512    512  Q                [32][4] u32          16 4"
+    ]
+   },
+   "render": [
+    "; lds: 512 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     512    512  Q                [32][4] u32          16 4",
+    "\tv_lshlrev_b32 v0, 4, v2                                      // adr = v * 16",
+    "\tds_load_b32 v12, v0 offset:4                                 // Q + (v * 16) + 4",
+    "\tv_lshlrev_b32 v0, 2, v2                                      // adr = v * 4",
+    "\tds_load_b32 v13, v0 offset:28                                // Q + (v * 4) + 28",
+    "\tv_lshlrev_b32 v0, 2, v2                                      // adr = v * 4",
+    "\tds_load_b32 v14, v0 offset:24                                // Q + (v + 6) * 4",
+    "\tv_lshl_add_u32 v0, v2, 2, 4294967284                         // adr = (v * 4) + -12",
+    "\tds_load_b32 v15, v0                                          // Q + ((v - 5) * 4) + 8",
+    "\tv_sub_nc_u32 v0, 127, v2                                     // adr = (127 - v) * 8",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v1, 3, v0",
+    "\tds_load_b32 v16, v1                                          // Q + (127 - v) * 8",
+    "\tds_load_b32 v17, v9                                          // Q + k",
+    "\tv_add_nc_u32 v0, 4294967276, v2                              // adr = v + -20",
+    "\tds_load_b32 v18, v0                                          // Q + v - 20",
+    "\tds_load_b32 v19, v2                                          // Q + v",
+    "\tv_mul_lo_u32 v0, v2, 3                                       // adr = v * 3",
+    "\tds_load_b32 v20, v0 offset:6                                 // Q + (v * 3) + 6",
+    "\tv_lshlrev_b32 v0, 2, v2                                      // adr = v * 4",
+    "\tds_load_b32 v21, v0                                          // Q + ((v + 1) * 4) - 4",
+    "\tds_load_b32 v22, v2 offset:20                                // Q + v + 20",
+    "\tv_mov_b32 v0, 0                                              // adr = 0",
+    "\tds_load_b32 v23, v0 offset:44                                // Q + 8 + 36",
+    "\ts_wait_dscnt 0",
+    "\tv_mov_b32 v0, 0                                              // adr = 0",
+    "\tds_store_b32 v0, v12 offset:92                               // Q + 92"
+   ]
+  },
+  {
+   "name": "split_offset_field_limit",
+   "src": "L = b.lds()\nQ = L.region(\"Q\", (32, 4), \"u32\")\nv = V.u32(name=\"v\", at=2)\nk = V.i32(name=\"k\", at=9)\ngot = V.u32(n=4, name=\"got\")\nb.emit(O.ds_read(got[0], Q + v + 65532))\nb.emit(O.ds_read(got[1], Q + v + 65536))\nb.emit(O.ds_read(got[2], Q + k + 4))\nb.emit(O.ds_read(got[3], Q + 65535 + v - 3))",
+   "built": [
+    "ds_load_b32 v:got#1[0]x1, v:v#1[0]x1 {offset=65532} ; comment=\"Q + v + 0xfffc\" lds=(Q, \"ds_load_b32 Q + v + 0xfffc\", field=65532, offset=var)",
+    "v_add_nc_u32 v:adr#1[0]x1, 65536, v:v#1[0]x1 ; comment=\"adr = v + 0x10000\"",
+    "ds_load_b32 v:got#1[0]x1+1, v:adr#1[0]x1 ; comment=\"Q + v + 0x10000\" lds=(Q, \"ds_load_b32 Q + v + 0x10000\", field=0, offset=var)",
+    "ds_load_b32 v:got#1[0]x1+2, v:k#1[0]x1 {offset=4} ; comment=\"Q + k + 4\" lds=(Q, \"ds_load_b32 Q + k + 4\", field=4, offset=var)",
+    "ds_load_b32 v:got#1[0]x1+3, v:v#1[0]x1 {offset=65532} ; comment=\"Q + (v + 0xffff) - 3\" lds=(Q, \"ds_load_b32 Q + (v + 0xffff) - 3\", field=65532, offset=var)"
+   ],
+   "values": [
+    "0 v v#1 n=1 align=1 pin=2",
+    "1 v k#1 n=1 align=1 pin=9",
+    "2 v got#1 n=4 align=4",
+    "3 v adr#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "v#1",
+     "k#1"
+    ],
+    "lds_table": [
+     "lds: 512 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     512    512  Q                [32][4] u32          16 4"
+    ]
+   },
+   "render": [
+    "; lds: 512 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     512    512  Q                [32][4] u32          16 4",
+    "\tds_load_b32 v4, v2 offset:65532                              // Q + v + 0xfffc",
+    "\tv_add_nc_u32 v0, 65536, v2                                   // adr = v + 0x10000",
+    "\tds_load_b32 v5, v0                                           // Q + v + 0x10000",
+    "\tds_load_b32 v6, v9 offset:4                                  // Q + k + 4",
+    "\tds_load_b32 v7, v2 offset:65532                              // Q + (v + 0xffff) - 3"
+   ]
+  },
+  {
+   "name": "store_reads_load_in_flight",
+   "src": "L = b.lds()\nQ = L.region(\"Q\", (32, 4), \"u32\")\nv = V.u32(name=\"v\", at=2)\ngot = V.u32(name=\"got\")\nb.emit(O.ds_read(got, Q + v))\nb.emit(O.ds_write(Q + v + 4, got))",
+   "built": [
+    "ds_load_b32 v:got#1[0]x1, v:v#1[0]x1 ; comment=\"Q + v\" lds=(Q, \"ds_load_b32 Q + v\", field=0, offset=var)",
+    "ds_store_b32 v:v#1[0]x1, v:got#1[0]x1 {offset=4} ; comment=\"Q + v + 4\" lds=(Q, \"ds_store_b32 Q + v + 4\", field=4, offset=var)"
+   ],
+   "values": [
+    "0 v v#1 n=1 align=1 pin=2",
+    "1 v got#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "v#1"
+    ],
+    "lds_table": [
+     "lds: 512 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     512    512  Q                [32][4] u32          16 4"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "ds_store_b32 v:v#1, v:got#1 offset:4 (after the entry) touches a register while the load on it may be in flight on some path: it needs dscnt(0) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "reload_same_destination_in_flight",
+   "src": "L = b.lds()\nBk = L.region(\"Bk\", (16, 16), \"u16\")\nv = V.u32(name=\"v\", at=6)\nh = V.u32(name=\"h\")\nb.emit(O.ds_read(h, Bk.at(v, 4), bytes=2))\nb.emit(O.ds_read(h, Bk + 64, bytes=2))\nb.wait(h)",
+   "built": [
+    "v_lshlrev_b32 v:adr#1[0]x1, 5, v:v#1[0]x1 ; comment=\"adr = v * 32\"",
+    "ds_load_u16 v:h#1[0]x1, v:adr#1[0]x1 {offset=8} ; comment=\"Bk + (v * 32) + 8\" lds=(Bk, \"ds_load_u16 Bk + (v * 32) + 8\", field=8, offset=var)",
+    "v_mov_b32 v:adr#2[0]x1, 0 ; comment=\"adr = 0\"",
+    "ds_load_u16 v:h#1[0]x1, v:adr#2[0]x1 {offset=64} ; comment=\"Bk + 64\" lds=(Bk, \"ds_load_u16 Bk + 64\", field=64, offset=none)",
+    "ir.wait_regs v:h#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:h#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:h#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:h#1[0]x1 {counter=km, said=, regions=()}"
+   ],
+   "values": [
+    "0 v v#1 n=1 align=1 pin=6",
+    "1 v h#1 n=1 align=1",
+    "2 v adr#1 n=1 align=1",
+    "3 v adr#2 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "v#1"
+    ],
+    "lds_table": [
+     "lds: 512 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     512    512  Bk               [16][16] u16         32 2"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "ds_load_u16 v:h#1, v:adr#2 offset:64 (after the entry) touches a register while the load on it may be in flight on some path: it needs dscnt(0) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "scalar_offsets_into_vector_address",
+   "src": "L = b.lds()\nP = L.region(\"P\", (8, 4), f32)\nwv = S.u32(name=\"wv\", at=6)\nlo, hi = V.f32(name=\"lo\", at=2), V.f32(name=\"hi\", at=3)\no = V.u32(P.offset(wv, 2), name=\"o\")\nr = P.pointer(wv + 1, 3, name=\"r\")\nb.emit(O.ds_write(P + o, hi))\nb.emit(O.ds_write(P + o + 4, lo))\nb.emit(O.ds_write(r.at(2, -3), lo))",
+   "built": [
+    "s_lshl4_add_u32 s:t#1[0]x1, s:wv#1[0]x1, 8 ; comment=\"o = (wv * 16) + 8\"",
+    "v_mov_b32 v:o#1[0]x1, s:t#1[0]x1",
+    "s_lshl4_add_u32 s:r#1[0]x1, s:wv#1[0]x1, 28 ; comment=\"r = (wv * 16) + 28\"",
+    "ds_store_b32 v:o#1[0]x1, v:hi#1[0]x1 ; comment=\"P + o\" lds=(P, \"ds_store_b32 P + o\", field=0, offset=var)",
+    "ds_store_b32 v:o#1[0]x1, v:lo#1[0]x1 {offset=4} ; comment=\"P + o + 4\" lds=(P, \"ds_store_b32 P + o + 4\", field=4, offset=var)",
+    "v_mov_b32 v:adr#1[0]x1, s:r#1[0]x1 ; comment=\"adr = r\"",
+    "ds_store_b32 v:adr#1[0]x1, v:lo#1[0]x1 {offset=20} ; comment=\"P: r + 20\" lds=(P, \"ds_store_b32 P: r + 20\", field=20, offset=var)"
+   ],
+   "values": [
+    "0 s wv#1 n=1 align=1 pin=6",
+    "1 v lo#1 n=1 align=1 pin=2",
+    "2 v hi#1 n=1 align=1 pin=3",
+    "3 v o#1 n=1 align=1",
+    "4 s t#1 n=1 align=1",
+    "5 s r#1 n=1 align=1",
+    "6 v adr#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "lo#1",
+     "hi#1"
+    ],
+    "s.pinned": [
+     "wv#1"
+    ],
+    "lds_table": [
+     "lds: 128 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     128    128  P                [8][4] f32           16 4"
+    ]
+   },
+   "render": [
+    "; lds: 128 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     128    128  P                [8][4] f32           16 4",
+    "\ts_lshl4_add_u32 s0, s6, 8                                    // o = (wv * 16) + 8",
+    "\tv_mov_b32 v0, s0",
+    "\ts_lshl4_add_u32 s0, s6, 28                                   // r = (wv * 16) + 28",
+    "\tds_store_b32 v0, v3                                          // P + o",
+    "\tds_store_b32 v0, v2 offset:4                                 // P + o + 4",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\tv_mov_b32 v0, s0                                             // adr = r",
+    "\tds_store_b32 v0, v2 offset:20                                // P: r + 20"
+   ]
+  },
+  {
+   "name": "swizzle_shifted_key",
+   "src": "L = b.lds()\nRing = L.region(\"Ring\", (128, 16), \"b64\", swizzle=Xor(by=0, into=1, mask=15, shift=2))\nt = V.u32(name=\"t\", at=1)\nq = Ring.pointer(t >> 2, t & 3, name=\"q\")\npair = V.u32(n=2, name=\"pair\")\nb.emit(O.ds_read(pair, q.at(64, 0)))\nslot = V.u32(Ring.stored(t >> 4, t & 15)[1], name=\"slot\")\nfixed = V.u32(Ring.offset(9, 6), name=\"fixed\")\nraw = V.u32(Ring.offset(9, 6, swizzled=False), name=\"raw\")",
+   "built": [
+    "v_and_b32 v:t#3[0]x1, 3, v:t#1[0]x1 ; comment=\"q = ((t >> 2) * 128) + (((t & 3) ^ (((t >> 2) >> 2) & 15)) * 8)\"",
+    "v_lshrrev_b32 v:t#5[0]x1, 2, v:t#1[0]x1",
+    "v_bfe_u32 v:t#4[0]x1, v:t#5[0]x1, 2, 4",
+    "v_xor_b32 v:t#2[0]x1, v:t#3[0]x1, v:t#4[0]x1",
+    "v_lshrrev_b32 v:t#7[0]x1, 2, v:t#1[0]x1",
+    "v_lshlrev_b32 v:t#6[0]x1, 7, v:t#7[0]x1",
+    "v_lshl_add_u32 v:q#1[0]x1, v:t#2[0]x1, 3, v:t#6[0]x1",
+    "ds_load_b64 v:pair#1[0]x2, v:q#1[0]x1 {offset=8192} ; comment=\"Ring: q + 8192\" lds=(Ring, \"ds_load_b64 Ring: q + 8192\", field=8192, offset=var)",
+    "v_and_b32 v:t#8[0]x1, 15, v:t#1[0]x1 ; comment=\"slot = (t & 15) ^ (((t >> 4) >> 2) & 15)\"",
+    "v_lshrrev_b32 v:t#10[0]x1, 4, v:t#1[0]x1",
+    "v_bfe_u32 v:t#9[0]x1, v:t#10[0]x1, 2, 4",
+    "v_xor_b32 v:slot#1[0]x1, v:t#8[0]x1, v:t#9[0]x1",
+    "v_mov_b32 v:fixed#1[0]x1, 1184 ; comment=\"fixed = 1184\"",
+    "v_mov_b32 v:raw#1[0]x1, 1200 ; comment=\"raw = 1200\""
+   ],
+   "values": [
+    "0 v t#1 n=1 align=1 pin=1",
+    "1 v q#1 n=1 align=1",
+    "2 v t#2 n=1 align=1",
+    "3 v t#3 n=1 align=1",
+    "4 v t#4 n=1 align=1",
+    "5 v t#5 n=1 align=1",
+    "6 v t#6 n=1 align=1",
+    "7 v t#7 n=1 align=1",
+    "8 v pair#1 n=2 align=2",
+    "9 v slot#1 n=1 align=1",
+    "10 v t#8 n=1 align=1",
+    "11 v t#9 n=1 align=1",
+    "12 v t#10 n=1 align=1",
+    "13 v fixed#1 n=1 align=1",
+    "14 v raw#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "t#1"
+    ],
+    "lds_table": [
+     "lds: 16384 B",
+     "  offset     end   size  region           shape                strides",
+     "       0   16384  16384  Ring             [128][16] b64        128 8  swizzle [1] ^= ([0] >> 2) & 15"
+    ]
+   },
+   "render": [
+    "; lds: 16384 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0   16384  16384  Ring             [128][16] b64        128 8  swizzle [1] ^= ([0] >> 2) & 15",
+    "\tv_and_b32 v0, 3, v1                                          // q = ((t >> 2) * 128) + (((t & 3) ^ (((t >> 2) >> 2) & 15)) * 8)",
+    "\tv_lshrrev_b32 v2, 2, v1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_bfe_u32 v3, v2, 2, 4",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v2, v0, v3",
+    "\tv_lshrrev_b32 v0, 2, v1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v3, 7, v0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshl_add_u32 v0, v2, 3, v3",
+    "\tds_load_b64 v[2:3], v0 offset:8192                           // Ring: q + 8192",
+    "\tv_and_b32 v0, 15, v1                                         // slot = (t & 15) ^ (((t >> 4) >> 2) & 15)",
+    "\tv_lshrrev_b32 v4, 4, v1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_bfe_u32 v1, v4, 2, 4",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v4, v0, v1",
+    "\tv_mov_b32 v0, 1184                                           // fixed = 1184",
+    "\tv_mov_b32 v1, 1200                                           // raw = 1200"
+   ]
+  },
+  {
+   "name": "swizzle_plain_key_wide_rows",
+   "src": "L = b.lds()\nSw = L.region(\"Sw\", (64, 4), \"b128\", swizzle=Xor(by=0, into=1, mask=3))\nln = V.u32(name=\"ln\", at=7)\np = Sw.pointer(ln >> 2, ln & 3, name=\"p\")\nquad = V.u32(n=4, name=\"quad\")\nb.emit(O.ds_read(quad, p.at(4, 0)))\npos = V.u32(Sw.stored(ln, ln >> 1)[1], name=\"pos\")",
+   "built": [
+    "v_and_b32 v:t#2[0]x1, 3, v:ln#1[0]x1 ; comment=\"p = ((ln >> 2) * 64) + (((ln & 3) ^ ((ln >> 2) & 3)) * 16)\"",
+    "v_bfe_u32 v:t#3[0]x1, v:ln#1[0]x1, 2, 2",
+    "v_xor_b32 v:t#1[0]x1, v:t#2[0]x1, v:t#3[0]x1",
+    "v_lshrrev_b32 v:t#5[0]x1, 2, v:ln#1[0]x1",
+    "v_lshlrev_b32 v:t#4[0]x1, 6, v:t#5[0]x1",
+    "v_lshl_add_u32 v:p#1[0]x1, v:t#1[0]x1, 4, v:t#4[0]x1",
+    "ds_load_b128 v:quad#1[0]x4, v:p#1[0]x1 {offset=256} ; comment=\"Sw: p + 256\" lds=(Sw, \"ds_load_b128 Sw: p + 256\", field=256, offset=var)",
+    "v_lshrrev_b32 v:t#6[0]x1, 1, v:ln#1[0]x1 ; comment=\"pos = (ln >> 1) ^ (ln & 3)\"",
+    "v_and_b32 v:t#7[0]x1, 3, v:ln#1[0]x1",
+    "v_xor_b32 v:pos#1[0]x1, v:t#6[0]x1, v:t#7[0]x1"
+   ],
+   "values": [
+    "0 v ln#1 n=1 align=1 pin=7",
+    "1 v p#1 n=1 align=1",
+    "2 v t#1 n=1 align=1",
+    "3 v t#2 n=1 align=1",
+    "4 v t#3 n=1 align=1",
+    "5 v t#4 n=1 align=1",
+    "6 v t#5 n=1 align=1",
+    "7 v quad#1 n=4 align=4",
+    "8 v pos#1 n=1 align=1",
+    "9 v t#6 n=1 align=1",
+    "10 v t#7 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "ln#1"
+    ],
+    "lds_table": [
+     "lds: 4096 B",
+     "  offset     end   size  region           shape                strides",
+     "       0    4096   4096  Sw               [64][4] b128         64 16  swizzle [1] ^= [0] & 3"
+    ]
+   },
+   "render": [
+    "; lds: 4096 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0    4096   4096  Sw               [64][4] b128         64 16  swizzle [1] ^= [0] & 3",
+    "\tv_and_b32 v0, 3, v7                                          // p = ((ln >> 2) * 64) + (((ln & 3) ^ ((ln >> 2) & 3)) * 16)",
+    "\tv_bfe_u32 v1, v7, 2, 2",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v2, v0, v1",
+    "\tv_lshrrev_b32 v0, 2, v7",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v1, 6, v0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshl_add_u32 v0, v2, 4, v1",
+    "\tds_load_b128 v[8:11], v0 offset:256                          // Sw: p + 256",
+    "\tv_lshrrev_b32 v0, 1, v7                                      // pos = (ln >> 1) ^ (ln & 3)",
+    "\tv_and_b32 v1, 3, v7",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v2, v0, v1"
+   ]
+  },
+  {
+   "name": "parent_pointer_lands_in_part",
+   "src": "L = b.lds()\nKV = L.region(\"KV\", (3, 8, 8), \"u32\")\nKs, Vs, Ws = KV.parts(\"Ks\", \"Vs\", \"Ws\")\nt = V.u32(name=\"t\", at=2)\np = KV.pointer(0, t, 0, name=\"p\")\nx, y = V.u32(name=\"x\"), V.u32(name=\"y\")\nb.emit(O.ds_read(x, p.at(2, 1, 3)))\nb.emit(O.ds_read(y, Vs.at(t, 5)))\nb.wait(Vs, Ws)\nz = V.u32(x + y, name=\"z\")",
+   "built": [
+    "v_lshlrev_b32 v:p#1[0]x1, 5, v:t#1[0]x1 ; comment=\"p = t * 32\"",
+    "ds_load_b32 v:x#1[0]x1, v:p#1[0]x1 {offset=556} ; comment=\"Ws: p + 556\" lds=(Ws, \"ds_load_b32 Ws: p + 556\", field=556, offset=var)",
+    "v_lshlrev_b32 v:adr#1[0]x1, 5, v:t#1[0]x1 ; comment=\"adr = t * 32\"",
+    "ds_load_b32 v:y#1[0]x1, v:adr#1[0]x1 {offset=276} ; comment=\"Vs + (t * 32) + 20\" lds=(Vs, \"ds_load_b32 Vs + (t * 32) + 20\", field=276, offset=var)",
+    "ir.wait_regs {counter=load, said=, regions=('Vs', 'Ws')}",
+    "ir.wait_regs {counter=store, said=, regions=('Vs', 'Ws')}",
+    "ir.wait_regs {counter=ds, said=, regions=('Vs', 'Ws')}",
+    "ir.wait_regs {counter=km, said=, regions=('Vs', 'Ws')}",
+    "v_add_nc_u32 v:z#1[0]x1, v:x#1[0]x1, v:y#1[0]x1 ; comment=\"z = x + y\""
+   ],
+   "values": [
+    "0 v t#1 n=1 align=1 pin=2",
+    "1 v p#1 n=1 align=1",
+    "2 v x#1 n=1 align=1",
+    "3 v y#1 n=1 align=1",
+    "4 v adr#1 n=1 align=1",
+    "5 v z#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "t#1"
+    ],
+    "lds_table": [
+     "lds: 768 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     768    768  KV               [3][8][8] u32        256 32 4",
+     "       0     256    256    . Ks           [8][8] u32           32 4",
+     "     256     512    256    . Vs           [8][8] u32           32 4",
+     "     512     768    256    . Ws           [8][8] u32           32 4"
+    ]
+   },
+   "render": [
+    "; lds: 768 B",
+    ";   offset     end   size  region           shape                strides",
+    ";        0     768    768  KV               [3][8][8] u32        256 32 4",
+    ";        0     256    256    . Ks           [8][8] u32           32 4",
+    ";      256     512    256    . Vs           [8][8] u32           32 4",
+    ";      512     768    256    . Ws           [8][8] u32           32 4",
+    "\tv_lshlrev_b32 v0, 5, v2                                      // p = t * 32",
+    "\tds_load_b32 v1, v0 offset:556                                // Ws: p + 556",
+    "\tv_lshlrev_b32 v0, 5, v2                                      // adr = t * 32",
+    "\tds_load_b32 v2, v0 offset:276                                // Vs + (t * 32) + 20",
+    "\ts_wait_dscnt 0",
+    "\tv_add_nc_u32 v0, v1, v2                                      // z = x + y"
+   ]
+  },
+  {
+   "name": "part_wait_misses_register",
+   "src": "L = b.lds()\nAB = L.region(\"AB\", (2, 32), f32)\nPa, Pb = AB.parts(\"Pa\", \"Pb\")\nln = V.u32(name=\"ln\", at=1)\ne = V.f32(name=\"e\")\nb.emit(O.ds_read(e, AB.pointer(1, ln, name='q').at(0, 0)))\nb.emit(O.ds_read(e, Pa.at(ln)))\nb.wait(Pb)",
+   "built": [
+    "v_lshl_add_u32 v:q#1[0]x1, v:ln#1[0]x1, 2, 128 ; comment=\"q = (ln * 4) + 128\"",
+    "ds_load_b32 v:e#1[0]x1, v:q#1[0]x1 ; comment=\"Pb: q + 0\" lds=(Pb, \"ds_load_b32 Pb: q + 0\", field=0, offset=var)",
+    "v_lshlrev_b32 v:adr#1[0]x1, 2, v:ln#1[0]x1 ; comment=\"adr = ln * 4\"",
+    "ds_load_b32 v:e#1[0]x1, v:adr#1[0]x1 ; comment=\"Pa + ln * 4\" lds=(Pa, \"ds_load_b32 Pa + ln * 4\", field=0, offset=var)",
+    "ir.wait_regs {counter=load, said=, regions=('Pb',)}",
+    "ir.wait_regs {counter=store, said=, regions=('Pb',)}",
+    "ir.wait_regs {counter=ds, said=, regions=('Pb',)}",
+    "ir.wait_regs {counter=km, said=, regions=('Pb',)}"
+   ],
+   "values": [
+    "0 v ln#1 n=1 align=1 pin=1",
+    "1 v e#1 n=1 align=1",
+    "2 v q#1 n=1 align=1",
+    "3 v adr#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "ln#1"
+    ],
+    "lds_table": [
+     "lds: 256 B",
+     "  offset     end   size  region           shape                strides",
+     "       0     256    256  AB               [2][32] f32          128 4",
+     "       0     128    128    . Pa           [32] f32             4",
+     "     128     256    128    . Pb           [32] f32             4"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "ds_load_b32 v:e#1, v:adr#1 (after the entry) touches a register while the load on it may be in flight on some path: it needs dscnt(0) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "global_and_buffer_split",
+   "src": "src = S.ptr(name=\"src\", at=2)\nrsrc = S.u32(n=4, name=\"rsrc\", at=8)\ni, j = V.u32(name=\"i\", at=4), V.u32(name=\"j\", at=5)\nlhs, rhs = V.u32(name=\"lhs\"), V.u32(name=\"rhs\")\nb.emit(O.global_load(lhs, src + mul24(j, 768) + i * 8 + 4))\nb.emit(O.buffer_load(rhs, i * 16 + 48, rsrc))\nb.wait(lhs, rhs)\nlhs ^= rhs\nb.emit(O.global_store(src + i * 8 + 4096, lhs))\nb.emit(O.global_store(src + 8388607, lhs))\nb.emit(O.global_store(src + 8388608, lhs))\nb.emit(O.global_store(i * 8, lhs, src, offset=-16))\nb.emit(O.global_store(src, lhs))",
+   "built": [
+    "v_mul_u32_u24 v:t#1[0]x1, 768, v:j#1[0]x1 ; comment=\"adr = mul24(j, 768) + (i * 8)\"",
+    "v_lshl_add_u32 v:adr#1[0]x1, v:i#1[0]x1, 3, v:t#1[0]x1",
+    "global_load_b32 v:lhs#1[0]x1, v:adr#1[0]x1, s:src#1[0]x2 {offset=4} ; comment=\"src + (mul24(j, 768) + (i * 8)) + 4\"",
+    "v_lshlrev_b32 v:adr#2[0]x1, 4, v:i#1[0]x1 ; comment=\"adr = i * 16\"",
+    "buffer_load_b32 v:rhs#1[0]x1, v:adr#2[0]x1, s:rsrc#1[0]x4, 0 {offen=True, offset=48} ; comment=\"(i * 16) + 48\"",
+    "ir.wait_regs v:lhs#1[0]x1, v:rhs#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:lhs#1[0]x1, v:rhs#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:lhs#1[0]x1, v:rhs#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:lhs#1[0]x1, v:rhs#1[0]x1 {counter=km, said=, regions=()}",
+    "v_xor_b32 v:lhs#1[0]x1, v:lhs#1[0]x1, v:rhs#1[0]x1 ; comment=\"lhs = lhs ^ rhs\" wait_uses=[v:lhs#1[0]x1, v:rhs#1[0]x1]",
+    "v_lshlrev_b32 v:adr#3[0]x1, 3, v:i#1[0]x1 ; comment=\"adr = i * 8\"",
+    "global_store_b32 v:adr#3[0]x1, v:lhs#1[0]x1, s:src#1[0]x2 {offset=4096} ; comment=\"src + (i * 8) + 0x1000\"",
+    "v_mov_b32 v:adr#4[0]x1, 0 ; comment=\"adr = 0\"",
+    "global_store_b32 v:adr#4[0]x1, v:lhs#1[0]x1, s:src#1[0]x2 {offset=8388607} ; comment=\"src + 0x7fffff\"",
+    "v_mov_b32 v:adr#5[0]x1, 8388608 ; comment=\"adr = 0x800000\"",
+    "global_store_b32 v:adr#5[0]x1, v:lhs#1[0]x1, s:src#1[0]x2 ; comment=\"src + 0x800000\"",
+    "v_lshlrev_b32 v:adr#6[0]x1, 3, v:i#1[0]x1 ; comment=\"adr = i * 8\"",
+    "global_store_b32 v:adr#6[0]x1, v:lhs#1[0]x1, s:src#1[0]x2 {offset=-16} ; comment=\"(i * 8) - 16\"",
+    "v_mov_b32 v:adr#7[0]x1, 0 ; comment=\"adr = 0\"",
+    "global_store_b32 v:adr#7[0]x1, v:lhs#1[0]x1, s:src#1[0]x2 ; comment=\"0\""
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 s rsrc#1 n=4 align=4 pin=8",
+    "2 v i#1 n=1 align=1 pin=4",
+    "3 v j#1 n=1 align=1 pin=5",
+    "4 v lhs#1 n=1 align=1",
+    "5 v rhs#1 n=1 align=1",
+    "6 v adr#1 n=1 align=1",
+    "7 v t#1 n=1 align=1",
+    "8 v adr#2 n=1 align=1",
+    "9 v adr#3 n=1 align=1",
+    "10 v adr#4 n=1 align=1",
+    "11 v adr#5 n=1 align=1",
+    "12 v adr#6 n=1 align=1",
+    "13 v adr#7 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "i#1",
+     "j#1"
+    ],
+    "s.pinned": [
+     "src#1",
+     "rsrc#1"
+    ]
+   },
+   "render": [
+    "\tv_mul_u32_u24 v0, 768, v5                                    // adr = mul24(j, 768) + (i * 8)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshl_add_u32 v1, v4, 3, v0",
+    "\tglobal_load_b32 v0, v1, s[2:3] offset:4                      // src + (mul24(j, 768) + (i * 8)) + 4",
+    "\tv_lshlrev_b32 v1, 4, v4                                      // adr = i * 16",
+    "\tbuffer_load_b32 v2, v1, s[8:11], 0 offen offset:48           // (i * 16) + 48",
+    "\ts_wait_loadcnt 0",
+    "\tv_xor_b32 v0, v0, v2                                         // lhs = lhs ^ rhs",
+    "\tv_lshlrev_b32 v1, 3, v4                                      // adr = i * 8",
+    "\tglobal_store_b32 v1, v0, s[2:3] offset:4096                  // src + (i * 8) + 0x1000",
+    "\tv_mov_b32 v1, 0                                              // adr = 0",
+    "\tglobal_store_b32 v1, v0, s[2:3] offset:8388607               // src + 0x7fffff",
+    "\tv_mov_b32 v1, 8388608                                        // adr = 0x800000",
+    "\tglobal_store_b32 v1, v0, s[2:3]                              // src + 0x800000",
+    "\tv_lshlrev_b32 v1, 3, v4                                      // adr = i * 8",
+    "\tglobal_store_b32 v1, v0, s[2:3] offset:-16                   // (i * 8) - 16",
+    "\tv_mov_b32 v1, 0                                              // adr = 0",
+    "\tglobal_store_b32 v1, v0, s[2:3]                              // 0"
+   ]
+  },
+  {
+   "name": "scalar_split_distinct_destinations",
+   "src": "tab = S.ptr(name=\"tab\", at=10)\nsel = S.u32(name=\"sel\", at=5)\nu, v, w, z = S.u32(name=\"u\"), S.u32(name=\"v\"), S.u32(name=\"w\"), S.u32(name=\"z\")\nb.emit(O.s_load(u, tab + sel * 16 + 32))\nb.emit(O.s_load(v, tab + 124))\nb.emit(O.s_load(w, tab + sel))\nb.emit(O.s_load(z, tab, sel + 12))\nb.wait(u, v, w, z)\nmix = S.u32(u + v + w + z, name=\"mix\")",
+   "built": [
+    "s_lshl4_add_u32 s:soff#1[0]x1, s:sel#1[0]x1, 32 ; comment=\"soff = (sel * 16) + 32\"",
+    "s_load_b32 s:u#1[0]x1, s:tab#1[0]x2, s:soff#1[0]x1 ; comment=\"tab + (sel * 16) + 32\"",
+    "s_load_b32 s:v#1[0]x1, s:tab#1[0]x2, 124'0x7c' ; comment=\"tab + 124\"",
+    "s_load_b32 s:w#1[0]x1, s:tab#1[0]x2, s:sel#1[0]x1 ; comment=\"tab + sel\"",
+    "s_add_co_u32 s:soff#2[0]x1, s:sel#1[0]x1, 12 ; comment=\"soff = sel + 12\"",
+    "s_load_b32 s:z#1[0]x1, s:tab#1[0]x2, s:soff#2[0]x1 ; comment=\"sel + 12\"",
+    "ir.wait_regs s:u#1[0]x1, s:v#1[0]x1, s:w#1[0]x1, s:z#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs s:u#1[0]x1, s:v#1[0]x1, s:w#1[0]x1, s:z#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs s:u#1[0]x1, s:v#1[0]x1, s:w#1[0]x1, s:z#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs s:u#1[0]x1, s:v#1[0]x1, s:w#1[0]x1, s:z#1[0]x1 {counter=km, said=, regions=()}",
+    "s_add_co_u32 s:t#2[0]x1, s:u#1[0]x1, s:v#1[0]x1 ; comment=\"mix = ((u + v) + w) + z\" wait_uses=[s:u#1[0]x1, s:v#1[0]x1, s:w#1[0]x1, s:z#1[0]x1]",
+    "s_add_co_u32 s:t#1[0]x1, s:t#2[0]x1, s:w#1[0]x1",
+    "s_add_co_u32 s:mix#1[0]x1, s:t#1[0]x1, s:z#1[0]x1"
+   ],
+   "values": [
+    "0 s tab#1 n=2 align=2 pin=10",
+    "1 s sel#1 n=1 align=1 pin=5",
+    "2 s u#1 n=1 align=1",
+    "3 s v#1 n=1 align=1",
+    "4 s w#1 n=1 align=1",
+    "5 s z#1 n=1 align=1",
+    "6 s soff#1 n=1 align=1",
+    "7 s soff#2 n=1 align=1",
+    "8 s mix#1 n=1 align=1",
+    "9 s t#1 n=1 align=1",
+    "10 s t#2 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "tab#1",
+     "sel#1"
+    ]
+   },
+   "render": [
+    "\ts_lshl4_add_u32 s0, s5, 32                                   // soff = (sel * 16) + 32",
+    "\ts_load_b32 s1, s[10:11], s0                                  // tab + (sel * 16) + 32",
+    "\ts_load_b32 s0, s[10:11], 0x7c                                // tab + 124",
+    "\ts_load_b32 s2, s[10:11], s5                                  // tab + sel",
+    "\ts_add_co_u32 s3, s5, 12                                      // soff = sel + 12",
+    "\ts_load_b32 s4, s[10:11], s3                                  // sel + 12",
+    "\ts_wait_kmcnt 0",
+    "\ts_add_co_u32 s3, s1, s0                                      // mix = ((u + v) + w) + z",
+    "\ts_add_co_u32 s0, s3, s2",
+    "\ts_add_co_u32 s1, s0, s4"
+   ]
+  },
+  {
+   "name": "scalar_reload_in_flight",
+   "src": "tab = S.ptr(name=\"tab\", at=10)\nsel = S.u32(name=\"sel\", at=5)\nu = S.u32(name=\"u\")\nb.emit(O.s_load(u, tab + sel * 4))\nb.emit(O.s_load(u, tab, 64))",
+   "built": [
+    "s_lshl_b32 s:soff#1[0]x1, s:sel#1[0]x1, 2 ; comment=\"soff = sel * 4\"",
+    "s_load_b32 s:u#1[0]x1, s:tab#1[0]x2, s:soff#1[0]x1 ; comment=\"tab + sel * 4\"",
+    "s_load_b32 s:u#1[0]x1, s:tab#1[0]x2, 64'0x40'"
+   ],
+   "values": [
+    "0 s tab#1 n=2 align=2 pin=10",
+    "1 s sel#1 n=1 align=1 pin=5",
+    "2 s u#1 n=1 align=1",
+    "3 s soff#1 n=1 align=1"
+   ],
+   "records": {
+    "s.pinned": [
+     "tab#1",
+     "sel#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "s_load_b32 s:u#1, s:tab#1x2, 0x40 (after the entry) touches a register while the load on it may be in flight on some path: it needs kmcnt(0) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "refuse_layout_twice",
+   "src": "b.lds(budget=1024)\nb.lds(budget=1024)",
+   "error": {
+    "class": "MemError",
+    "message": "lds(): the kernel's layout is made already (a kernel has one)"
+   }
+  },
+  {
+   "name": "refuse_budget_0",
+   "src": "b.lds(budget=0)",
+   "error": {
+    "class": "MemError",
+    "message": "budget 0: 1 .. 65536 bytes (a workgroup's LDS)"
+   }
+  },
+  {
+   "name": "refuse_budget_65537",
+   "src": "b.lds(budget=65537)",
+   "error": {
+    "class": "MemError",
+    "message": "budget 65537: 1 .. 65536 bytes (a workgroup's LDS)"
+   }
+  },
+  {
+   "name": "refuse_past_budget",
+   "src": "L = b.lds(budget=256)\nL.region(\"Lead\", (16,), \"u32\")\nL.region(\"Rest\", nbytes=200)\nL.leaves()\nL.size",
+   "error": {
+    "class": "MemError",
+    "message": "the layout is 264 B, past its budget of 256 B:\nlds: 264 B of a 256 B budget\n  offset     end   size  region           shape                strides\n       0      64     64  Lead             [16] u32             4\n      64     264    200  Rest             200 B                -"
+   }
+  },
+  {
+   "name": "refuse_past_target",
+   "src": "L = b.lds()\nL.region(\"Huge\", (128, 256), f32)\nL.size",
+   "error": {
+    "class": "MemError",
+    "message": "the layout is 131072 B, past the 65536 B a workgroup has"
+   }
+  },
+  {
+   "name": "refuse_final_after_size",
+   "src": "L = b.lds()\nZ = L.region(\"Z\", (4,), \"u16\")\nL.size\nL.region(\"Late\", nbytes=4)",
+   "error": {
+    "class": "MemError",
+    "message": "region Late: the layout is final (its first base read, or the render)"
+   }
+  },
+  {
+   "name": "refuse_final_after_base",
+   "src": "L = b.lds()\nZ = L.region(\"Z\", (4,), \"u16\")\nZ.base\nL.region(\"Late\", nbytes=4)",
+   "error": {
+    "class": "MemError",
+    "message": "region Late: the layout is final (its first base read, or the render)"
+   }
+  },
+  {
+   "name": "refuse_duplicate_in_union",
+   "src": "L = b.lds()\nwith L.union():\n    L.region(\"Dup\", (8,), \"u32\")\n    L.region(\"Dup\", (4,), \"u64\")",
+   "error": {
+    "class": "MemError",
+    "message": "region Dup: declared twice"
+   }
+  },
+  {
+   "name": "refuse_overlap_placed",
+   "src": "L = b.lds()\nL.region(\"Lft\", nbytes=32, at=64)\nL.region(\"Rgt\", nbytes=16, at=80)\nL.size",
+   "error": {
+    "class": "MemError",
+    "message": "Lft [64, 96) and Rgt [80, 96) overlap and are not arms of one union"
+   }
+  },
+  {
+   "name": "refuse_shape_zero_dim",
+   "src": "L = b.lds()\nL.region(\"Z3\", (3, 0, 2), \"f16\")",
+   "error": {
+    "class": "MemError",
+    "message": "region Z3: shape [3, 0, 2], each dimension 1 or more"
+   }
+  },
+  {
+   "name": "refuse_no_size",
+   "src": "L = b.lds()\nL.region(\"Bare\", elem=\"u16\")",
+   "error": {
+    "class": "MemError",
+    "message": "region Bare: a shape or nbytes="
+   }
+  },
+  {
+   "name": "refuse_pitch_one_dim",
+   "src": "L = b.lds()\nL.region(\"Vec\", (16,), \"f16\", pitch=64)",
+   "error": {
+    "class": "MemError",
+    "message": "region Vec: pitch is a row's bytes (two dimensions or more)"
+   }
+  },
+  {
+   "name": "refuse_pitch_short",
+   "src": "L = b.lds()\nL.region(\"Rows\", (2, 8), f32, pitch=28)",
+   "error": {
+    "class": "MemError",
+    "message": "region Rows: pitch 28, a row of 8 x 4 B or more, a multiple of 4"
+   }
+  },
+  {
+   "name": "refuse_pitch_unaligned",
+   "src": "L = b.lds()\nL.region(\"Rows\", (2, 8), f32, pitch=34)",
+   "error": {
+    "class": "MemError",
+    "message": "region Rows: pitch 34, a row of 8 x 4 B or more, a multiple of 4"
+   }
+  },
+  {
+   "name": "refuse_nbytes_below_shape",
+   "src": "L = b.lds()\nL.region(\"Nb\", (8, 2), \"bf16\", nbytes=16)",
+   "error": {
+    "class": "MemError",
+    "message": "region Nb: nbytes 16 below its shape's 32"
+   }
+  },
+  {
+   "name": "refuse_element_type_f32x2",
+   "src": "L = b.lds()\nL.region(\"El\", (2,), f32x2)",
+   "error": {
+    "class": "MemError",
+    "message": "an element of type f32x2: u32, i32, f32, u64, or a name (f32, u32, i32, b32, bf16, f16, u16, i16, u8, i8, e4m3, e5m2, e2m1x2, e8m0, b8, b64, u64, b128)"
+   }
+  },
+  {
+   "name": "refuse_element_type_pair",
+   "src": "L = b.lds()\nL.region(\"El\", (2,), pair)",
+   "error": {
+    "class": "MemError",
+    "message": "element 'pair': a value type (f32, u32, ..) or one of f32, u32, i32, b32, bf16, f16, u16, i16, u8, i8, e4m3, e5m2, e2m1x2, e8m0, b8, b64, u64, b128"
+   }
+  },
+  {
+   "name": "refuse_element_name_fp8",
+   "src": "L = b.lds()\nL.region(\"El\", (2,), \"fp8\")",
+   "error": {
+    "class": "MemError",
+    "message": "element 'fp8': a value type (f32, u32, ..) or one of f32, u32, i32, b32, bf16, f16, u16, i16, u8, i8, e4m3, e5m2, e2m1x2, e8m0, b8, b64, u64, b128"
+   }
+  },
+  {
+   "name": "refuse_element_name_b16",
+   "src": "L = b.lds()\nL.region(\"El\", (2,), \"b16\")",
+   "error": {
+    "class": "MemError",
+    "message": "element 'b16': a value type (f32, u32, ..) or one of f32, u32, i32, b32, bf16, f16, u16, i16, u8, i8, e4m3, e5m2, e2m1x2, e8m0, b8, b64, u64, b128"
+   }
+  },
+  {
+   "name": "refuse_swizzle_one_dim",
+   "src": "L = b.lds()\nL.region(\"Sw1\", (32,), \"b128\", swizzle=Xor(by=0, into=0, mask=3))",
+   "error": {
+    "class": "MemError",
+    "message": "region Sw1: swizzle=Xor(by=, into=, mask=) on two dimensions or more"
+   }
+  },
+  {
+   "name": "refuse_swizzle_same_dims",
+   "src": "L = b.lds()\nL.region(\"Sw3\", (4, 4, 4), \"u32\", swizzle=Xor(2, 2, 3))",
+   "error": {
+    "class": "MemError",
+    "message": "region Sw3: swizzle dimensions 2, 2 of 3: two of its own"
+   }
+  },
+  {
+   "name": "refuse_swizzle_mask_7",
+   "src": "L = b.lds()\nL.region(\"Swm\", (8, 12), \"u32\", swizzle=Xor(by=0, into=1, mask=7))",
+   "error": {
+    "class": "MemError",
+    "message": "region Swm: swizzle mask 7: one less than a power of two dividing dimension 1's 12"
+   }
+  },
+  {
+   "name": "refuse_swizzle_mask_5",
+   "src": "L = b.lds()\nL.region(\"Swm\", (8, 12), \"u32\", swizzle=Xor(by=0, into=1, mask=5))",
+   "error": {
+    "class": "MemError",
+    "message": "region Swm: swizzle mask 5: one less than a power of two dividing dimension 1's 12"
+   }
+  },
+  {
+   "name": "refuse_parts_2_names",
+   "src": "L = b.lds()\nPr = L.region(\"Pr\", (3, 2), \"u16\")\nPr.parts(\"n0\", \"n1\")",
+   "error": {
+    "class": "MemError",
+    "message": "Pr: 2 parts for 3 entries"
+   }
+  },
+  {
+   "name": "refuse_parts_4_names",
+   "src": "L = b.lds()\nPr = L.region(\"Pr\", (3, 2), \"u16\")\nPr.parts(\"n0\", \"n1\", \"n2\", \"n3\")",
+   "error": {
+    "class": "MemError",
+    "message": "Pr: 4 parts for 3 entries"
+   }
+  },
+  {
+   "name": "refuse_parts_along_swizzle_key",
+   "src": "L = b.lds()\nSk = L.region(\"Sk\", (4, 4), \"b64\", swizzle=Xor(by=0, into=1, mask=3))\nSk.parts(\"r0\", \"r1\", \"r2\", \"r3\")",
+   "error": {
+    "class": "MemError",
+    "message": "Sk: parts along dimension 0, which its swizzle ([1] ^= [0] & 3) uses"
+   }
+  },
+  {
+   "name": "refuse_too_many_indices",
+   "src": "L = b.lds()\nLn = L.region(\"Ln\", (6,), \"u32\")\nLn.offset(2, 1)",
+   "error": {
+    "class": "MemError",
+    "message": "Ln[2, 1]: 2 indices for 1 dimensions"
+   }
+  },
+  {
+   "name": "refuse_pointer_move_by_formula",
+   "src": "L = b.lds()\nMv = L.region(\"Mv\", (4, 16), \"u16\")\ny = V.u32(name=\"y\", at=3)\nm = Mv.pointer(1, y, name=\"m\")\nm.at(0, y + 1)",
+   "error": {
+    "class": "MemError",
+    "message": "m.at(0, y + 1): a pointer moves by constant indices (a move by a formula: a pointer of its own, or Mv.at(..))"
+   }
+  },
+  {
+   "name": "refuse_pointer_move_breaks_swizzle",
+   "src": "L = b.lds()\nBs = L.region(\"Bs\", (32, 4), \"b64\", swizzle=Xor(by=0, into=1, mask=3))\ny = V.u32(name=\"y\", at=3)\nm = Bs.pointer(y, 1, name=\"m\")\nm.at(0, 2)",
+   "error": {
+    "class": "MemError",
+    "message": "m.at(0, 2): the move changes Bs's swizzle ([1] ^= [0] & 3): a move along [0] by a multiple of 4, along [1] by a multiple of 4 - else a pointer of its own"
+   }
+  },
+  {
+   "name": "refuse_pointer_subarray_element_swizzled",
+   "src": "L = b.lds()\nBs = L.region(\"Bs\", (32, 4), \"b64\", swizzle=Xor(by=0, into=1, mask=3))\ny = V.u32(name=\"y\", at=3)\nm = Bs.pointer(y, name=\"m\")\nm.at(4, 3)",
+   "error": {
+    "class": "MemError",
+    "message": "m.at(4, 3): m is a sub-array's start of Bs (1 indices), the move an element of it, swizzled ([1] ^= [0] & 3): a pointer at the element"
+   }
+  },
+  {
+   "name": "refuse_address_plus_address",
+   "src": "L = b.lds()\nR1 = L.region(\"R1\", (4,), \"u32\")\nR2 = L.region(\"R2\", (4,), \"u32\")\nR1.at(2) + R2",
+   "error": {
+    "class": "MemError",
+    "message": "R1 + 8 + R2: an address plus a byte offset, not two addresses"
+   }
+  },
+  {
+   "name": "refuse_register_address_with_layout",
+   "src": "L = b.lds()\nL.region(\"Rg\", nbytes=64)\noff, val = V.u32(name=\"off\", at=1), V.u32(name=\"val\", at=2)\nb.emit(O.ds_write(off, val))",
+   "error": {
+    "class": "MemError",
+    "message": "`ds_store_b32 v:off#1, v:val#1`: an LDS access names its region in a kernel with a layout - its address a region's (O.ds_read(d, A + t))"
+   }
+  },
+  {
+   "name": "refuse_region_of_other_builder",
+   "src": "other = Builder()\nOb = other.lds().region(\"Ob\", (4,), \"u32\")\nval = V.u32(name=\"val\", at=2)\nb.emit(O.ds_write(Ob.at(1), val))",
+   "error": {
+    "class": "MemError",
+    "message": "Ob + 4: a region of another Builder's layout"
+   }
+  },
+  {
+   "name": "refuse_bool_byte_offset",
+   "src": "L = b.lds()\nBo = L.region(\"Bo\", (4,), \"u32\")\nval = V.u32(name=\"val\", at=2)\nb.emit(O.ds_write(Bo + False, val))",
+   "error": {
+    "class": "MemError",
+    "message": "False: a byte offset"
+   }
+  },
+  {
+   "name": "refuse_vector_term_in_scalar_address",
+   "src": "tab = S.ptr(name=\"tab\", at=4)\nln = V.u32(name=\"ln\", at=3)\nh = S.u32(name=\"h\")\nb.emit(O.s_load(h, tab + ln * 4))",
+   "error": {
+    "class": "ExprError",
+    "message": "ln * 4: a vector value into an SGPR (v_readfirstlane is never implied: first_lane(x))"
+   }
+  },
+  {
+   "name": "refuse_global_offset_below",
+   "src": "src = S.ptr(name=\"src\", at=2)\nq = V.u32(name=\"q\", at=5)\nb.emit(O.global_load(q, q, src, offset=-8388609))",
+   "error": {
+    "class": "ValueError",
+    "message": "global offset -8388609 out of range (-8388608..8388607): put the rest into the address or the scalar base; the families split a formula address (O.global_load(d, p + t)) themselves"
+   }
+  },
+  {
+   "name": "refuse_global_offset_above",
+   "src": "src = S.ptr(name=\"src\", at=2)\nq = V.u32(name=\"q\", at=5)\nb.emit(O.global_load(q, q, src, offset=8388608))",
+   "error": {
+    "class": "ValueError",
+    "message": "global offset 8388608 out of range (-8388608..8388607): put the rest into the address or the scalar base; the families split a formula address (O.global_load(d, p + t)) themselves"
+   }
+  },
+  {
+   "name": "refuse_global_pointer_minus",
+   "src": "src = S.ptr(name=\"src\", at=2)\nq = V.u32(name=\"q\", at=5)\nb.emit(O.global_store(src - 256, q))",
+   "error": {
+    "class": "ValueError",
+    "message": "src - 256: a global address is a scalar pointer plus u32 terms"
+   }
+  }
+ ]
+}

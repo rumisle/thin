@@ -1,0 +1,27 @@
+[package]
+name = "thin-py"
+description = "The Python binding of thin: type conversion, error mapping and object lifetime, and nothing else"
+publish = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { workspace = true, features = ["abi3-py310"] }
+numpy.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-targets.workspace = true
+thin-dsl.workspace = true
+thin-codegen.workspace = true
+thin-emu.workspace = true
+
+[lints]
+workspace = true

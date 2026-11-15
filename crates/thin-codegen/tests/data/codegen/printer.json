@@ -1,0 +1,1261 @@
+{
+ "notation": "Authored IR instruction operands printed through thin.ir.stream. Values use the printer test's pinned bases. before_placement is computed before the register files are placed; all placed forms and annotations are computed afterwards.",
+ "cases": [
+  {
+   "name": "integer_e32_comment",
+   "form": "v_add_nc_u32",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": 5,
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "y = x + five",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_add_nc_u32 {0}, {1}, 5",
+    "bare": "v_add_nc_u32 v:y#1, v:x#1, 5",
+    "named": "v_add_nc_u32 v:y#1, v:x#1, 5"
+   },
+   "placed": {
+    "bare": "v_add_nc_u32 v1, v0, 5",
+    "named": "v_add_nc_u32 v:y#1, v:x#1, 5",
+    "render": "\tv_add_nc_u32 v1, v0, 5                                       // y = x + five",
+    "passed": "v_add_nc_u32 v1, v0, 5",
+    "annotation": null
+   }
+  },
+  {
+   "name": "e64_sub_modifiers",
+   "form": "v_sub_f32_e64",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "0.375"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {
+    "clamp": true
+   },
+   "mods": [
+    1,
+    2,
+    0
+   ],
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_sub_f32_e64 -{0}, |{1}|, 0.375 clamp",
+    "bare": "v_sub_f32_e64 -v:x#1, |v:y#1|, 0.375 clamp",
+    "named": "v_sub_f32_e64 -v:x#1, |v:y#1|, 0.375 clamp"
+   },
+   "placed": {
+    "bare": "v_sub_f32_e64 -v0, |v1|, 0.375 clamp",
+    "named": "v_sub_f32_e64 -v:x#1, |v:y#1|, 0.375 clamp",
+    "render": "\tv_sub_f32_e64 -v0, |v1|, 0.375 clamp",
+    "passed": "v_sub_f32_e64 -v0, |v1|, 0.375 clamp",
+    "annotation": null
+   }
+  },
+  {
+   "name": "false_flag_omitted",
+   "form": "v_mul_f32_e64",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "-2.5"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {
+    "clamp": false
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mul_f32_e64 {0}, {1}, -2.5",
+    "bare": "v_mul_f32_e64 v:y#1, v:x#1, -2.5",
+    "named": "v_mul_f32_e64 v:y#1, v:x#1, -2.5"
+   },
+   "placed": {
+    "bare": "v_mul_f32_e64 v1, v0, -2.5",
+    "named": "v_mul_f32_e64 v:y#1, v:x#1, -2.5",
+    "render": "\tv_mul_f32_e64 v1, v0, -2.5",
+    "passed": "v_mul_f32_e64 v1, v0, -2.5",
+    "annotation": null
+   }
+  },
+  {
+   "name": "dpp_default_bound",
+   "form": "v_mov_b32_dpp",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {
+    "dpp": "row_shr:3",
+    "row_mask": 12,
+    "bank_mask": 5,
+    "bound_ctrl": false
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32_dpp {0}, {1} row_shr:3 row_mask:0xc bank_mask:0x5",
+    "bare": "v_mov_b32_dpp v:x#1, v:y#1 row_shr:3 row_mask:0xc bank_mask:0x5",
+    "named": "v_mov_b32_dpp v:x#1, v:y#1 row_shr:3 row_mask:0xc bank_mask:0x5"
+   },
+   "placed": {
+    "bare": "v_mov_b32_dpp v0, v1 row_shr:3 row_mask:0xc bank_mask:0x5",
+    "named": "v_mov_b32_dpp v:x#1, v:y#1 row_shr:3 row_mask:0xc bank_mask:0x5",
+    "render": "\tv_mov_b32_dpp v0, v1 row_shr:3 row_mask:0xc bank_mask:0x5",
+    "passed": "v_mov_b32_dpp v0, v1 row_shr:3 row_mask:0xc bank_mask:0x5",
+    "annotation": null
+   }
+  },
+  {
+   "name": "dpp_explicit_bound",
+   "form": "v_mov_b32_dpp",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {
+    "dpp": "row_ror:7",
+    "row_mask": 9,
+    "bank_mask": 6,
+    "bound_ctrl": true
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32_dpp {0}, {1} row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1",
+    "bare": "v_mov_b32_dpp v:y#1, v:x#1 row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1",
+    "named": "v_mov_b32_dpp v:y#1, v:x#1 row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1"
+   },
+   "placed": {
+    "bare": "v_mov_b32_dpp v1, v0 row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1",
+    "named": "v_mov_b32_dpp v:y#1, v:x#1 row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1",
+    "render": "\tv_mov_b32_dpp v1, v0 row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1",
+    "passed": "v_mov_b32_dpp v1, v0 row_ror:7 row_mask:0x9 bank_mask:0x6 bound_ctrl:1",
+    "annotation": null
+   }
+  },
+  {
+   "name": "store_off_b64",
+   "form": "global_store_b64",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "z#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 4,
+     "lo": 0,
+     "n": 2
+    },
+    {
+     "phys": "off"
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "global_store_b64 {0}, {1}, off",
+    "bare": "global_store_b64 v:x#1, v:z#1+0x2, off",
+    "named": "global_store_b64 v:x#1, v:z#1+0x2, off"
+   },
+   "placed": {
+    "bare": "global_store_b64 v0, v[4:5], off",
+    "named": "global_store_b64 v:x#1, v:z#1+0x2, off",
+    "render": "\tglobal_store_b64 v0, v[4:5], off",
+    "passed": "global_store_b64 v0, v[4:5], off",
+    "annotation": null
+   }
+  },
+  {
+   "name": "scalar_quad_offset",
+   "form": "s_load_b128",
+   "ops": [
+    {
+     "reg": "d#1",
+     "file": "s",
+     "index": 0,
+     "value_n": 4,
+     "lo": 0,
+     "n": 4
+    },
+    {
+     "reg": "p#1",
+     "file": "s",
+     "index": 0,
+     "value_n": 2,
+     "lo": 0,
+     "n": 2
+    },
+    {
+     "imm": 32,
+     "text": "0x20"
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_load_b128 {0}, {1}, 0x20",
+    "bare": "s_load_b128 s:d#1x4, s:p#1x2, 0x20",
+    "named": "s_load_b128 s:d#1x4, s:p#1x2, 0x20"
+   },
+   "placed": {
+    "bare": "s_load_b128 s[8:11], s[4:5], 0x20",
+    "named": "s_load_b128 s:d#1x4, s:p#1x2, 0x20",
+    "render": "\ts_load_b128 s[8:11], s[4:5], 0x20",
+    "passed": "s_load_b128 s[8:11], s[4:5], 0x20",
+    "annotation": null
+   }
+  },
+  {
+   "name": "ds_wait_field",
+   "form": "s_wait_dscnt",
+   "ops": [],
+   "fields": {
+    "dscnt": 2
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_wait_dscnt 2",
+    "bare": "s_wait_dscnt 2",
+    "named": "s_wait_dscnt 2"
+   },
+   "placed": {
+    "bare": "s_wait_dscnt 2",
+    "named": "s_wait_dscnt 2",
+    "render": "\ts_wait_dscnt 2",
+    "passed": "s_wait_dscnt 2",
+    "annotation": null
+   }
+  },
+  {
+   "name": "packed_selectors",
+   "form": "v_pk_mul_f16",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {
+    "op_sel": {
+     "tuple": [
+      0,
+      1
+     ]
+    },
+    "op_sel_hi": {
+     "tuple": [
+      1,
+      1
+     ]
+    },
+    "neg_lo": null
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_pk_mul_f16 {0}, {1}, {2} op_sel:[0,1] op_sel_hi:[1,1]",
+    "bare": "v_pk_mul_f16 v:y#1, v:x#1, v:y#1 op_sel:[0,1] op_sel_hi:[1,1]",
+    "named": "v_pk_mul_f16 v:y#1, v:x#1, v:y#1 op_sel:[0,1] op_sel_hi:[1,1]"
+   },
+   "placed": {
+    "bare": "v_pk_mul_f16 v1, v0, v1 op_sel:[0,1] op_sel_hi:[1,1]",
+    "named": "v_pk_mul_f16 v:y#1, v:x#1, v:y#1 op_sel:[0,1] op_sel_hi:[1,1]",
+    "render": "\tv_pk_mul_f16 v1, v0, v1 op_sel:[0,1] op_sel_hi:[1,1]",
+    "passed": "v_pk_mul_f16 v1, v0, v1 op_sel:[0,1] op_sel_hi:[1,1]",
+    "annotation": null
+   }
+  },
+  {
+   "name": "hex_immediate",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": 32,
+     "text": "0x20"
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, 0x20",
+    "bare": "v_mov_b32 v:x#1, 0x20",
+    "named": "v_mov_b32 v:x#1, 0x20"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v0, 0x20",
+    "named": "v_mov_b32 v:x#1, 0x20",
+    "render": "\tv_mov_b32 v0, 0x20",
+    "passed": "v_mov_b32 v0, 0x20",
+    "annotation": null
+   }
+  },
+  {
+   "name": "negative_immediate",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": -7,
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, -7",
+    "bare": "v_mov_b32 v:y#1, -7",
+    "named": "v_mov_b32 v:y#1, -7"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v1, -7",
+    "named": "v_mov_b32 v:y#1, -7",
+    "render": "\tv_mov_b32 v1, -7",
+    "passed": "v_mov_b32 v1, -7",
+    "annotation": null
+   }
+  },
+  {
+   "name": "large_integer",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": 8589934592,
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, 8589934592",
+    "bare": "v_mov_b32 v:x#1, 8589934592",
+    "named": "v_mov_b32 v:x#1, 8589934592"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v0, 8589934592",
+    "named": "v_mov_b32 v:x#1, 8589934592",
+    "render": "\tv_mov_b32 v0, 8589934592",
+    "passed": "v_mov_b32 v0, 8589934592",
+    "annotation": null
+   }
+  },
+  {
+   "name": "large_exponent_float",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "3250000000000.0"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, 3250000000000.0",
+    "bare": "v_mov_b32 v:y#1, 3250000000000.0",
+    "named": "v_mov_b32 v:y#1, 3250000000000.0"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v1, 3250000000000.0",
+    "named": "v_mov_b32 v:y#1, 3250000000000.0",
+    "render": "\tv_mov_b32 v1, 3250000000000.0",
+    "passed": "v_mov_b32 v1, 3250000000000.0",
+    "annotation": null
+   }
+  },
+  {
+   "name": "small_exponent_float",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "2e-07"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, 2e-07",
+    "bare": "v_mov_b32 v:x#1, 2e-07",
+    "named": "v_mov_b32 v:x#1, 2e-07"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v0, 2e-07",
+    "named": "v_mov_b32 v:x#1, 2e-07",
+    "render": "\tv_mov_b32 v0, 2e-07",
+    "passed": "v_mov_b32 v0, 2e-07",
+    "annotation": null
+   }
+  },
+  {
+   "name": "signed_zero",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "-0.0"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, -0.0",
+    "bare": "v_mov_b32 v:y#1, -0.0",
+    "named": "v_mov_b32 v:y#1, -0.0"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v1, -0.0",
+    "named": "v_mov_b32 v:y#1, -0.0",
+    "render": "\tv_mov_b32 v1, -0.0",
+    "passed": "v_mov_b32 v1, -0.0",
+    "annotation": null
+   }
+  },
+  {
+   "name": "rounded_float_repr",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "98765432.0"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, 98765432.0",
+    "bare": "v_mov_b32 v:x#1, 98765432.0",
+    "named": "v_mov_b32 v:x#1, 98765432.0"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v0, 98765432.0",
+    "named": "v_mov_b32 v:x#1, 98765432.0",
+    "render": "\tv_mov_b32 v0, 98765432.0",
+    "passed": "v_mov_b32 v0, 98765432.0",
+    "annotation": null
+   }
+  },
+  {
+   "name": "negative_infinity",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "-inf"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, -inf",
+    "bare": "v_mov_b32 v:y#1, -inf",
+    "named": "v_mov_b32 v:y#1, -inf"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v1, -inf",
+    "named": "v_mov_b32 v:y#1, -inf",
+    "render": "\tv_mov_b32 v1, -inf",
+    "passed": "v_mov_b32 v1, -inf",
+    "annotation": null
+   }
+  },
+  {
+   "name": "ordinary_float",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "imm": {
+      "float": "-4.5"
+     },
+     "text": ""
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, -4.5",
+    "bare": "v_mov_b32 v:x#1, -4.5",
+    "named": "v_mov_b32 v:x#1, -4.5"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v0, -4.5",
+    "named": "v_mov_b32 v:x#1, -4.5",
+    "render": "\tv_mov_b32 v0, -4.5",
+    "passed": "v_mov_b32 v0, -4.5",
+    "annotation": null
+   }
+  },
+  {
+   "name": "wide_value_member",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "z#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 4,
+     "lo": 1,
+     "n": 1
+    },
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, {1}",
+    "bare": "v_mov_b32 v:z#1+1, v:y#1",
+    "named": "v_mov_b32 v:z#1+1, v:y#1"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v5, v1",
+    "named": "v_mov_b32 v:z#1+1, v:y#1",
+    "render": "\tv_mov_b32 v5, v1",
+    "passed": "v_mov_b32 v5, v1",
+    "annotation": null
+   }
+  },
+  {
+   "name": "wide_pair_slices",
+   "form": "v_lshlrev_b64",
+   "ops": [
+    {
+     "reg": "z#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 4,
+     "lo": 0,
+     "n": 2
+    },
+    {
+     "imm": 3,
+     "text": ""
+    },
+    {
+     "reg": "z#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 4,
+     "lo": 2,
+     "n": 2
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_lshlrev_b64 {0}, 3, {1}",
+    "bare": "v_lshlrev_b64 v:z#1+0x2, 3, v:z#1+2x2",
+    "named": "v_lshlrev_b64 v:z#1+0x2, 3, v:z#1+2x2"
+   },
+   "placed": {
+    "bare": "v_lshlrev_b64 v[4:5], 3, v[6:7]",
+    "named": "v_lshlrev_b64 v:z#1+0x2, 3, v:z#1+2x2",
+    "render": "\tv_lshlrev_b64 v[4:5], 3, v[6:7]",
+    "passed": "v_lshlrev_b64 v[4:5], 3, v[6:7]",
+    "annotation": null
+   }
+  },
+  {
+   "name": "group_last_member",
+   "form": "v_mov_b32",
+   "ops": [
+    {
+     "reg": "q",
+     "file": "v",
+     "index": 2,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "q",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "v_mov_b32 {0}, {1}",
+    "bare": "v_mov_b32 v:q[2], v:q[0]",
+    "named": "v_mov_b32 v:q[2], v:q[0]"
+   },
+   "placed": {
+    "bare": "v_mov_b32 v10, v8",
+    "named": "v_mov_b32 v:q[2], v:q[0]",
+    "render": "\tv_mov_b32 v10, v8",
+    "passed": "v_mov_b32 v10, v8",
+    "annotation": null
+   }
+  },
+  {
+   "name": "physical_vcc_exec",
+   "form": "s_mov_b32",
+   "ops": [
+    {
+     "phys": "vcc_lo"
+    },
+    {
+     "phys": "exec_lo"
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_mov_b32 vcc_lo, exec_lo",
+    "bare": "s_mov_b32 vcc_lo, exec_lo",
+    "named": "s_mov_b32 vcc_lo, exec_lo"
+   },
+   "placed": {
+    "bare": "s_mov_b32 vcc_lo, exec_lo",
+    "named": "s_mov_b32 vcc_lo, exec_lo",
+    "render": "\ts_mov_b32 vcc_lo, exec_lo",
+    "passed": "s_mov_b32 vcc_lo, exec_lo",
+    "annotation": null
+   }
+  },
+  {
+   "name": "m0_from_placed_sgpr",
+   "form": "s_mov_b32",
+   "ops": [
+    {
+     "phys": "m0"
+    },
+    {
+     "reg": "p#1",
+     "file": "s",
+     "index": 0,
+     "value_n": 2,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_mov_b32 m0, {0}",
+    "bare": "s_mov_b32 m0, s:p#1+0",
+    "named": "s_mov_b32 m0, s:p#1+0"
+   },
+   "placed": {
+    "bare": "s_mov_b32 m0, s4",
+    "named": "s_mov_b32 m0, s:p#1+0",
+    "render": "\ts_mov_b32 m0, s4",
+    "passed": "s_mov_b32 m0, s4",
+    "annotation": null
+   }
+  },
+  {
+   "name": "authored_branch_label",
+   "form": "s_cbranch_scc0",
+   "ops": [
+    {
+     "block": ".Lloop_37"
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_cbranch_scc0 .Lloop_37",
+    "bare": "s_cbranch_scc0 .Lloop_37",
+    "named": "s_cbranch_scc0 .Lloop_37"
+   },
+   "placed": {
+    "bare": "s_cbranch_scc0 .Lloop_37",
+    "named": "s_cbranch_scc0 .Lloop_37",
+    "render": "\ts_cbranch_scc0 .Lloop_37",
+    "passed": "s_cbranch_scc0 .Lloop_#",
+    "annotation": null
+   }
+  },
+  {
+   "name": "authored_label",
+   "form": "ir.label",
+   "ops": [],
+   "fields": {
+    "name": ".Lloop_37"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": ".Lloop_37:",
+    "bare": ".Lloop_37:",
+    "named": ".Lloop_37:"
+   },
+   "placed": {
+    "bare": ".Lloop_37:",
+    "named": ".Lloop_37:",
+    "render": ".Lloop_37:",
+    "passed": ".Lloop_#:",
+    "annotation": null
+   }
+  },
+  {
+   "name": "authored_comment",
+   "form": "ir.comment",
+   "ops": [],
+   "fields": {
+    "text": "; independent marker"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "; independent marker",
+    "bare": "; independent marker",
+    "named": "; independent marker"
+   },
+   "placed": {
+    "bare": "; independent marker",
+    "named": "; independent marker",
+    "render": "; independent marker",
+    "passed": "; independent marker",
+    "annotation": null
+   }
+  },
+  {
+   "name": "named_alu_counts",
+   "form": "s_wait_alu",
+   "ops": [],
+   "fields": {
+    "depctr_va_vdst": 1,
+    "depctr_sa_sdst": 0
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)",
+    "bare": "s_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)",
+    "named": "s_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)"
+   },
+   "placed": {
+    "bare": "s_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)",
+    "named": "s_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)",
+    "render": "\ts_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)",
+    "passed": "s_wait_alu depctr_sa_sdst(0) depctr_va_vdst(1)",
+    "annotation": null
+   }
+  },
+  {
+   "name": "load_wait_comment",
+   "form": "s_wait_loadcnt",
+   "ops": [],
+   "fields": {
+    "loadcnt": 5
+   },
+   "mods": null,
+   "comment": "fragment ready",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_wait_loadcnt 5",
+    "bare": "s_wait_loadcnt 5",
+    "named": "s_wait_loadcnt 5"
+   },
+   "placed": {
+    "bare": "s_wait_loadcnt 5",
+    "named": "s_wait_loadcnt 5",
+    "render": "\ts_wait_loadcnt 5                                             // fragment ready",
+    "passed": "s_wait_loadcnt 5",
+    "annotation": null
+   }
+  },
+  {
+   "name": "operand_wait_count",
+   "form": "s_wait_loadcnt",
+   "ops": [
+    {
+     "imm": 7,
+     "text": "0x7"
+    }
+   ],
+   "fields": {},
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "s_wait_loadcnt 0x7",
+    "bare": "s_wait_loadcnt 0x7",
+    "named": "s_wait_loadcnt 0x7"
+   },
+   "placed": {
+    "bare": "s_wait_loadcnt 0x7",
+    "named": "s_wait_loadcnt 0x7",
+    "render": "\ts_wait_loadcnt 0x7",
+    "passed": "s_wait_loadcnt 0x7",
+    "annotation": null
+   }
+  },
+  {
+   "name": "uniform_reason",
+   "form": "ir.uniform",
+   "ops": [
+    {
+     "reg": "p#1",
+     "file": "s",
+     "index": 0,
+     "value_n": 2,
+     "lo": 0,
+     "n": 2
+    },
+    {
+     "phys": "scc"
+    }
+   ],
+   "fields": {
+    "why": "launch-wide control"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "; uniform: s:p#1[0]x2, scc (launch-wide control)",
+    "bare": "; uniform: s:p#1[0]x2, scc (launch-wide control)",
+    "named": "; uniform: s:p#1[0]x2, scc (launch-wide control)"
+   },
+   "placed": {
+    "bare": "; uniform: s:p#1[0]x2, scc (launch-wide control)",
+    "named": "; uniform: s:p#1[0]x2, scc (launch-wide control)",
+    "render": "; uniform: s[4:5], scc (launch-wide control)",
+    "passed": "; uniform: s:p#1[0]x2, scc (launch-wide control)",
+    "annotation": "; uniform: s[4:5], scc (launch-wide control)"
+   }
+  },
+  {
+   "name": "assume_lane_range",
+   "form": "ir.assume",
+   "ops": [
+    {
+     "reg": "y#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {
+    "lo": 2,
+    "hi": 30,
+    "why": "compact lane id"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "; assume: v:y#1[0]x1 in [2, 30] (compact lane id)",
+    "bare": "; assume: v:y#1[0]x1 in [2, 30] (compact lane id)",
+    "named": "; assume: v:y#1[0]x1 in [2, 30] (compact lane id)"
+   },
+   "placed": {
+    "bare": "; assume: v:y#1[0]x1 in [2, 30] (compact lane id)",
+    "named": "; assume: v:y#1[0]x1 in [2, 30] (compact lane id)",
+    "render": "; assume: v1 in [2, 30] (compact lane id)",
+    "passed": "; assume: v:y#1[0]x1 in [2, 30] (compact lane id)",
+    "annotation": "; assume: v1 in [2, 30] (compact lane id)"
+   }
+  },
+  {
+   "name": "undefined_middle_pair",
+   "form": "ir.undefined",
+   "ops": [
+    {
+     "reg": "z#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 4,
+     "lo": 1,
+     "n": 2
+    }
+   ],
+   "fields": {
+    "why": "consumed pair"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "; undefined: v:z#1[0]x2+1 (consumed pair)",
+    "bare": "; undefined: v:z#1[0]x2+1 (consumed pair)",
+    "named": "; undefined: v:z#1[0]x2+1 (consumed pair)"
+   },
+   "placed": {
+    "bare": "; undefined: v:z#1[0]x2+1 (consumed pair)",
+    "named": "; undefined: v:z#1[0]x2+1 (consumed pair)",
+    "render": "; undefined: v[5:6] (consumed pair)",
+    "passed": "; undefined: v:z#1[0]x2+1 (consumed pair)",
+    "annotation": "; undefined: v[5:6] (consumed pair)"
+   }
+  },
+  {
+   "name": "discard_other_register",
+   "form": "ir.discard",
+   "ops": [
+    {
+     "reg": "w#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {
+    "why": "unused tail"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "; discard v:w#1[0]x1: unused tail",
+    "bare": "; discard v:w#1[0]x1: unused tail",
+    "named": "; discard v:w#1[0]x1: unused tail"
+   },
+   "placed": {
+    "bare": "; discard v:w#1[0]x1: unused tail",
+    "named": "; discard v:w#1[0]x1: unused tail",
+    "render": "; discard v20: unused tail",
+    "passed": "; discard v:w#1[0]x1: unused tail",
+    "annotation": "; discard v20: unused tail"
+   }
+  },
+  {
+   "name": "global_cache_fields",
+   "form": "global_load_b32",
+   "ops": [
+    {
+     "reg": "w#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "p#1",
+     "file": "s",
+     "index": 0,
+     "value_n": 2,
+     "lo": 0,
+     "n": 2
+    }
+   ],
+   "fields": {
+    "offset": 48,
+    "th": "TH_LOAD_BYPASS",
+    "scope": "SCOPE_SYS"
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [],
+   "before_placement": {
+    "text": "global_load_b32 {0}, {1}, {2} offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS",
+    "bare": "global_load_b32 v:w#1, v:x#1, s:p#1x2 offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS",
+    "named": "global_load_b32 v:w#1, v:x#1, s:p#1x2 offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS"
+   },
+   "placed": {
+    "bare": "global_load_b32 v20, v0, s[4:5] offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS",
+    "named": "global_load_b32 v:w#1, v:x#1, s:p#1x2 offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS",
+    "render": "\tglobal_load_b32 v20, v0, s[4:5] offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS",
+    "passed": "global_load_b32 v20, v0, s[4:5] offset:48 th:TH_LOAD_BYPASS scope:SCOPE_SYS",
+    "annotation": null
+   }
+  },
+  {
+   "name": "ds_places_order",
+   "form": "ds_load_b32",
+   "ops": [
+    {
+     "reg": "w2#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    },
+    {
+     "reg": "x#1",
+     "file": "v",
+     "index": 0,
+     "value_n": 1,
+     "lo": 0,
+     "n": 1
+    }
+   ],
+   "fields": {
+    "offset": 12
+   },
+   "mods": null,
+   "comment": "",
+   "attrs": [
+    "Places(names=('tile', 'left'))"
+   ],
+   "before_placement": {
+    "text": "ds_load_b32 {0}, {1} offset:12",
+    "bare": "ds_load_b32 v:w2#1, v:x#1 offset:12",
+    "named": "ds_load_b32 v:w2#1, v:x#1 offset:12"
+   },
+   "placed": {
+    "bare": "ds_load_b32 v21, v0 offset:12",
+    "named": "ds_load_b32 v:w2#1, v:x#1 offset:12",
+    "render": "\tds_load_b32 v21, v0 offset:12",
+    "passed": "ds_load_b32 v21, v0 offset:12 @left,tile",
+    "annotation": null
+   }
+  }
+ ]
+}

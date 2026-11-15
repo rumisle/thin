@@ -1,0 +1,1237 @@
+{
+ "target": {
+  "name": "gfx1201",
+  "wave": 32,
+  "lds_max": 65536,
+  "full_mask": 4294967295,
+  "files": [
+   {
+    "name": "v",
+    "size": 256,
+    "granule": 24,
+    "align64": 1
+   },
+   {
+    "name": "s",
+    "size": 106,
+    "granule": 1,
+    "align64": 1
+   }
+  ],
+  "counters": [
+   {
+    "name": "load",
+    "max": 63,
+    "field": "loadcnt",
+    "units": [
+     "VMEM"
+    ]
+   },
+   {
+    "name": "store",
+    "max": 63,
+    "field": "storecnt",
+    "units": [
+     "VMEM"
+    ]
+   },
+   {
+    "name": "ds",
+    "max": 63,
+    "field": "dscnt",
+    "units": [
+     "DS"
+    ]
+   },
+   {
+    "name": "km",
+    "max": 31,
+    "field": "kmcnt",
+    "units": [
+     "SMEM"
+    ]
+   }
+  ],
+  "waits": [
+   {
+    "mnemonic": "s_wait_loadcnt",
+    "fields": [
+     "loadcnt"
+    ],
+    "text": "Bare"
+   },
+   {
+    "mnemonic": "s_wait_storecnt",
+    "fields": [
+     "storecnt"
+    ],
+    "text": "Bare"
+   },
+   {
+    "mnemonic": "s_wait_dscnt",
+    "fields": [
+     "dscnt"
+    ],
+    "text": "Bare"
+   },
+   {
+    "mnemonic": "s_wait_kmcnt",
+    "fields": [
+     "kmcnt"
+    ],
+    "text": "Bare"
+   },
+   {
+    "mnemonic": "s_wait_alu",
+    "fields": [
+     "depctr_hold_cnt",
+     "depctr_sa_sdst",
+     "depctr_va_vdst",
+     "depctr_va_sdst",
+     "depctr_va_ssrc",
+     "depctr_va_vcc",
+     "depctr_vm_vsrc"
+    ],
+    "text": "Named"
+   }
+  ],
+  "wait_fields": [
+   "loadcnt",
+   "storecnt",
+   "dscnt",
+   "kmcnt",
+   "depctr_hold_cnt",
+   "depctr_sa_sdst",
+   "depctr_va_vdst",
+   "depctr_va_sdst",
+   "depctr_va_ssrc",
+   "depctr_va_vcc",
+   "depctr_vm_vsrc"
+  ],
+  "operands": {
+   "vop3_literal": true,
+   "constant_bus": 2,
+   "valu_sgpr_write_waits_smem": false
+  },
+  "chip": {
+   "xcds": 1,
+   "cus": 32,
+   "simds": 4,
+   "lds": 131072,
+   "vgprs": 256,
+   "vgprs_per_lane": 1536,
+   "sgprs": 106,
+   "user_sgprs": 16,
+   "preload": 0,
+   "wave_slots": 16,
+   "wgids": [
+    "ttmp9",
+    "ttmp7"
+   ]
+  },
+  "spellings": [
+   [
+    "v.add.u32",
+    "v_add_nc_u32"
+   ],
+   [
+    "v.sub.u32",
+    "v_sub_nc_u32"
+   ],
+   [
+    "v.subrev.u32",
+    "v_subrev_nc_u32"
+   ],
+   [
+    "v.addc.co.u32",
+    "v_add_co_ci_u32"
+   ],
+   [
+    "v.subb.co.u32",
+    "v_sub_co_ci_u32"
+   ],
+   [
+    "v.subbrev.co.u32",
+    "v_subrev_co_ci_u32"
+   ],
+   [
+    "v.max.f32",
+    "v_max_num_f32"
+   ],
+   [
+    "v.min.f32",
+    "v_min_num_f32"
+   ],
+   [
+    "v.max3.f32",
+    "v_max3_num_f32"
+   ],
+   [
+    "v.min3.f32",
+    "v_min3_num_f32"
+   ],
+   [
+    "v.med3.f32",
+    "v_med3_num_f32"
+   ],
+   [
+    "s.add.u32",
+    "s_add_co_u32"
+   ],
+   [
+    "s.addc.u32",
+    "s_add_co_ci_u32"
+   ],
+   [
+    "s.sub.u32",
+    "s_sub_co_u32"
+   ],
+   [
+    "s.subb.u32",
+    "s_sub_co_ci_u32"
+   ],
+   [
+    "s.andn2.b32",
+    "s_and_not1_b32"
+   ],
+   [
+    "s.andn2.b64",
+    "s_and_not1_b64"
+   ],
+   [
+    "s.orn2.b32",
+    "s_or_not1_b32"
+   ],
+   [
+    "s.orn2.b64",
+    "s_or_not1_b64"
+   ],
+   [
+    "s.ff1.i32.b32",
+    "s_ctz_i32_b32"
+   ],
+   [
+    "s.ff1.i32.b64",
+    "s_ctz_i32_b64"
+   ]
+  ],
+  "barrier": [
+   [
+    "s_barrier_signal",
+    [
+     -1
+    ]
+   ],
+   [
+    "s_barrier_wait",
+    [
+     65535
+    ]
+   ]
+  ],
+  "hazards": {
+   "rules": 0,
+   "pass": true,
+   "window": 0
+  },
+  "forms": 1893,
+  "pseudo_ops": 11,
+  "encodings": 1554
+ },
+ "phys": [
+  {
+   "name": "exec",
+   "dwords": 2,
+   "file": "s",
+   "whole": "exec"
+  },
+  {
+   "name": "exec_lo",
+   "dwords": 1,
+   "file": "s",
+   "whole": "exec"
+  },
+  {
+   "name": "exec_hi",
+   "dwords": 1,
+   "file": "s",
+   "whole": "exec"
+  },
+  {
+   "name": "vcc",
+   "dwords": 2,
+   "file": "s",
+   "whole": "vcc"
+  },
+  {
+   "name": "vcc_lo",
+   "dwords": 1,
+   "file": "s",
+   "whole": "vcc"
+  },
+  {
+   "name": "vcc_hi",
+   "dwords": 1,
+   "file": "s",
+   "whole": "vcc"
+  },
+  {
+   "name": "m0",
+   "dwords": 1,
+   "file": "s",
+   "whole": "m0"
+  },
+  {
+   "name": "scc",
+   "dwords": 1,
+   "file": "scc",
+   "whole": "scc"
+  },
+  {
+   "name": "off",
+   "dwords": 1,
+   "file": "s",
+   "whole": "off"
+  },
+  {
+   "name": "ttmp7",
+   "dwords": 1,
+   "file": "s",
+   "whole": "ttmp7"
+  },
+  {
+   "name": "ttmp9",
+   "dwords": 1,
+   "file": "s",
+   "whole": "ttmp9"
+  },
+  {
+   "name": "null",
+   "dwords": 1,
+   "file": "s",
+   "whole": "null"
+  }
+ ],
+ "flags": [
+  [
+   "SALU",
+   0
+  ],
+  [
+   "VALU",
+   1
+  ],
+  [
+   "MATRIX",
+   2
+  ],
+  [
+   "SMEM",
+   3
+  ],
+  [
+   "VMEM",
+   4
+  ],
+  [
+   "DS",
+   5
+  ],
+  [
+   "BRANCH",
+   6
+  ],
+  [
+   "UNCOND",
+   7
+  ],
+  [
+   "ENDPGM",
+   8
+  ],
+  [
+   "BARRIER",
+   9
+  ],
+  [
+   "WAITCNT",
+   10
+  ],
+  [
+   "NOP",
+   11
+  ],
+  [
+   "LOAD",
+   12
+  ],
+  [
+   "STORE",
+   13
+  ],
+  [
+   "ATOMIC",
+   14
+  ],
+  [
+   "TRANS",
+   15
+  ],
+  [
+   "DOT",
+   16
+  ],
+  [
+   "DPP",
+   17
+  ],
+  [
+   "PERMLANE",
+   19
+  ],
+  [
+   "READLANE",
+   20
+  ],
+  [
+   "WRITELANE",
+   21
+  ],
+  [
+   "CMP",
+   22
+  ],
+  [
+   "CMPX",
+   23
+  ],
+  [
+   "CROSS_LANE",
+   24
+  ],
+  [
+   "D16",
+   25
+  ],
+  [
+   "SCC_CMP",
+   26
+  ],
+  [
+   "SCC_SELECT",
+   27
+  ],
+  [
+   "SCC_CARRY_IN",
+   28
+  ],
+  [
+   "SCC_CARRY_OUT",
+   29
+  ],
+  [
+   "PSEUDO",
+   30
+  ],
+  [
+   "SAVEEXEC",
+   31
+  ],
+  [
+   "FP_ATOMIC",
+   32
+  ],
+  [
+   "WAVE_VARYING",
+   33
+  ],
+  [
+   "ACCUMULATE",
+   34
+  ],
+  [
+   "READS_DST",
+   35
+  ],
+  [
+   "LDS_MEM",
+   36
+  ]
+ ],
+ "field_names": [
+  "dpp",
+  "row_mask",
+  "bank_mask",
+  "bound_ctrl",
+  "offen",
+  "idxen",
+  "offset",
+  "offset0",
+  "offset1",
+  "th",
+  "scope",
+  "op_sel",
+  "op_sel_hi",
+  "neg_lo",
+  "neg_hi",
+  "clamp",
+  "omod",
+  "name",
+  "text",
+  "why",
+  "counter",
+  "said",
+  "regions",
+  "tags",
+  "left",
+  "ablated",
+  "lo",
+  "hi",
+  "loadcnt",
+  "storecnt",
+  "dscnt",
+  "kmcnt",
+  "depctr_hold_cnt",
+  "depctr_sa_sdst",
+  "depctr_va_vdst",
+  "depctr_va_sdst",
+  "depctr_va_ssrc",
+  "depctr_va_vcc",
+  "depctr_vm_vsrc"
+ ],
+ "queries": {
+  "spell": [
+   [
+    "v.add.u32",
+    "v_add_nc_u32"
+   ],
+   [
+    "v.sub.u32",
+    "v_sub_nc_u32"
+   ],
+   [
+    "v.max.f32",
+    "v_max_num_f32"
+   ],
+   [
+    "s.add.u32",
+    "s_add_co_u32"
+   ],
+   [
+    "s.andn2.b32",
+    "s_and_not1_b32"
+   ],
+   [
+    "s.mov.mask",
+    "s_mov_b32"
+   ],
+   [
+    "s.and.saveexec.mask",
+    "s_and_saveexec_b32"
+   ],
+   [
+    "s.mov.b32",
+    "s_mov_b32"
+   ],
+   [
+    "v.add.f32",
+    "v_add_f32"
+   ],
+   [
+    "v.cmp.gt.u32",
+    "v_cmp_gt_u32"
+   ],
+   [
+    "global.load.b32",
+    "global_load_b32"
+   ],
+   [
+    "s.load.b128",
+    "s_load_b128"
+   ],
+   [
+    "s.branch",
+    "s_branch"
+   ],
+   [
+    "s.endpgm",
+    "s_endpgm"
+   ],
+   [
+    "s.ff1.i32.b32",
+    "s_ctz_i32_b32"
+   ],
+   [
+    "s.mov.umask",
+    null
+   ],
+   [
+    "v.mov.b32",
+    "v_mov_b32"
+   ],
+   [
+    "s_mov_b32",
+    "s_mov_b32"
+   ],
+   [
+    "nonexistent",
+    "nonexistent"
+   ],
+   [
+    "v.nonexistent.op",
+    null
+   ],
+   [
+    "v.add.co.u32",
+    "v_add_co_u32"
+   ],
+   [
+    "v.addc.co.u32",
+    "v_add_co_ci_u32"
+   ],
+   [
+    "v.fma.f32",
+    "v_fma_f32"
+   ],
+   [
+    "v.lshl.add.u32",
+    "v_lshl_add_u32"
+   ],
+   [
+    "s.cselect.b32",
+    "s_cselect_b32"
+   ],
+   [
+    "s.cselect.mask",
+    "s_cselect_b32"
+   ],
+   [
+    "v.cndmask.b32",
+    "v_cndmask_b32"
+   ],
+   [
+    "s.waitcnt",
+    null
+   ],
+   [
+    "s.wait.loadcnt",
+    "s_wait_loadcnt"
+   ],
+   [
+    "v.permlane16.swap.b32",
+    null
+   ],
+   [
+    "v.mul.u32.u24",
+    "v_mul_u32_u24"
+   ],
+   [
+    "v.readlane.b32",
+    "v_readlane_b32"
+   ],
+   [
+    "v.pk.add.f16",
+    "v_pk_add_f16"
+   ],
+   [
+    "ds.load.b32",
+    "ds_load_b32"
+   ],
+   [
+    "ds.read.b32",
+    null
+   ],
+   [
+    "buffer.load.b32",
+    "buffer_load_b32"
+   ],
+   [
+    "s.add.co.u32",
+    "s_add_co_u32"
+   ],
+   [
+    "v.add.nc.u32",
+    "v_add_nc_u32"
+   ],
+   [
+    "v.min.f32",
+    "v_min_num_f32"
+   ],
+   [
+    "v.max.num.f32",
+    "v_max_num_f32"
+   ]
+  ],
+  "masked": [
+   [
+    "s.mov.mask",
+    "s.mov.b32"
+   ],
+   [
+    "s.and.saveexec.mask",
+    "s.and.saveexec.b32"
+   ],
+   [
+    "s.mov.umask",
+    "s.mov.u32"
+   ],
+   [
+    "v.add.u32",
+    "v.add.u32"
+   ]
+  ],
+  "canon": [
+   [
+    "v_add_nc_u32",
+    "v.add.u32"
+   ],
+   [
+    "v_add_f32_e32",
+    "v.add.f32.e32"
+   ],
+   [
+    "s_and_not1_b32",
+    "s.andn2.b32"
+   ],
+   [
+    "s_mov_b32",
+    "s.mov.b32"
+   ],
+   [
+    "s_ctz_i32_b32",
+    "s.ff1.i32.b32"
+   ],
+   [
+    "v_max_num_f32",
+    "v.max.f32"
+   ],
+   [
+    "v_max_num_f32_e64",
+    "v.max.f32.e64"
+   ],
+   [
+    "global_load_b32",
+    "global.load.b32"
+   ],
+   [
+    "v_max_num_f32_dpp",
+    "v.max.f32.dpp"
+   ],
+   [
+    "v_add_nc_u32_e64",
+    "v.add.u32.e64"
+   ]
+  ],
+  "group": [
+   [
+    "vm",
+    [
+     "load",
+     "store"
+    ]
+   ],
+   [
+    "lgkm",
+    [
+     "ds",
+     "km"
+    ]
+   ],
+   [
+    "smem",
+    [
+     "km"
+    ]
+   ],
+   [
+    "load",
+    [
+     "load"
+    ]
+   ],
+   [
+    "store",
+    [
+     "store"
+    ]
+   ],
+   [
+    "ds",
+    [
+     "ds"
+    ]
+   ],
+   [
+    "km",
+    [
+     "km"
+    ]
+   ],
+   [
+    "nonexistent",
+    []
+   ]
+  ],
+  "mask_reg": [
+   [
+    "exec",
+    "exec_lo"
+   ],
+   [
+    "vcc",
+    "vcc_lo"
+   ],
+   [
+    "exec_lo",
+    "exec_lo"
+   ],
+   [
+    "m0",
+    "m0"
+   ],
+   [
+    "scc",
+    "scc"
+   ]
+  ],
+  "unit_and_mem": [
+   [
+    "v_add_f32",
+    [
+     "VALU"
+    ],
+    null
+   ],
+   [
+    "v_add_f32_e32",
+    [
+     "VALU"
+    ],
+    null
+   ],
+   [
+    "v_wmma_f32_16x16x16_f16",
+    [
+     "VALU"
+    ],
+    null
+   ],
+   [
+    "s_cbranch_scc0",
+    [
+     "BRANCH"
+    ],
+    null
+   ],
+   [
+    "s_branch",
+    [
+     "BRANCH"
+    ],
+    null
+   ],
+   [
+    "s_load_b32",
+    [
+     "SMEM"
+    ],
+    "smem"
+   ],
+   [
+    "s_buffer_load_b64",
+    [
+     "SMEM"
+    ],
+    "smem"
+   ],
+   [
+    "s_prefetch_data",
+    [
+     "SMEM"
+    ],
+    "smem"
+   ],
+   [
+    "s_dcache_inv",
+    [
+     "SMEM"
+    ],
+    "smem"
+   ],
+   [
+    "s_mov_b32",
+    [
+     "SALU"
+    ],
+    null
+   ],
+   [
+    "s_endpgm",
+    [
+     "SALU"
+    ],
+    null
+   ],
+   [
+    "ds_load_b32",
+    [
+     "DS"
+    ],
+    "ds"
+   ],
+   [
+    "global_load_b32",
+    [
+     "VMEM"
+    ],
+    "global"
+   ],
+   [
+    "buffer_load_b32",
+    [
+     "VMEM"
+    ],
+    "buffer"
+   ],
+   [
+    "flat_load_b32",
+    [
+     "VMEM"
+    ],
+    "flat"
+   ],
+   [
+    "scratch_load_b32",
+    [
+     "VMEM"
+    ],
+    "scratch"
+   ],
+   [
+    "tbuffer_load_format_x",
+    [
+     "VMEM"
+    ],
+    "buffer"
+   ],
+   [
+    "x_foo",
+    null,
+    null
+   ],
+   [
+    "exp",
+    null,
+    null
+   ],
+   [
+    "s_atc_probe",
+    [
+     "SMEM"
+    ],
+    "smem"
+   ],
+   [
+    "v_nop",
+    [
+     "VALU"
+    ],
+    null
+   ]
+  ],
+  "returning": [
+   [
+    "buffer_atomic_add_u32",
+    "TH_ATOMIC_RETURN",
+    true
+   ],
+   [
+    "buffer_atomic_add_u32",
+    null,
+    false
+   ],
+   [
+    "buffer_atomic_add_u32",
+    "TH_ATOMIC_NT",
+    false
+   ],
+   [
+    "buffer_atomic_add_u32",
+    "TH_ATOMIC_NT_RETURN",
+    true
+   ],
+   [
+    "global_atomic_add_u32",
+    "TH_ATOMIC_RETURN",
+    false
+   ],
+   [
+    "buffer_load_b32",
+    "TH_ATOMIC_RETURN",
+    false
+   ]
+  ],
+  "form": [
+   [
+    "global_atomic_add_u32",
+    4,
+    false,
+    320
+   ],
+   [
+    "global_atomic_add_u32",
+    3,
+    false,
+    319
+   ],
+   [
+    "buffer_atomic_add_u32",
+    4,
+    true,
+    3
+   ],
+   [
+    "buffer_atomic_add_u32",
+    4,
+    false,
+    2
+   ],
+   [
+    "v_add_f32",
+    3,
+    false,
+    753
+   ],
+   [
+    "v_add_f32_e64",
+    3,
+    false,
+    755
+   ],
+   [
+    "v_add_f32",
+    2,
+    false,
+    null
+   ],
+   [
+    "s_wait_alu",
+    0,
+    false,
+    675
+   ],
+   [
+    "s_wait_alu",
+    1,
+    false,
+    676
+   ]
+  ]
+ },
+ "generic": {
+  "mem_of_encoding": [
+   [
+    "ENC_VDS",
+    "ds"
+   ],
+   [
+    "ENC_VFLAT",
+    "flat"
+   ],
+   [
+    "ENC_VGLOBAL",
+    "global"
+   ],
+   [
+    "ENC_VSCRATCH",
+    "scratch"
+   ],
+   [
+    "ENC_VBUFFER",
+    "buffer"
+   ],
+   [
+    "ENC_SMEM",
+    "smem"
+   ],
+   [
+    "ENC_VOP3",
+    null
+   ],
+   [
+    "VOP3_SDST_ENC",
+    null
+   ],
+   [
+    "",
+    null
+   ],
+   [
+    "ENC_VIMAGE",
+    null
+   ]
+  ],
+  "mem_bytes": [
+   [
+    "ds_load_b32",
+    4
+   ],
+   [
+    "global_load_u16",
+    2
+   ],
+   [
+    "global_load_i8",
+    1
+   ],
+   [
+    "global_load_b96",
+    12
+   ],
+   [
+    "s_load_b512",
+    4
+   ],
+   [
+    "ds_add_u32",
+    4
+   ],
+   [
+    "ds_add_f32",
+    4
+   ],
+   [
+    "global_atomic_add_f64",
+    8
+   ],
+   [
+    "b32",
+    4
+   ],
+   [
+    "ds_nop",
+    4
+   ],
+   [
+    "global_load_b64",
+    8
+   ],
+   [
+    "buffer_store_format_xy",
+    4
+   ],
+   [
+    "global_load_d16_hi_b16",
+    2
+   ]
+  ],
+  "reads_dst": [
+   [
+    "v_fmac_f32_e32",
+    true
+   ],
+   [
+    "v_pk_fmac_f16",
+    true
+   ],
+   [
+    "v_dot2_f32_f16",
+    false
+   ],
+   [
+    "v_dot2acc_f32_f16",
+    true
+   ],
+   [
+    "v_dot4_i32_iu8",
+    false
+   ],
+   [
+    "v_fma_f32",
+    false
+   ],
+   [
+    "s_fmac_f32",
+    false
+   ],
+   [
+    "v_dotacc_x",
+    true
+   ]
+  ],
+  "base": [
+   [
+    "v_add_co_u32_e64",
+    "v_add_co_u32"
+   ],
+   [
+    "v_add_f32_dpp",
+    "v_add_f32"
+   ],
+   [
+    "buffer_atomic_add_u32+rtn",
+    "buffer_atomic_add_u32"
+   ],
+   [
+    "v_add_f32_e32",
+    "v_add_f32_e32"
+   ],
+   [
+    "v_cmp_eq_f32_e64",
+    "v_cmp_eq_f32"
+   ],
+   [
+    "s_mov_b32",
+    "s_mov_b32"
+   ]
+  ],
+  "dst_sel": [
+   [
+    "v_fma_mixlo_f16",
+    true,
+    "Always"
+   ],
+   [
+    "v_fma_mixhi_f16",
+    true,
+    "Always"
+   ],
+   [
+    "v_pk_add_f16",
+    true,
+    "Never"
+   ],
+   [
+    "v_dot2_f32_f16",
+    true,
+    "Never"
+   ],
+   [
+    "v_fma_mix_f32",
+    true,
+    "Never"
+   ],
+   [
+    "v_add_f16",
+    true,
+    "OpSel"
+   ],
+   [
+    "v_cvt_pk_fp8_f32",
+    true,
+    "OpSel"
+   ],
+   [
+    "s_add_u32",
+    false,
+    "Never"
+   ],
+   [
+    "v_fma_mixlo_f16",
+    false,
+    "Never"
+   ]
+  ]
+ },
+ "target_known": true
+}

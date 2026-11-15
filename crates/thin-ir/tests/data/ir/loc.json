@@ -1,0 +1,129 @@
+{
+ "rule": "Executable helper, inner, outer and recursive deep functions are compiled from memory. Internal frames are those outside /w/user. main captures two shared locations, a direct location, six recursive frames (truncated to four), and one final location. The API then interns names and fused locations; all paths are relative to the working directory /.",
+ "calls": "two outer captures; one inner; deep recursion; another outer; name with and without an inner location; fusions with text, duplicate ids, zero ids, one id and no text; diagnostics with notes, a name and no location",
+ "locs": {
+  "a": {
+   "loc": 3,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/kern.py:4 (outer)",
+    "w/user/main.py:2 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "b": {
+   "loc": 3,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/kern.py:4 (outer)",
+    "w/user/main.py:2 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "c": {
+   "loc": 5,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/main.py:3 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "deep": {
+   "loc": 9,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/kern.py:6 (deep)",
+    "w/user/kern.py:6 (deep)",
+    "w/user/kern.py:6 (deep)"
+   ],
+   "short": "kern.py:2"
+  },
+  "e": {
+   "loc": 12,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/kern.py:4 (outer)",
+    "w/user/main.py:5 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "name": {
+   "loc": 13,
+   "lines": [
+    "peel copy 1",
+    "  w/user/kern.py:2 (inner)",
+    "  w/user/kern.py:4 (outer)",
+    "  w/user/main.py:2 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "name_no_inner": {
+   "loc": 14,
+   "lines": [
+    "hazard"
+   ],
+   "short": "(unknown)"
+  },
+  "fuse": {
+   "loc": 15,
+   "lines": [
+    "merged wait",
+    "  w/user/kern.py:2 (inner)",
+    "  w/user/kern.py:4 (outer)",
+    "  w/user/main.py:2 (main)",
+    "  w/user/kern.py:2 (inner)",
+    "  w/user/main.py:3 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "fuse_dups": {
+   "loc": 3,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/kern.py:4 (outer)",
+    "w/user/main.py:2 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "fuse_unknowns": {
+   "loc": 0,
+   "lines": [
+    "(unknown)"
+   ],
+   "short": "(unknown)"
+  },
+  "fuse_single": {
+   "loc": 3,
+   "lines": [
+    "w/user/kern.py:2 (inner)",
+    "w/user/kern.py:4 (outer)",
+    "w/user/main.py:2 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "fuse_two_no_what": {
+   "loc": 16,
+   "lines": [
+    "  w/user/kern.py:2 (inner)",
+    "  w/user/main.py:3 (main)",
+    "  w/user/kern.py:2 (inner)",
+    "  w/user/kern.py:4 (outer)",
+    "  w/user/main.py:2 (main)"
+   ],
+   "short": "kern.py:2"
+  },
+  "unknown": {
+   "loc": 0,
+   "lines": [
+    "(unknown)"
+   ],
+   "short": "(unknown)"
+  }
+ },
+ "len_after": 17,
+ "renders": {
+  "error_with_notes": "kern.py:2: reads v5 while its load may be in flight\n    at w/user/kern.py:4 (outer)\n    at w/user/main.py:2 (main)\n  note: kern.py:2: the load\n  note: (unknown): unknown note",
+  "named": "kern.py:2: named\n    at w/user/kern.py:2 (inner)\n    at w/user/kern.py:4 (outer)\n    at w/user/main.py:2 (main)",
+  "unknown": "no location"
+ }
+}

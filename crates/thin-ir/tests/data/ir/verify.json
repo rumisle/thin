@@ -1,0 +1,626 @@
+{
+ "target": "gfx1201",
+ "values": {
+  "a": "v, 1 dword",
+  "b": "v, 1 dword",
+  "p": "v, 2 dwords",
+  "s": "s, 1 dword",
+  "s2": "s, 2 dwords"
+ },
+ "note": "Each case constructs a fresh IR Program. error is the native verifier's Diag.msg; null means verification succeeded. forms are read from the native target forms actually used by the authored programs. Values retain stable ids 0 through 4.",
+ "forms": {
+  "ds_load_b32/2": {
+   "slots": [
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [
+    {
+     "name": "offset",
+     "kind": "int",
+     "bits": 16,
+     "signed": false,
+     "choices": []
+    }
+   ],
+   "flags": [
+    "DS",
+    "LOAD",
+    "LDS_MEM"
+   ]
+  },
+  "global_load_b32/3": {
+   "slots": [
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 2,
+     "widths": [
+      1,
+      2
+     ],
+     "modifiers": false
+    },
+    {
+     "kind": "sgpr",
+     "name": "OPR_SREG",
+     "dwords": 2,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [
+    {
+     "name": "offset",
+     "kind": "int",
+     "bits": 24,
+     "signed": true,
+     "choices": []
+    },
+    {
+     "name": "th",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "choices": [
+      "TH_LOAD_RT",
+      "TH_LOAD_NT",
+      "TH_LOAD_HT",
+      "TH_LOAD_LU",
+      "TH_LOAD_NT_RT",
+      "TH_LOAD_RT_NT",
+      "TH_LOAD_NT_HT",
+      "TH_LOAD_BYPASS",
+      "TH_STORE_RT",
+      "TH_STORE_NT",
+      "TH_STORE_HT",
+      "TH_STORE_WB",
+      "TH_STORE_NT_RT",
+      "TH_STORE_RT_NT",
+      "TH_STORE_NT_HT",
+      "TH_STORE_NT_WB",
+      "TH_STORE_BYPASS",
+      "TH_ATOMIC_RT",
+      "TH_ATOMIC_RETURN",
+      "TH_ATOMIC_NT",
+      "TH_ATOMIC_NT_RETURN",
+      "TH_ATOMIC_CASCADE_RT",
+      "TH_ATOMIC_CASCADE_NT"
+     ]
+    },
+    {
+     "name": "scope",
+     "kind": "choice",
+     "bits": 0,
+     "signed": false,
+     "choices": [
+      "SCOPE_CU",
+      "SCOPE_SE",
+      "SCOPE_DEV",
+      "SCOPE_SYS"
+     ]
+    }
+   ],
+   "flags": [
+    "VMEM",
+    "LOAD"
+   ]
+  },
+  "s_cbranch_scc1/1": {
+   "slots": [
+    {
+     "kind": "label",
+     "name": "OPR_LABEL",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [],
+   "flags": [
+    "BRANCH"
+   ]
+  },
+  "s_endpgm/0": {
+   "slots": [],
+   "fields": [],
+   "flags": [
+    "SALU",
+    "UNCOND",
+    "ENDPGM"
+   ]
+  },
+  "s_mov_b32/2": {
+   "slots": [
+    {
+     "kind": "sgpr",
+     "name": "OPR_SDST",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "ssrc",
+     "name": "OPR_SSRC",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [],
+   "flags": [
+    "SALU"
+   ]
+  },
+  "v_add_nc_u32/3": {
+   "slots": [
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vsrc",
+     "name": "OPR_SRC",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vsrc",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [],
+   "flags": [
+    "VALU"
+   ]
+  },
+  "v_dot2_f32_bf16/4": {
+   "slots": [
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vsrc",
+     "name": "OPR_SRC",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vsrc",
+     "name": "OPR_SRC",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vsrc",
+     "name": "OPR_SRC",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [
+    {
+     "name": "op_sel",
+     "kind": "bits",
+     "bits": 3,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "op_sel_hi",
+     "kind": "bits",
+     "bits": 3,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "neg_lo",
+     "kind": "bits",
+     "bits": 3,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "neg_hi",
+     "kind": "bits",
+     "bits": 3,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "clamp",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "choices": []
+    }
+   ],
+   "flags": [
+    "VALU",
+    "DOT"
+   ]
+  },
+  "v_mov_b32_dpp/2": {
+   "slots": [
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    },
+    {
+     "kind": "vgpr",
+     "name": "OPR_VGPR",
+     "dwords": 1,
+     "widths": [],
+     "modifiers": false
+    }
+   ],
+   "fields": [
+    {
+     "name": "dpp",
+     "kind": "dpp",
+     "bits": 0,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "row_mask",
+     "kind": "int",
+     "bits": 4,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "bank_mask",
+     "kind": "int",
+     "bits": 4,
+     "signed": false,
+     "choices": []
+    },
+    {
+     "name": "bound_ctrl",
+     "kind": "flag",
+     "bits": 0,
+     "signed": false,
+     "choices": []
+    }
+   ],
+   "flags": [
+    "VALU",
+    "DPP",
+    "CROSS_LANE"
+   ]
+  }
+ },
+ "cases": [
+  {
+   "name": "valid_branch_loop",
+   "program": "a valid arithmetic, branch, label and end program",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "missing_add_operand",
+   "program": "a fixed-arity instruction with too few operands",
+   "printable": false,
+   "error": "`v_add_nc_u32`: 2 operands; the form takes 3"
+  },
+  {
+   "name": "scalar_destination",
+   "program": "a scalar value in a vector destination",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 0 is a s register; slot OPR_VGPR takes vgpr"
+  },
+  {
+   "name": "wide_add_destination",
+   "program": "a two-dword value in a fixed one-dword destination",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 0 is 2 dwords; slot OPR_VGPR takes 1"
+  },
+  {
+   "name": "load_address_widths",
+   "program": "both accepted widths of a load address",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "register_range_overflow",
+   "program": "a register range extending beyond its value",
+   "printable": false,
+   "error": "`global_load_b32`: operand 1: dwords 0..1 outside %v0:a (1)"
+  },
+  {
+   "name": "named_vector_destination",
+   "program": "a named non-vector register in a vector destination",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 0 is exec_lo; slot OPR_VGPR takes vgpr"
+  },
+  {
+   "name": "off_address",
+   "program": "the physical off register accepted by a width-choice address slot",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "immediate_destination",
+   "program": "an immediate in a vector destination",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 0 is an immediate; slot OPR_VGPR takes vgpr"
+  },
+  {
+   "name": "immediate_source",
+   "program": "an immediate accepted in a vector source",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "block_source",
+   "program": "a block reference in a vector source",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 1 is a block; slot OPR_SRC takes vsrc"
+  },
+  {
+   "name": "unsupported_modifier",
+   "program": "nonzero modifiers on a slot that does not allow them",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 1: modifiers on slot OPR_SRC, which takes none"
+  },
+  {
+   "name": "zero_modifiers",
+   "program": "zero modifier bytes allowed on an unmodified slot",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "unresolved_branch",
+   "program": "a branch reference absent from the program",
+   "printable": false,
+   "error": "`s_cbranch_scc1`: branches to nowhere, not a block of this program"
+  },
+  {
+   "name": "forward_branch",
+   "program": "a forward branch resolved by a later label",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "unknown_add_field",
+   "program": "an unknown field on a form with no fields",
+   "printable": false,
+   "error": "`v_add_nc_u32`: no field offset (it takes none)"
+  },
+  {
+   "name": "unknown_ds_field",
+   "program": "an unknown field with the form's available fields listed",
+   "printable": false,
+   "error": "`ds_load_b32`: no field clamp (it takes offset)"
+  },
+  {
+   "name": "unsigned_offset_overflow",
+   "program": "an unsigned integer one above its maximum",
+   "printable": false,
+   "error": "`ds_load_b32`: offset:65536 outside 0..65535"
+  },
+  {
+   "name": "negative_unsigned_offset",
+   "program": "a negative integer in an unsigned field",
+   "printable": false,
+   "error": "`ds_load_b32`: offset:-1 outside 0..65535"
+  },
+  {
+   "name": "boolean_integer_offset",
+   "program": "a bool refused by an integer field",
+   "printable": false,
+   "error": "`ds_load_b32`: offset: an int, not a bool"
+  },
+  {
+   "name": "signed_offset_underflow",
+   "program": "a signed integer one below its minimum",
+   "printable": false,
+   "error": "`global_load_b32`: offset:-8388609 outside -8388608..8388607"
+  },
+  {
+   "name": "float_integer_offset",
+   "program": "a non-integer object numerically inside an integer range",
+   "printable": false,
+   "error": "`ds_load_b32`: offset:2.0 outside 0..65535"
+  },
+  {
+   "name": "integer_flag",
+   "program": "a non-boolean value in a flag field",
+   "printable": false,
+   "error": "`v_mov_b32_dpp`: bound_ctrl: a flag"
+  },
+  {
+   "name": "oversized_bits",
+   "program": "a bit tuple wider than its field",
+   "printable": false,
+   "error": "`v_dot2_f32_bf16`: op_sel:(0, 0, 0, 1): 3 bits at most"
+  },
+  {
+   "name": "nonbinary_bits",
+   "program": "a bit tuple containing a non-binary member",
+   "printable": false,
+   "error": "`v_dot2_f32_bf16`: op_sel:(0, 2): 3 bits at most"
+  },
+  {
+   "name": "empty_bits",
+   "program": "an empty bit tuple",
+   "printable": false,
+   "error": "`v_dot2_f32_bf16`: op_sel:(): 3 bits at most"
+  },
+  {
+   "name": "invalid_wait_counter",
+   "program": "a choice value outside its declared alternatives",
+   "printable": false,
+   "error": "`ir.wait_all`: counter: 'vm', not one of load, store, ds, km"
+  },
+  {
+   "name": "wait_counter_text",
+   "program": "a valid wait choice and optional text",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "missing_wait_count",
+   "program": "one required pseudo field absent",
+   "printable": false,
+   "error": "`ir.wait_left`: field left missing"
+  },
+  {
+   "name": "wait_count_overflow",
+   "program": "an eight-bit wait count one above its maximum",
+   "printable": false,
+   "error": "`ir.wait_left`: left:256 outside 0..255"
+  },
+  {
+   "name": "missing_wait_counter",
+   "program": "the required wait counter absent",
+   "printable": false,
+   "error": "`ir.wait_all`: field counter missing"
+  },
+  {
+   "name": "integer_label_name",
+   "program": "an integer in a text field",
+   "printable": false,
+   "error": "`ir.label`: name: a text"
+  },
+  {
+   "name": "text_region_tuple",
+   "program": "text in a tuple field",
+   "printable": false,
+   "error": "`ir.wait_regs`: regions: a tuple"
+  },
+  {
+   "name": "named_regions",
+   "program": "a names tuple accepted by a variadic wait marker",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "empty_variadic_wait",
+   "program": "an empty operand list on a variadic pseudo instruction",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "mixed_wait_registers",
+   "program": "value and physical register operands on a variadic pseudo instruction",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "immediate_wait_operand",
+   "program": "an immediate in an any-value pseudo slot",
+   "printable": false,
+   "error": "`ir.assume`: operand 0 is an immediate; slot 0 takes any"
+  },
+  {
+   "name": "extra_assume_operand",
+   "program": "a fixed pseudo instruction with an extra operand",
+   "printable": false,
+   "error": "`ir.assume`: 2 operands; the form takes 1"
+  },
+  {
+   "name": "assume_bound_overflow",
+   "program": "a 32-bit assumption bound one above its maximum",
+   "printable": false,
+   "error": "`ir.assume`: hi:4294967296 outside 0..4294967295"
+  },
+  {
+   "name": "label_with_operand",
+   "program": "a non-variadic label with an operand",
+   "printable": false,
+   "error": "`ir.label`: 1 operands; the form takes 0"
+  },
+  {
+   "name": "nonbarrier_fence",
+   "program": "a fence attribute on a non-barrier instruction",
+   "printable": false,
+   "error": "`v_add_nc_u32`: attribute Fence on a form that is none of BARRIER"
+  },
+  {
+   "name": "nonmemory_places",
+   "program": "a places attribute on a non-memory instruction",
+   "printable": false,
+   "error": "`s_mov_b32`: attribute Places on a form that is none of VMEM|DS"
+  },
+  {
+   "name": "empty_places",
+   "program": "an empty places attribute accepted as absent",
+   "printable": false,
+   "error": null
+  },
+  {
+   "name": "nonbranch_waves",
+   "program": "a wave-taken attribute on a non-branch instruction",
+   "printable": false,
+   "error": "`v_add_nc_u32`: attribute WavesTaken on a form that is none of BRANCH"
+  },
+  {
+   "name": "nonmemory_lds",
+   "program": "an LDS-access attribute on a non-memory instruction",
+   "printable": false,
+   "error": "`s_mov_b32`: attribute LdsAccess on a form that is none of VMEM|DS"
+  },
+  {
+   "name": "nonatomic_published",
+   "program": "a published attribute on a non-atomic instruction",
+   "printable": false,
+   "error": "`v_add_nc_u32`: attribute Published on a form that is none of ATOMIC"
+  },
+  {
+   "name": "printable_wait_marker",
+   "program": "an otherwise valid wait marker left for the printer",
+   "printable": true,
+   "error": "`ir.wait_all`: a wait request left at the printer"
+  },
+  {
+   "name": "first_instruction_error",
+   "program": "the earliest instruction's branch error precedes a later operand error",
+   "printable": false,
+   "error": "`s_cbranch_scc1`: branches to nowhere, not a block of this program"
+  },
+  {
+   "name": "operand_error_precedence",
+   "program": "an operand error precedes an error in an unknown field",
+   "printable": false,
+   "error": "`v_add_nc_u32`: operand 0 is a s register; slot OPR_VGPR takes vgpr"
+  }
+ ]
+}

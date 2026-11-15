@@ -1,0 +1,758 @@
+{
+ "notation": "gfx1201 argument declarations are evaluated with the public DSL. Residency and budget outputs are computed by the native ABI from the explicit numeric inputs. Argument refusals record the actual exception.",
+ "residency": [
+  {
+   "lds": 0,
+   "vgpr": 3,
+   "agpr": 0,
+   "wgsize": 256,
+   "resident": 8,
+   "limiter": "wave slots",
+   "limits": {
+    "vgpr": 32,
+    "lds": null,
+    "waves": 8
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 24,
+   "agpr": 0,
+   "wgsize": 64,
+   "resident": 32,
+   "limiter": "wave slots",
+   "limits": {
+    "vgpr": 128,
+    "lds": null,
+    "waves": 32
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 25,
+   "agpr": 0,
+   "wgsize": 64,
+   "resident": 32,
+   "limiter": "wave slots",
+   "limits": {
+    "vgpr": 64,
+    "lds": null,
+    "waves": 32
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 128,
+   "agpr": 0,
+   "wgsize": 256,
+   "resident": 5,
+   "limiter": "VGPRs",
+   "limits": {
+    "vgpr": 5,
+    "lds": null,
+    "waves": 8
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 256,
+   "agpr": 0,
+   "wgsize": 32,
+   "resident": 20,
+   "limiter": "VGPRs",
+   "limits": {
+    "vgpr": 20,
+    "lds": null,
+    "waves": 64
+   }
+  },
+  {
+   "lds": 512,
+   "vgpr": 3,
+   "agpr": 0,
+   "wgsize": 128,
+   "resident": 16,
+   "limiter": "wave slots",
+   "limits": {
+    "vgpr": 64,
+    "lds": 256,
+    "waves": 16
+   }
+  },
+  {
+   "lds": 65536,
+   "vgpr": 3,
+   "agpr": 0,
+   "wgsize": 256,
+   "resident": 2,
+   "limiter": "LDS",
+   "limits": {
+    "vgpr": 32,
+    "lds": 2,
+    "waves": 8
+   }
+  },
+  {
+   "lds": 32768,
+   "vgpr": 40,
+   "agpr": 0,
+   "wgsize": 512,
+   "resident": 4,
+   "limiter": "LDS",
+   "limits": {
+    "vgpr": 8,
+    "lds": 4,
+    "waves": 4
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 0,
+   "agpr": 0,
+   "wgsize": 32,
+   "resident": 64,
+   "limiter": "wave slots",
+   "limits": {
+    "vgpr": null,
+    "lds": null,
+    "waves": 64
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 96,
+   "agpr": 0,
+   "wgsize": 1024,
+   "resident": 2,
+   "limiter": "VGPRs",
+   "limits": {
+    "vgpr": 2,
+    "lds": null,
+    "waves": 2
+   }
+  },
+  {
+   "lds": 0,
+   "vgpr": 256,
+   "agpr": 0,
+   "wgsize": 1024,
+   "resident": 0,
+   "limiter": "VGPRs",
+   "limits": {
+    "vgpr": 0,
+    "lds": null,
+    "waves": 2
+   }
+  }
+ ],
+ "budget": [
+  {
+   "lds": 0,
+   "vgpr": 256,
+   "agpr": 0,
+   "sgpr": 106,
+   "wgsize": 32,
+   "ok": null
+  },
+  {
+   "lds": 0,
+   "vgpr": 257,
+   "agpr": 0,
+   "sgpr": 10,
+   "wgsize": 32,
+   "refused": "ScheduleError",
+   "message": "k: over budget: 257 arch VGPRs (max 256)"
+  },
+  {
+   "lds": 0,
+   "vgpr": 200,
+   "agpr": 0,
+   "sgpr": 10,
+   "wgsize": 1024,
+   "refused": "ScheduleError",
+   "message": "k: over budget: 216 VGPRs + AGPRs per wave, 8 waves per SIMD (WG 1024): max 192"
+  },
+  {
+   "lds": 0,
+   "vgpr": 192,
+   "agpr": 0,
+   "sgpr": 10,
+   "wgsize": 256,
+   "ok": null
+  },
+  {
+   "lds": 0,
+   "vgpr": 10,
+   "agpr": 0,
+   "sgpr": 107,
+   "wgsize": 64,
+   "refused": "ScheduleError",
+   "message": "k: over budget: 107 SGPRs (max 106)"
+  },
+  {
+   "lds": 65537,
+   "vgpr": 10,
+   "agpr": 0,
+   "sgpr": 10,
+   "wgsize": 64,
+   "refused": "ScheduleError",
+   "message": "k: over budget: 65537 B LDS (max 65536)"
+  },
+  {
+   "lds": 70000,
+   "vgpr": 300,
+   "agpr": 0,
+   "sgpr": 200,
+   "wgsize": 1024,
+   "refused": "ScheduleError",
+   "message": "k: over budget: 300 arch VGPRs (max 256); 312 VGPRs + AGPRs per wave, 8 waves per SIMD (WG 1024): max 192; 200 SGPRs (max 106); 70000 B LDS (max 65536)"
+  },
+  {
+   "lds": 0,
+   "vgpr": 10,
+   "agpr": 1,
+   "sgpr": 10,
+   "wgsize": 64,
+   "ok": null
+  }
+ ],
+ "args": [
+  {
+   "name": "two_buffers_and_counts",
+   "src": "Args(first=ptr, second=ptr, count=u32, checksum=u32)",
+   "ok": {
+    "size": 24,
+    "args": [
+     {
+      "name": "first",
+      "offset": 0,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "second",
+      "offset": 8,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "count",
+      "offset": 16,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "checksum",
+      "offset": 20,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "scalar_padding_before_pointer",
+   "src": "Args(tag=u32, buffer=ptr, scale=f32)",
+   "ok": {
+    "size": 20,
+    "args": [
+     {
+      "name": "tag",
+      "offset": 0,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "buffer",
+      "offset": 8,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "scale",
+      "offset": 16,
+      "bytes": 4,
+      "kind": "f32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "all_kinds_reordered",
+   "src": "Args(buffer=ptr, bits=u64, real=f32, signed=i32, count=u32)",
+   "ok": {
+    "size": 28,
+    "args": [
+     {
+      "name": "buffer",
+      "offset": 0,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "bits",
+      "offset": 8,
+      "bytes": 8,
+      "kind": "u64",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "real",
+      "offset": 16,
+      "bytes": 4,
+      "kind": "f32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "signed",
+      "offset": 20,
+      "bytes": 4,
+      "kind": "i32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "count",
+      "offset": 24,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "signed_range",
+   "src": "Args(height=i32.within(-12, 240))",
+   "ok": {
+    "size": 4,
+    "args": [
+     {
+      "name": "height",
+      "offset": 0,
+      "bytes": 4,
+      "kind": "i32",
+      "lo": -12,
+      "hi": 240,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "divisor_layout",
+   "src": "Args(blocks=u32, quantum=u32.within(3, 1 << 12).divisor())",
+   "ok": {
+    "size": 24,
+    "args": [
+     {
+      "name": "blocks",
+      "offset": 0,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "quantum",
+      "offset": 8,
+      "bytes": 16,
+      "kind": "u32",
+      "lo": 3,
+      "hi": 4096,
+      "divisor": true,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "stride_multiple",
+   "src": "Args(stride=u32.within(6, 90).multiple_of(6))",
+   "ok": {
+    "size": 4,
+    "args": [
+     {
+      "name": "stride",
+      "offset": 0,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": 6,
+      "hi": 90,
+      "divisor": false,
+      "multiple": 6,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "owned_memory_mix",
+   "src": "Args(workspace=scratch, persistent=kept.uncached, rollback=carried)",
+   "ok": {
+    "size": 24,
+    "args": [
+     {
+      "name": "workspace",
+      "offset": 0,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": "scratch",
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "persistent",
+      "offset": 8,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": "kept",
+      "library": null,
+      "mem": "uncached",
+      "ranks": null
+     },
+     {
+      "name": "rollback",
+      "offset": 16,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": "carried",
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "rank_shape_declaration",
+   "src": "Args(segments=u32, world=mapped(3), fallback=ptr)",
+   "ok": {
+    "size": 48,
+    "args": [
+     {
+      "name": "segments",
+      "offset": 0,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "world",
+      "offset": 8,
+      "bytes": 32,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": "mapped",
+      "library": null,
+      "mem": null,
+      "ranks": 3
+     },
+     {
+      "name": "fallback",
+      "offset": 40,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "five_peers",
+   "src": "Args(team=peers(5), cutoff=u32)",
+   "ok": {
+    "size": 52,
+    "args": [
+     {
+      "name": "team",
+      "offset": 0,
+      "bytes": 48,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": 5
+     },
+     {
+      "name": "cutoff",
+      "offset": 48,
+      "bytes": 4,
+      "kind": "u32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "library_state_first",
+   "src": "Args(state=lib_arg(kept, 'trace'), source=ptr)",
+   "ok": {
+    "size": 16,
+    "args": [
+     {
+      "name": "state",
+      "offset": 0,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": "kept",
+      "library": "trace",
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "source",
+      "offset": 8,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "explicit_sparse_offsets",
+   "src": "Args(at={'marker': 48, 'payload': 80}, first=ptr, marker=f32, payload=u64)",
+   "ok": {
+    "size": 88,
+    "args": [
+     {
+      "name": "first",
+      "offset": 0,
+      "bytes": 8,
+      "kind": "ptr",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "marker",
+      "offset": 48,
+      "bytes": 4,
+      "kind": "f32",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     },
+     {
+      "name": "payload",
+      "offset": 80,
+      "bytes": 8,
+      "kind": "u64",
+      "lo": null,
+      "hi": null,
+      "divisor": false,
+      "multiple": 1,
+      "owned": null,
+      "library": null,
+      "mem": null,
+      "ranks": null
+     }
+    ]
+   }
+  },
+  {
+   "name": "misaligned_explicit_pointer",
+   "src": "Args(at={'vector': 12}, vector=ptr)",
+   "refused": "ValueError",
+   "message": "argument vector: at byte 12, a ptr is 8-aligned"
+  },
+  {
+   "name": "overlap_explicit_scalar",
+   "src": "Args(at={'stop': 6}, base=ptr, stop=u32)",
+   "refused": "ValueError",
+   "message": "argument stop: at byte 6, a u32 is 4-aligned"
+  },
+  {
+   "name": "unknown_explicit_name",
+   "src": "Args(at={'missing': 24}, base=ptr)",
+   "refused": "ValueError",
+   "message": "at= names no argument: missing"
+  },
+  {
+   "name": "fractional_range_refused",
+   "src": "Args(scale=f32.within(2, 16))",
+   "refused": "ValueError",
+   "message": "argument scale: a range on an integer (u32, i32), not f32"
+  },
+  {
+   "name": "empty_declaration",
+   "src": "Args()",
+   "ok": {
+    "size": 0,
+    "args": []
+   }
+  }
+ ]
+}

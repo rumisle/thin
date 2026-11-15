@@ -1,0 +1,2688 @@
+{
+ "notation": "Each case is a DSL snippet (`src`) run on a fresh Builder for gfx1201, with `b` the Builder, `V`, `S` its files and every name of the language imported. `built` is the stream the Builder made, before any pass: one line per instruction, `<form name> <operands> {fields}; <attributes>`. A register operand is written as VReg repr (`<file>:<value name>[<index in group>]x<dwords>` and `+<lo>` when lo != 0); a named register by its name; an immediate as its value, with the writer's spelling in quotes when it has one (`16'0x10'`); a block as `@label`. Source modifiers are written `-x`, `|x|`. Fields are in stored order. Attributes in a fixed order: comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset: none or var, ordered), m0_set, waves_taken, fence. `values` lists the program's values in id order: `id file name n= align= [index=] [pin=] [same_as=]`. `records` holds the Program's lane regions and loops, the deferred records' kinds, each file's entered / pinned groups and lanes-covered names, and the wave index. `error` is the refusal (exception class and message) raised while the snippet ran. `render` (the whole pipeline's output) is the final.s; `render_error` a refusal of the pipeline's passes.",
+ "cases": [
+  {
+   "name": "vadd_operand_kinds",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nsum_sv = V.u32(k1 + w, name=\"sum_sv\")\nsum_vv = V.u32(w + u, name=\"sum_vv\")\nsum_iv = V.u32(17 + u, name=\"sum_iv\")\nsum_vs = V.u32(u + k0, name=\"sum_vs\")\nsum_lit = V.u32(w + 0x4b16517f, name=\"sum_lit\")\nsum_vi = V.u32(w + 38, name=\"sum_vi\")",
+   "built": [
+    "v_add_nc_u32 v:sum_sv#1[0]x1, s:k1#1[0]x1, v:w#1[0]x1 ; comment=\"sum_sv = k1 + w\"",
+    "v_add_nc_u32 v:sum_vv#1[0]x1, v:w#1[0]x1, v:u#1[0]x1 ; comment=\"sum_vv = w + u\"",
+    "v_add_nc_u32 v:sum_iv#1[0]x1, 17, v:u#1[0]x1 ; comment=\"sum_iv = 17 + u\"",
+    "v_add_nc_u32 v:sum_vs#1[0]x1, s:k0#1[0]x1, v:u#1[0]x1 ; comment=\"sum_vs = u + k0\"",
+    "v_add_nc_u32 v:sum_lit#1[0]x1, 1259753855, v:w#1[0]x1 ; comment=\"sum_lit = w + 0x4b16517f\"",
+    "v_add_nc_u32 v:sum_vi#1[0]x1, 38, v:w#1[0]x1 ; comment=\"sum_vi = w + 38\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v sum_sv#1 n=1 align=1",
+    "5 v sum_vv#1 n=1 align=1",
+    "6 v sum_iv#1 n=1 align=1",
+    "7 v sum_vs#1 n=1 align=1",
+    "8 v sum_lit#1 n=1 align=1",
+    "9 v sum_vi#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_add_nc_u32 v0, s2, v4                                      // sum_sv = k1 + w",
+    "\tv_add_nc_u32 v1, v4, v3                                      // sum_vv = w + u",
+    "\tv_add_nc_u32 v2, 17, v3                                      // sum_iv = 17 + u",
+    "\tv_add_nc_u32 v5, s1, v3                                      // sum_vs = u + k0",
+    "\tv_add_nc_u32 v3, 1259753855, v4                              // sum_lit = w + 0x4b16517f",
+    "\tv_add_nc_u32 v6, 38, v4                                      // sum_vi = w + 38"
+   ]
+  },
+  {
+   "name": "vsub_reversed_forms",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nd_ks = V.u32(k1 - u, name=\"d_ks\")\nd_vk = V.u32(w - k0, name=\"d_vk\")\nd_iv = V.u32(62 - w, name=\"d_iv\")\nd_vv = V.u32(u - w, name=\"d_vv\")\nd_vi = V.u32(u - 11, name=\"d_vi\")\nd_lit = V.u32(w - 970919414, name=\"d_lit\")",
+   "built": [
+    "v_sub_nc_u32 v:d_ks#1[0]x1, s:k1#1[0]x1, v:u#1[0]x1 ; comment=\"d_ks = k1 - u\"",
+    "v_subrev_nc_u32 v:d_vk#1[0]x1, s:k0#1[0]x1, v:w#1[0]x1 ; comment=\"d_vk = w - k0\"",
+    "v_sub_nc_u32 v:d_iv#1[0]x1, 62, v:w#1[0]x1 ; comment=\"d_iv = 62 - w\"",
+    "v_sub_nc_u32 v:d_vv#1[0]x1, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"d_vv = u - w\"",
+    "v_subrev_nc_u32 v:d_vi#1[0]x1, 11, v:u#1[0]x1 ; comment=\"d_vi = u - 11\"",
+    "v_subrev_nc_u32 v:d_lit#1[0]x1, 970919414, v:w#1[0]x1 ; comment=\"d_lit = w - 0x39df0df6\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v d_ks#1 n=1 align=1",
+    "5 v d_vk#1 n=1 align=1",
+    "6 v d_iv#1 n=1 align=1",
+    "7 v d_vv#1 n=1 align=1",
+    "8 v d_vi#1 n=1 align=1",
+    "9 v d_lit#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_sub_nc_u32 v0, s2, v3                                      // d_ks = k1 - u",
+    "\tv_subrev_nc_u32 v1, s1, v4                                   // d_vk = w - k0",
+    "\tv_sub_nc_u32 v2, 62, v4                                      // d_iv = 62 - w",
+    "\tv_sub_nc_u32 v5, v3, v4                                      // d_vv = u - w",
+    "\tv_subrev_nc_u32 v6, 11, v3                                   // d_vi = u - 11",
+    "\tv_subrev_nc_u32 v3, 970919414, v4                            // d_lit = w - 0x39df0df6"
+   ]
+  },
+  {
+   "name": "vmul_and_power_of_two",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nm_vs = V.u32(w * k1, name=\"m_vs\")\nm_pow = V.u32(u * 64, name=\"m_pow\")\nm_iv = V.u32(24 * w, name=\"m_iv\")\nm_lit = V.u32(u * 0x10001, name=\"m_lit\")\nm_vv = V.u32(u * w, name=\"m_vv\")",
+   "built": [
+    "v_mul_lo_u32 v:m_vs#1[0]x1, v:w#1[0]x1, s:k1#1[0]x1 ; comment=\"m_vs = w * k1\"",
+    "v_lshlrev_b32 v:m_pow#1[0]x1, 6, v:u#1[0]x1 ; comment=\"m_pow = u * 64\"",
+    "v_mul_lo_u32 v:m_iv#1[0]x1, 24, v:w#1[0]x1 ; comment=\"m_iv = 24 * w\"",
+    "v_mul_lo_u32 v:m_lit#1[0]x1, v:u#1[0]x1, 65537 ; comment=\"m_lit = u * 0x10001\"",
+    "v_mul_lo_u32 v:m_vv#1[0]x1, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"m_vv = u * w\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v m_vs#1 n=1 align=1",
+    "5 v m_pow#1 n=1 align=1",
+    "6 v m_iv#1 n=1 align=1",
+    "7 v m_lit#1 n=1 align=1",
+    "8 v m_vv#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_mul_lo_u32 v0, v4, s2                                      // m_vs = w * k1",
+    "\tv_lshlrev_b32 v1, 6, v3                                      // m_pow = u * 64",
+    "\tv_mul_lo_u32 v2, 24, v4                                      // m_iv = 24 * w",
+    "\tv_mul_lo_u32 v5, v3, 65537                                   // m_lit = u * 0x10001",
+    "\tv_mul_lo_u32 v6, v3, v4                                      // m_vv = u * w"
+   ]
+  },
+  {
+   "name": "vbitwise_operand_kinds",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nb_not = V.u32(~w, name=\"b_not\")\nb_xor = V.u32(u ^ w, name=\"b_xor\")\nb_and = V.u32(w & 0xABCDE, name=\"b_and\")\nb_or = V.u32(k0 | u, name=\"b_or\")",
+   "built": [
+    "v_not_b32 v:b_not#1[0]x1, v:w#1[0]x1 ; comment=\"b_not = ~w\"",
+    "v_xor_b32 v:b_xor#1[0]x1, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"b_xor = u ^ w\"",
+    "v_and_b32 v:b_and#1[0]x1, 703710, v:w#1[0]x1 ; comment=\"b_and = w & 0xabcde\"",
+    "v_or_b32 v:b_or#1[0]x1, s:k0#1[0]x1, v:u#1[0]x1 ; comment=\"b_or = k0 | u\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v b_not#1 n=1 align=1",
+    "5 v b_xor#1 n=1 align=1",
+    "6 v b_and#1 n=1 align=1",
+    "7 v b_or#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_not_b32 v0, v4                                             // b_not = ~w",
+    "\tv_xor_b32 v1, v3, v4                                         // b_xor = u ^ w",
+    "\tv_and_b32 v2, 703710, v4                                     // b_and = w & 0xabcde",
+    "\tv_or_b32 v4, s1, v3                                          // b_or = k0 | u"
+   ]
+  },
+  {
+   "name": "vshift_kinds",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nsg, sh = V.i32(name=\"sg\", at=8), V.i32(name=\"sh\", at=9)\nsh_r = V.u32(w >> 7, name=\"sh_r\")\nsh_lv = V.u32(u << w, name=\"sh_lv\")\nsh_as = V.i32(sg >> i32(k1), name=\"sh_as\")\nsh_ai = V.i32(sh >> 9, name=\"sh_ai\")\nsh_rs = V.u32(w >> k0, name=\"sh_rs\")\nsh_cv = V.u32(5 << u, name=\"sh_cv\")",
+   "built": [
+    "v_lshrrev_b32 v:sh_r#1[0]x1, 7, v:w#1[0]x1 ; comment=\"sh_r = w >> 7\"",
+    "v_lshlrev_b32 v:sh_lv#1[0]x1, v:w#1[0]x1, v:u#1[0]x1 ; comment=\"sh_lv = u << w\"",
+    "v_ashrrev_i32 v:sh_as#1[0]x1, s:k1#1[0]x1, v:sg#1[0]x1 ; comment=\"sh_as = sg >> i32(k1)\"",
+    "v_ashrrev_i32 v:sh_ai#1[0]x1, 9, v:sh#1[0]x1 ; comment=\"sh_ai = sh >> 9\"",
+    "v_lshrrev_b32 v:sh_rs#1[0]x1, s:k0#1[0]x1, v:w#1[0]x1 ; comment=\"sh_rs = w >> k0\"",
+    "v_lshlrev_b32_e64 v:sh_cv#1[0]x1, v:u#1[0]x1, 5 ; comment=\"sh_cv = 5 << u\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v sg#1 n=1 align=1 pin=8",
+    "5 v sh#1 n=1 align=1 pin=9",
+    "6 v sh_r#1 n=1 align=1",
+    "7 v sh_lv#1 n=1 align=1",
+    "8 v sh_as#1 n=1 align=1",
+    "9 v sh_ai#1 n=1 align=1",
+    "10 v sh_rs#1 n=1 align=1",
+    "11 v sh_cv#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "sg#1",
+     "sh#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_lshrrev_b32 v0, 7, v4                                      // sh_r = w >> 7",
+    "\tv_lshlrev_b32 v1, v4, v3                                     // sh_lv = u << w",
+    "\tv_ashrrev_i32 v2, s2, v8                                     // sh_as = sg >> i32(k1)",
+    "\tv_ashrrev_i32 v5, 9, v9                                      // sh_ai = sh >> 9",
+    "\tv_lshrrev_b32 v6, s1, v4                                     // sh_rs = w >> k0",
+    "\tv_lshlrev_b32_e64 v4, v3, 5                                  // sh_cv = 5 << u"
+   ]
+  },
+  {
+   "name": "identity_rewrites",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nid_mul = V.u32(1 * u, name=\"id_mul\")\nid_or = V.u32(0 | u, name=\"id_or\")\nid_and = V.u32(0xFFFFFFFF & u, name=\"id_and\")\nid_xor = V.u32(0 ^ u, name=\"id_xor\")\nid_shl = V.u32(u << 0, name=\"id_shl\")\nid_addr = V.u32(u + 0, name=\"id_addr\")\nid_addl = V.u32(0 + u, name=\"id_addl\")\nid_sub = V.u32(u - 0, name=\"id_sub\")\nid_shr = V.u32(u >> 0, name=\"id_shr\")",
+   "built": [
+    "v_mov_b32 v:id_mul#1[0]x1, v:u#1[0]x1 ; comment=\"id_mul = 1 * u\"",
+    "v_mov_b32 v:id_or#1[0]x1, v:u#1[0]x1 ; comment=\"id_or = 0 | u\"",
+    "v_mov_b32 v:id_and#1[0]x1, v:u#1[0]x1 ; comment=\"id_and = 0xffffffff & u\"",
+    "v_mov_b32 v:id_xor#1[0]x1, v:u#1[0]x1 ; comment=\"id_xor = 0 ^ u\"",
+    "v_mov_b32 v:id_shl#1[0]x1, v:u#1[0]x1 ; comment=\"id_shl = u << 0\"",
+    "v_mov_b32 v:id_addr#1[0]x1, v:u#1[0]x1 ; comment=\"id_addr = u + 0\"",
+    "v_mov_b32 v:id_addl#1[0]x1, v:u#1[0]x1 ; comment=\"id_addl = 0 + u\"",
+    "v_mov_b32 v:id_sub#1[0]x1, v:u#1[0]x1 ; comment=\"id_sub = u - 0\"",
+    "v_mov_b32 v:id_shr#1[0]x1, v:u#1[0]x1 ; comment=\"id_shr = u >> 0\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v id_mul#1 n=1 align=1",
+    "5 v id_or#1 n=1 align=1",
+    "6 v id_and#1 n=1 align=1",
+    "7 v id_xor#1 n=1 align=1",
+    "8 v id_shl#1 n=1 align=1",
+    "9 v id_addr#1 n=1 align=1",
+    "10 v id_addl#1 n=1 align=1",
+    "11 v id_sub#1 n=1 align=1",
+    "12 v id_shr#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, v3                                             // id_mul = 1 * u",
+    "\tv_mov_b32 v1, v3                                             // id_or = 0 | u",
+    "\tv_mov_b32 v2, v3                                             // id_and = 0xffffffff & u",
+    "\tv_mov_b32 v4, v3                                             // id_xor = 0 ^ u",
+    "\tv_mov_b32 v5, v3                                             // id_shl = u << 0",
+    "\tv_mov_b32 v6, v3                                             // id_addr = u + 0",
+    "\tv_mov_b32 v7, v3                                             // id_addl = 0 + u",
+    "\tv_mov_b32 v8, v3                                             // id_sub = u - 0",
+    "\tv_mov_b32 v9, v3                                             // id_shr = u >> 0"
+   ]
+  },
+  {
+   "name": "fused_shift_add_or",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nla_mul = V.u32(w + u * 8, name=\"la_mul\")\nla_shl = V.u32((w << 1) + u, name=\"la_shl\")\nla_ks = V.u32(u + (w << k1), name=\"la_ks\")\nlo_or = V.u32(u | (w << 4), name=\"lo_or\")\nla_sk = V.u32(k0 + w * 2, name=\"la_sk\")",
+   "built": [
+    "v_lshl_add_u32 v:la_mul#1[0]x1, v:u#1[0]x1, 3, v:w#1[0]x1 ; comment=\"la_mul = w + (u * 8)\"",
+    "v_lshl_add_u32 v:la_shl#1[0]x1, v:w#1[0]x1, 1, v:u#1[0]x1 ; comment=\"la_shl = (w << 1) + u\"",
+    "v_lshl_add_u32 v:la_ks#1[0]x1, v:w#1[0]x1, s:k1#1[0]x1, v:u#1[0]x1 ; comment=\"la_ks = u + (w << k1)\"",
+    "v_lshl_or_b32 v:lo_or#1[0]x1, v:w#1[0]x1, 4, v:u#1[0]x1 ; comment=\"lo_or = u | (w << 4)\"",
+    "v_lshl_add_u32 v:la_sk#1[0]x1, v:w#1[0]x1, 1, s:k0#1[0]x1 ; comment=\"la_sk = k0 + (w * 2)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v la_mul#1 n=1 align=1",
+    "5 v la_shl#1 n=1 align=1",
+    "6 v la_ks#1 n=1 align=1",
+    "7 v lo_or#1 n=1 align=1",
+    "8 v la_sk#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_lshl_add_u32 v0, v3, 3, v4                                 // la_mul = w + (u * 8)",
+    "\tv_lshl_add_u32 v1, v4, 1, v3                                 // la_shl = (w << 1) + u",
+    "\tv_lshl_add_u32 v2, v4, s2, v3                                // la_ks = u + (w << k1)",
+    "\tv_lshl_or_b32 v5, v4, 4, v3                                  // lo_or = u | (w << 4)",
+    "\tv_lshl_add_u32 v3, v4, 1, s1                                 // la_sk = k0 + (w * 2)"
+   ]
+  },
+  {
+   "name": "field_extract_fold_mask",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nsg, sh = V.i32(name=\"sg\", at=8), V.i32(name=\"sh\", at=9)\nbf = V.u32((w >> 9) & 0x3F, name=\"bf\")\nfold = V.u32((u - 20) + 5, name=\"fold\")\nlow = V.u32((w + (u << 6)) & 0x3F, name=\"low\")\ntail = V.u32((u >> 28) & 0xFF, name=\"tail\")\nbfs = V.i32((sg >> 12) & 0x7, name=\"bfs\")",
+   "built": [
+    "v_bfe_u32 v:bf#1[0]x1, v:w#1[0]x1, 9, 6 ; comment=\"bf = (w >> 9) & 63\"",
+    "v_subrev_nc_u32 v:fold#1[0]x1, 15, v:u#1[0]x1 ; comment=\"fold = (u - 20) + 5\"",
+    "v_and_b32 v:low#1[0]x1, 63, v:w#1[0]x1 ; comment=\"low = (w + (u << 6)) & 63\"",
+    "v_lshrrev_b32 v:t#1[0]x1, 28, v:u#1[0]x1 ; comment=\"tail = (u >> 28) & 255\"",
+    "v_and_b32 v:tail#1[0]x1, 255, v:t#1[0]x1",
+    "v_bfe_u32 v:bfs#1[0]x1, v:sg#1[0]x1, 12, 3 ; comment=\"bfs = (sg >> 12) & 7\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v sg#1 n=1 align=1 pin=8",
+    "5 v sh#1 n=1 align=1 pin=9",
+    "6 v bf#1 n=1 align=1",
+    "7 v fold#1 n=1 align=1",
+    "8 v low#1 n=1 align=1",
+    "9 v tail#1 n=1 align=1",
+    "10 v t#1 n=1 align=1",
+    "11 v bfs#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "sg#1",
+     "sh#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_bfe_u32 v0, v4, 9, 6                                       // bf = (w >> 9) & 63",
+    "\tv_subrev_nc_u32 v1, 15, v3                                   // fold = (u - 20) + 5",
+    "\tv_and_b32 v2, 63, v4                                         // low = (w + (u << 6)) & 63",
+    "\tv_lshrrev_b32 v4, 28, v3                                     // tail = (u >> 28) & 255",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_and_b32 v3, 255, v4",
+    "\tv_bfe_u32 v4, v8, 12, 3                                      // bfs = (sg >> 12) & 7"
+   ]
+  },
+  {
+   "name": "salu_arith_and_lshl_add",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nsj = S.i32(name=\"sj\", at=4)\nsc_madd = S.u32(k0 + k1 * 6, name=\"sc_madd\")\nsc_sub = S.u32(k0 - k1, name=\"sc_sub\")\nsc_shl = S.u32(k1 << 7, name=\"sc_shl\")\nsc_shr = S.u32(k0 >> k1, name=\"sc_shr\")\nsc_ashr = S.i32(sj >> 3, name=\"sc_ashr\")\nsc_not = S.u32(~k1, name=\"sc_not\")\nsc_l1 = S.u32(k1 * 2 + k0, name=\"sc_l1\")\nsc_l4 = S.u32(k0 + k1 * 16, name=\"sc_l4\")\nsc_l6 = S.u32((k0 << 6) + k1, name=\"sc_l6\")",
+   "built": [
+    "s_mul_i32 s:t#1[0]x1, s:k1#1[0]x1, 6 ; comment=\"sc_madd = k0 + (k1 * 6)\"",
+    "s_add_co_u32 s:sc_madd#1[0]x1, s:k0#1[0]x1, s:t#1[0]x1",
+    "s_sub_co_u32 s:sc_sub#1[0]x1, s:k0#1[0]x1, s:k1#1[0]x1 ; comment=\"sc_sub = k0 - k1\"",
+    "s_lshl_b32 s:sc_shl#1[0]x1, s:k1#1[0]x1, 7 ; comment=\"sc_shl = k1 << 7\"",
+    "s_lshr_b32 s:sc_shr#1[0]x1, s:k0#1[0]x1, s:k1#1[0]x1 ; comment=\"sc_shr = k0 >> k1\"",
+    "s_ashr_i32 s:sc_ashr#1[0]x1, s:sj#1[0]x1, 3 ; comment=\"sc_ashr = sj >> 3\"",
+    "s_not_b32 s:sc_not#1[0]x1, s:k1#1[0]x1 ; comment=\"sc_not = ~k1\"",
+    "s_lshl1_add_u32 s:sc_l1#1[0]x1, s:k1#1[0]x1, s:k0#1[0]x1 ; comment=\"sc_l1 = (k1 * 2) + k0\"",
+    "s_lshl4_add_u32 s:sc_l4#1[0]x1, s:k1#1[0]x1, s:k0#1[0]x1 ; comment=\"sc_l4 = k0 + (k1 * 16)\"",
+    "s_lshl_b32 s:t#2[0]x1, s:k0#1[0]x1, 6 ; comment=\"sc_l6 = (k0 << 6) + k1\"",
+    "s_add_co_u32 s:sc_l6#1[0]x1, s:t#2[0]x1, s:k1#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s sj#1 n=1 align=1 pin=4",
+    "5 s sc_madd#1 n=1 align=1",
+    "6 s t#1 n=1 align=1",
+    "7 s sc_sub#1 n=1 align=1",
+    "8 s sc_shl#1 n=1 align=1",
+    "9 s sc_shr#1 n=1 align=1",
+    "10 s sc_ashr#1 n=1 align=1",
+    "11 s sc_not#1 n=1 align=1",
+    "12 s sc_l1#1 n=1 align=1",
+    "13 s sc_l4#1 n=1 align=1",
+    "14 s sc_l6#1 n=1 align=1",
+    "15 s t#2 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "sj#1"
+    ]
+   },
+   "render": [
+    "\ts_mul_i32 s0, s2, 6                                          // sc_madd = k0 + (k1 * 6)",
+    "\ts_add_co_u32 s3, s1, s0",
+    "\ts_sub_co_u32 s0, s1, s2                                      // sc_sub = k0 - k1",
+    "\ts_lshl_b32 s5, s2, 7                                         // sc_shl = k1 << 7",
+    "\ts_lshr_b32 s6, s1, s2                                        // sc_shr = k0 >> k1",
+    "\ts_ashr_i32 s7, s4, 3                                         // sc_ashr = sj >> 3",
+    "\ts_not_b32 s4, s2                                             // sc_not = ~k1",
+    "\ts_lshl1_add_u32 s8, s2, s1                                   // sc_l1 = (k1 * 2) + k0",
+    "\ts_lshl4_add_u32 s9, s2, s1                                   // sc_l4 = k0 + (k1 * 16)",
+    "\ts_lshl_b32 s10, s1, 6                                        // sc_l6 = (k0 << 6) + k1",
+    "\ts_add_co_u32 s1, s10, s2"
+   ]
+  },
+  {
+   "name": "salu_literal_staging",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\npick = S.u32(select(k1 < 12, 0x5555, 0x6666), name=\"pick\")\nlin = S.u32(k0 * 300 + 195199038, name=\"lin\")\nfld = S.u32((k1 >> 11) & 0x7F, name=\"fld\")",
+   "built": [
+    "s_cmp_lt_u32 s:k1#1[0]x1, 12 ; comment=\"pick = select(k1 < 12, 0x5555, 0x6666)\"",
+    "s_mov_b32 s:t#1[0]x1, 26214",
+    "s_cselect_b32 s:pick#1[0]x1, 21845, s:t#1[0]x1",
+    "s_mul_i32 s:t#2[0]x1, s:k0#1[0]x1, 300 ; comment=\"lin = (k0 * 300) + 0xba2803e\"",
+    "s_add_co_u32 s:lin#1[0]x1, s:t#2[0]x1, 195199038",
+    "s_bfe_u32 s:fld#1[0]x1, s:k1#1[0]x1, 458763 ; comment=\"fld = (k1 >> 11) & 127\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s pick#1 n=1 align=1",
+    "5 s t#1 n=1 align=1",
+    "6 s lin#1 n=1 align=1",
+    "7 s t#2 n=1 align=1",
+    "8 s fld#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\ts_cmp_lt_u32 s2, 12                                          // pick = select(k1 < 12, 0x5555, 0x6666)",
+    "\ts_mov_b32 s0, 26214",
+    "\ts_cselect_b32 s3, 21845, s0",
+    "\ts_mul_i32 s0, s1, 300                                        // lin = (k0 * 300) + 0xba2803e",
+    "\ts_add_co_u32 s1, s0, 195199038",
+    "\ts_bfe_u32 s0, s2, 458763                                     // fld = (k1 >> 11) & 127"
+   ]
+  },
+  {
+   "name": "scalar_tree_into_vgpr",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nvk = V.u32(k1 ^ 3, name=\"vk\")\nvc = V.u32(42, name=\"vc\")\nvl = V.u32(0xDEADBEEF, name=\"vl\")\nsl = S.u32(123456, name=\"sl\")\nvm = V.u32(k0, name=\"vm\")",
+   "built": [
+    "s_xor_b32 s:t#1[0]x1, s:k1#1[0]x1, 3 ; comment=\"vk = k1 ^ 3\"",
+    "v_mov_b32 v:vk#1[0]x1, s:t#1[0]x1",
+    "v_mov_b32 v:vc#1[0]x1, 42 ; comment=\"vc = 42\"",
+    "v_mov_b32 v:vl#1[0]x1, 3735928559 ; comment=\"vl = 0xdeadbeef\"",
+    "s_mov_b32 s:sl#1[0]x1, 123456 ; comment=\"sl = 0x1e240\"",
+    "v_mov_b32 v:vm#1[0]x1, s:k0#1[0]x1 ; comment=\"vm = k0\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v vk#1 n=1 align=1",
+    "5 s t#1 n=1 align=1",
+    "6 v vc#1 n=1 align=1",
+    "7 v vl#1 n=1 align=1",
+    "8 s sl#1 n=1 align=1",
+    "9 v vm#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\ts_xor_b32 s0, s2, 3                                          // vk = k1 ^ 3",
+    "\tv_mov_b32 v0, s0",
+    "\tv_mov_b32 v1, 42                                             // vc = 42",
+    "\tv_mov_b32 v2, 3735928559                                     // vl = 0xdeadbeef",
+    "\ts_mov_b32 s0, 123456                                         // sl = 0x1e240",
+    "\tv_mov_b32 v3, s1                                             // vm = k0"
+   ]
+  },
+  {
+   "name": "float_arith_constants",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\nfsum = V.f32(fa + fc, name=\"fsum\")\nfdiff = V.f32(fb - 4.0, name=\"fdiff\")\nfrev = V.f32(0.5 - fb, name=\"frev\")\nflit = V.f32(fc * 0.1, name=\"flit\")\nfint = V.f32(fb * 4, name=\"fint\")\nfzero = V.f32(0.0, name=\"fzero\")\nfone = V.f32(1.0, name=\"fone\")\nfneg = V.f32(fa * -2.0, name=\"fneg\")",
+   "built": [
+    "v_add_f32 v:fsum#1[0]x1, v:fa#1[0]x1, v:fc#1[0]x1 ; comment=\"fsum = fa + fc\"",
+    "v_subrev_f32 v:fdiff#1[0]x1, 4.0, v:fb#1[0]x1 ; comment=\"fdiff = fb - 4.0\"",
+    "v_sub_f32 v:frev#1[0]x1, 0.5, v:fb#1[0]x1 ; comment=\"frev = 0.5 - fb\"",
+    "v_mul_f32 v:flit#1[0]x1, 1036831949, v:fc#1[0]x1 ; comment=\"flit = fc * 0.1\"",
+    "v_mul_f32 v:fint#1[0]x1, 4.0, v:fb#1[0]x1 ; comment=\"fint = fb * 4\"",
+    "v_mov_b32 v:fzero#1[0]x1, 0 ; comment=\"fzero = 0.0\"",
+    "v_mov_b32 v:fone#1[0]x1, 1.0 ; comment=\"fone = 1.0\"",
+    "v_mul_f32 v:fneg#1[0]x1, -2.0, v:fa#1[0]x1 ; comment=\"fneg = fa * -2.0\""
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v fsum#1 n=1 align=1",
+    "4 v fdiff#1 n=1 align=1",
+    "5 v frev#1 n=1 align=1",
+    "6 v flit#1 n=1 align=1",
+    "7 v fint#1 n=1 align=1",
+    "8 v fzero#1 n=1 align=1",
+    "9 v fone#1 n=1 align=1",
+    "10 v fneg#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_add_f32 v0, v5, v7                                         // fsum = fa + fc",
+    "\tv_subrev_f32 v1, 4.0, v6                                     // fdiff = fb - 4.0",
+    "\tv_sub_f32 v2, 0.5, v6                                        // frev = 0.5 - fb",
+    "\tv_mul_f32 v3, 1036831949, v7                                 // flit = fc * 0.1",
+    "\tv_mul_f32 v4, 4.0, v6                                        // fint = fb * 4",
+    "\tv_mov_b32 v6, 0                                              // fzero = 0.0",
+    "\tv_mov_b32 v7, 1.0                                            // fone = 1.0",
+    "\tv_mul_f32 v8, -2.0, v5                                       // fneg = fa * -2.0"
+   ]
+  },
+  {
+   "name": "float_no_implicit_fma",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\nunf = V.f32(fc + fa * fb, name=\"unf\")\nfused = V.f32(fma(fc, fb, -1.0), name=\"fused\")",
+   "built": [
+    "v_mul_f32 v:t#1[0]x1, v:fa#1[0]x1, v:fb#1[0]x1 ; comment=\"unf = fc + (fa * fb)\"",
+    "v_add_f32 v:unf#1[0]x1, v:fc#1[0]x1, v:t#1[0]x1",
+    "v_fma_f32 v:fused#1[0]x1, v:fc#1[0]x1, v:fb#1[0]x1, -1.0 ; comment=\"fused = fma(fc, fb, -1.0)\""
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v unf#1 n=1 align=1",
+    "4 v t#1 n=1 align=1",
+    "5 v fused#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_mul_f32 v0, v5, v6                                         // unf = fc + (fa * fb)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32 v1, v7, v0",
+    "\tv_fma_f32 v0, v7, v6, -1.0                                   // fused = fma(fc, fb, -1.0)"
+   ]
+  },
+  {
+   "name": "float_source_modifiers",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\nmm = V.f32(abs(fb) * -fc, name=\"mm\")\nng = V.f32(-fb, name=\"ng\")\nab = V.f32(abs(fc), name=\"ab\")\nnab = V.f32(-abs(fb), name=\"nab\")\nabn = V.f32(abs(-fc), name=\"abn\")\ndbl = V.f32(-(-fa) * fb, name=\"dbl\")\nfm = V.f32(fma(abs(fa), -fb, fc), name=\"fm\")",
+   "built": [
+    "v_mul_f32_e64 v:mm#1[0]x1, |v:fb#1[0]x1|, -v:fc#1[0]x1 ; comment=\"mm = |fb| * -fc\"",
+    "v_xor_b32 v:ng#1[0]x1, 2147483648, v:fb#1[0]x1 ; comment=\"ng = -fb\"",
+    "v_and_b32 v:ab#1[0]x1, 2147483647, v:fc#1[0]x1 ; comment=\"ab = |fc|\"",
+    "v_or_b32 v:nab#1[0]x1, 2147483648, v:fb#1[0]x1 ; comment=\"nab = -|fb|\"",
+    "v_and_b32 v:abn#1[0]x1, 2147483647, v:fc#1[0]x1 ; comment=\"abn = |-fc|\"",
+    "v_mul_f32 v:dbl#1[0]x1, v:fa#1[0]x1, v:fb#1[0]x1 ; comment=\"dbl = --fa * fb\"",
+    "v_fma_f32 v:fm#1[0]x1, |v:fa#1[0]x1|, -v:fb#1[0]x1, v:fc#1[0]x1 ; comment=\"fm = fma(|fa|, -fb, fc)\""
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v mm#1 n=1 align=1",
+    "4 v ng#1 n=1 align=1",
+    "5 v ab#1 n=1 align=1",
+    "6 v nab#1 n=1 align=1",
+    "7 v abn#1 n=1 align=1",
+    "8 v dbl#1 n=1 align=1",
+    "9 v fm#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_mul_f32_e64 v0, |v6|, -v7                                  // mm = |fb| * -fc",
+    "\tv_xor_b32 v1, 2147483648, v6                                 // ng = -fb",
+    "\tv_and_b32 v2, 2147483647, v7                                 // ab = |fc|",
+    "\tv_or_b32 v3, 2147483648, v6                                  // nab = -|fb|",
+    "\tv_and_b32 v4, 2147483647, v7                                 // abn = |-fc|",
+    "\tv_mul_f32 v8, v5, v6                                         // dbl = --fa * fb",
+    "\tv_fma_f32 v9, |v5|, -v6, v7                                  // fm = fma(|fa|, -fb, fc)"
+   ]
+  },
+  {
+   "name": "float_transcendentals",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\nt0 = V.f32(sqrt(fa) - exp2(fb), name=\"t0\")\nt1 = V.f32(rcp(log2(fc)), name=\"t1\")\nt2 = V.f32(rsq(fa), name=\"t2\")",
+   "built": [
+    "v_sqrt_f32 v:t#1[0]x1, v:fa#1[0]x1 ; comment=\"t0 = sqrt(fa) - exp2(fb)\"",
+    "v_exp_f32 v:t#2[0]x1, v:fb#1[0]x1",
+    "v_sub_f32 v:t0#1[0]x1, v:t#1[0]x1, v:t#2[0]x1",
+    "v_log_f32 v:t#3[0]x1, v:fc#1[0]x1 ; comment=\"t1 = rcp(log2(fc))\"",
+    "v_rcp_f32 v:t1#1[0]x1, v:t#3[0]x1",
+    "v_rsq_f32 v:t2#1[0]x1, v:fa#1[0]x1 ; comment=\"t2 = rsq(fa)\""
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v t0#1 n=1 align=1",
+    "4 v t#1 n=1 align=1",
+    "5 v t#2 n=1 align=1",
+    "6 v t1#1 n=1 align=1",
+    "7 v t#3 n=1 align=1",
+    "8 v t2#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_sqrt_f32 v0, v5                                            // t0 = sqrt(fa) - exp2(fb)",
+    "\tv_exp_f32 v1, v6",
+    "\ts_delay_alu 5                                                // hazard: instid0(TRANS32_DEP_1)",
+    "\tv_sub_f32 v2, v0, v1",
+    "\tv_log_f32 v0, v7                                             // t1 = rcp(log2(fc))",
+    "\ts_delay_alu 5                                                // hazard: instid0(TRANS32_DEP_1)",
+    "\tv_rcp_f32 v1, v0",
+    "\tv_rsq_f32 v0, v5                                             // t2 = rsq(fa)"
+   ]
+  },
+  {
+   "name": "numeric_conversions",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nfa, fb = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6)\nsg = V.i32(name=\"sg\", at=8)\n\ncs = V.f32(cvt_f32(k1), name=\"cs\")\nci = V.i32(cvt_i32(fb), name=\"ci\")\ncn = V.f32(cvt_f32(sg), name=\"cn\")\ncu = V.u32(cvt_u32(fa), name=\"cu\")\ncw = V.f32(cvt_f32(w), name=\"cw\")",
+   "built": [
+    "v_cvt_f32_u32 v:cs#1[0]x1, s:k1#1[0]x1 ; comment=\"cs = cvt_f32(k1)\"",
+    "v_cvt_i32_f32 v:ci#1[0]x1, v:fb#1[0]x1 ; comment=\"ci = cvt_i32(fb)\"",
+    "v_cvt_f32_i32 v:cn#1[0]x1, v:sg#1[0]x1 ; comment=\"cn = cvt_f32(sg)\"",
+    "v_cvt_u32_f32 v:cu#1[0]x1, v:fa#1[0]x1 ; comment=\"cu = cvt_u32(fa)\"",
+    "v_cvt_f32_u32 v:cw#1[0]x1, v:w#1[0]x1 ; comment=\"cw = cvt_f32(w)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v fa#1 n=1 align=1 pin=5",
+    "5 v fb#1 n=1 align=1 pin=6",
+    "6 v sg#1 n=1 align=1 pin=8",
+    "7 v cs#1 n=1 align=1",
+    "8 v ci#1 n=1 align=1",
+    "9 v cn#1 n=1 align=1",
+    "10 v cu#1 n=1 align=1",
+    "11 v cw#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "fa#1",
+     "fb#1",
+     "sg#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cvt_f32_u32 v0, s2                                         // cs = cvt_f32(k1)",
+    "\tv_cvt_i32_f32 v1, v6                                         // ci = cvt_i32(fb)",
+    "\tv_cvt_f32_i32 v2, v8                                         // cn = cvt_f32(sg)",
+    "\tv_cvt_u32_f32 v3, v5                                         // cu = cvt_u32(fa)",
+    "\tv_cvt_f32_u32 v5, v4                                         // cw = cvt_f32(w)"
+   ]
+  },
+  {
+   "name": "min_max_and_three_way",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nfa, fb = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6)\nsg, sh = V.i32(name=\"sg\", at=8), V.i32(name=\"sh\", at=9)\n\nlo_f = V.f32(min(fb, fa), name=\"lo_f\")\nhi_f = V.f32(max(fa, -2.0), name=\"hi_f\")\nlo_u = V.u32(min(u, w), name=\"lo_u\")\nhi_i = V.i32(max(sg, sh), name=\"hi_i\")\nlo_s = S.u32(min(k0, k1), name=\"lo_s\")\nt_max = V.u32(max3(u, 30, w), name=\"t_max\")\nt_min = V.i32(min3(sh, sg, sh), name=\"t_min\")\nt_med = V.u32(med3(k1, u, w), name=\"t_med\")",
+   "built": [
+    "v_min_num_f32 v:lo_f#1[0]x1, v:fb#1[0]x1, v:fa#1[0]x1 ; comment=\"lo_f = min(fb, fa)\"",
+    "v_max_num_f32 v:hi_f#1[0]x1, -2.0, v:fa#1[0]x1 ; comment=\"hi_f = max(fa, -2.0)\"",
+    "v_min_u32 v:lo_u#1[0]x1, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"lo_u = min(u, w)\"",
+    "v_max_i32 v:hi_i#1[0]x1, v:sg#1[0]x1, v:sh#1[0]x1 ; comment=\"hi_i = max(sg, sh)\"",
+    "s_min_u32 s:lo_s#1[0]x1, s:k0#1[0]x1, s:k1#1[0]x1 ; comment=\"lo_s = min(k0, k1)\"",
+    "v_max3_u32 v:t_max#1[0]x1, v:u#1[0]x1, 30, v:w#1[0]x1 ; comment=\"t_max = max3(u, 30, w)\"",
+    "v_min3_i32 v:t_min#1[0]x1, v:sh#1[0]x1, v:sg#1[0]x1, v:sh#1[0]x1 ; comment=\"t_min = min3(sh, sg, sh)\"",
+    "v_med3_u32 v:t_med#1[0]x1, s:k1#1[0]x1, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"t_med = med3(k1, u, w)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v fa#1 n=1 align=1 pin=5",
+    "5 v fb#1 n=1 align=1 pin=6",
+    "6 v sg#1 n=1 align=1 pin=8",
+    "7 v sh#1 n=1 align=1 pin=9",
+    "8 v lo_f#1 n=1 align=1",
+    "9 v hi_f#1 n=1 align=1",
+    "10 v lo_u#1 n=1 align=1",
+    "11 v hi_i#1 n=1 align=1",
+    "12 s lo_s#1 n=1 align=1",
+    "13 v t_max#1 n=1 align=1",
+    "14 v t_min#1 n=1 align=1",
+    "15 v t_med#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "fa#1",
+     "fb#1",
+     "sg#1",
+     "sh#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_min_num_f32 v0, v6, v5                                     // lo_f = min(fb, fa)",
+    "\tv_max_num_f32 v1, -2.0, v5                                   // hi_f = max(fa, -2.0)",
+    "\tv_min_u32 v2, v3, v4                                         // lo_u = min(u, w)",
+    "\tv_max_i32 v5, v8, v9                                         // hi_i = max(sg, sh)",
+    "\ts_min_u32 s0, s1, s2                                         // lo_s = min(k0, k1)",
+    "\tv_max3_u32 v6, v3, 30, v4                                    // t_max = max3(u, 30, w)",
+    "\tv_min3_i32 v7, v9, v8, v9                                    // t_min = min3(sh, sg, sh)",
+    "\tv_med3_u32 v8, s2, v3, v4                                    // t_med = med3(k1, u, w)"
+   ]
+  },
+  {
+   "name": "bf16_halves_as_f32",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\npb = V.f32(bf16_hi(u) * bf16_lo(w), name=\"pb\")",
+   "built": [
+    "v_and_b32 v:t#1[0]x1, 4294901760, v:u#1[0]x1 ; comment=\"pb = bf16_hi(u) * bf16_lo(w)\"",
+    "v_lshlrev_b32 v:t#2[0]x1, 16, v:w#1[0]x1",
+    "v_mul_f32 v:pb#1[0]x1, v:t#1[0]x1, v:t#2[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v pb#1 n=1 align=1",
+    "5 v t#1 n=1 align=1",
+    "6 v t#2 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_and_b32 v0, 4294901760, v3                                 // pb = bf16_hi(u) * bf16_lo(w)",
+    "\tv_lshlrev_b32 v1, 16, v4",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_f32 v2, v0, v1"
+   ]
+  },
+  {
+   "name": "multiply_family_both_files",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nsw = S.u64(mul_wide(k1, k0), name=\"sw\")\nvh = V.u32(mulhi(w, 0x4bad0490), name=\"vh\")\nv24 = V.u32(mul24(w, 300), name=\"v24\")\ns24 = S.u32(mul24(k0, k1), name=\"s24\")\nvm24 = V.u32(mad24(w, u, 11), name=\"vm24\")\nsm24 = S.u32(mad24(k1, k0, 3), name=\"sm24\")\nvhh = V.u32(mulhi(u, w), name=\"vhh\")\nsh_ = S.u32(mulhi(k1, k0), name=\"sh_\")\nvw = V.u64(mul_wide(w, u), name=\"vw\")",
+   "built": [
+    "s_mul_i32 s:sw#1[0]x1, s:k1#1[0]x1, s:k0#1[0]x1 ; comment=\"sw = mul_wide(k1, k0)\"",
+    "s_mul_hi_u32 s:sw#1[0]x1+1, s:k1#1[0]x1, s:k0#1[0]x1",
+    "v_mul_hi_u32 v:vh#1[0]x1, v:w#1[0]x1, 1269630096 ; comment=\"vh = mulhi(w, 0x4bad0490)\"",
+    "v_mul_u32_u24 v:v24#1[0]x1, 300, v:w#1[0]x1 ; comment=\"v24 = mul24(w, 300)\"",
+    "s_mul_i32 s:s24#1[0]x1, s:k0#1[0]x1, s:k1#1[0]x1 ; comment=\"s24 = mul24(k0, k1)\"",
+    "v_mad_u32_u24 v:vm24#1[0]x1, v:w#1[0]x1, v:u#1[0]x1, 11 ; comment=\"vm24 = mad24(w, u, 11)\"",
+    "s_mul_i32 s:sm24#1[0]x1, s:k1#1[0]x1, s:k0#1[0]x1 ; comment=\"sm24 = mad24(k1, k0, 3)\"",
+    "s_add_co_u32 s:sm24#1[0]x1, s:sm24#1[0]x1, 3",
+    "v_mul_hi_u32 v:vhh#1[0]x1, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"vhh = mulhi(u, w)\"",
+    "s_mul_hi_u32 s:sh_#1[0]x1, s:k1#1[0]x1, s:k0#1[0]x1 ; comment=\"sh_ = mulhi(k1, k0)\"",
+    "v_mul_lo_u32 v:vw#1[0]x1, v:w#1[0]x1, v:u#1[0]x1 ; comment=\"vw = mul_wide(w, u)\"",
+    "v_mul_hi_u32 v:vw#1[0]x1+1, v:w#1[0]x1, v:u#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s sw#1 n=2 align=2",
+    "5 v vh#1 n=1 align=1",
+    "6 v v24#1 n=1 align=1",
+    "7 s s24#1 n=1 align=1",
+    "8 v vm24#1 n=1 align=1",
+    "9 s sm24#1 n=1 align=1",
+    "10 v vhh#1 n=1 align=1",
+    "11 s sh_#1 n=1 align=1",
+    "12 v vw#1 n=2 align=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\ts_mul_i32 s4, s2, s1                                         // sw = mul_wide(k1, k0)",
+    "\ts_mul_hi_u32 s5, s2, s1",
+    "\tv_mul_hi_u32 v0, v4, 1269630096                              // vh = mulhi(w, 0x4bad0490)",
+    "\tv_mul_u32_u24 v1, 300, v4                                    // v24 = mul24(w, 300)",
+    "\ts_mul_i32 s0, s1, s2                                         // s24 = mul24(k0, k1)",
+    "\tv_mad_u32_u24 v2, v4, v3, 11                                 // vm24 = mad24(w, u, 11)",
+    "\ts_mul_i32 s3, s2, s1                                         // sm24 = mad24(k1, k0, 3)",
+    "\ts_add_co_u32 s3, s3, 3",
+    "\tv_mul_hi_u32 v5, v3, v4                                      // vhh = mulhi(u, w)",
+    "\ts_mul_hi_u32 s6, s2, s1                                      // sh_ = mulhi(k1, k0)",
+    "\tv_mul_lo_u32 v6, v4, v3                                      // vw = mul_wide(w, u)",
+    "\tv_mul_hi_u32 v7, v4, v3"
+   ]
+  },
+  {
+   "name": "vector_divide_by_constants",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nq32 = V.u32(w // 32, name=\"q32\")\nr4 = V.u32(w % 4, name=\"r4\")\nq5 = V.u32(u // 5, name=\"q5\")\nq19 = V.u32(u // 19, name=\"q19\")\nr12 = V.u32(w % 12, name=\"r12\")\nq1 = V.u32(u // 1, name=\"q1\")\nr1 = V.u32(u % 1, name=\"r1\")",
+   "built": [
+    "v_lshrrev_b32 v:q32#1[0]x1, 5, v:w#1[0]x1 ; comment=\"q32 = w // 32\"",
+    "v_and_b32 v:r4#1[0]x1, 3, v:w#1[0]x1 ; comment=\"r4 = w % 4\"",
+    "v_mul_hi_u32 v:q5#1[0]x1, v:u#1[0]x1, 3435973837 ; comment=\"q5 = u // 5\"",
+    "v_lshrrev_b32 v:q5#1[0]x1, 2, v:q5#1[0]x1",
+    "v_mul_hi_u32 v:q19#1[0]x1, v:u#1[0]x1, 2938661835 ; comment=\"q19 = u // 19\"",
+    "v_sub_nc_u32 v:t#1[0]x1, v:u#1[0]x1, v:q19#1[0]x1",
+    "v_lshrrev_b32 v:t#1[0]x1, 1, v:t#1[0]x1",
+    "v_add_nc_u32 v:t#1[0]x1, v:t#1[0]x1, v:q19#1[0]x1",
+    "v_lshrrev_b32 v:q19#1[0]x1, 4, v:t#1[0]x1",
+    "v_mul_hi_u32 v:t#2[0]x1, v:w#1[0]x1, 2863311531 ; comment=\"r12 = w % 12\"",
+    "v_lshrrev_b32 v:t#2[0]x1, 3, v:t#2[0]x1",
+    "v_mul_lo_u32 v:t#3[0]x1, v:t#2[0]x1, 12",
+    "v_sub_nc_u32 v:r12#1[0]x1, v:w#1[0]x1, v:t#3[0]x1",
+    "v_mov_b32 v:q1#1[0]x1, v:u#1[0]x1 ; comment=\"q1 = u // 1\"",
+    "v_mov_b32 v:r1#1[0]x1, 0 ; comment=\"r1 = u % 1\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v q32#1 n=1 align=1",
+    "5 v r4#1 n=1 align=1",
+    "6 v q5#1 n=1 align=1",
+    "7 v q19#1 n=1 align=1",
+    "8 v t#1 n=1 align=1",
+    "9 v r12#1 n=1 align=1",
+    "10 v t#2 n=1 align=1",
+    "11 v t#3 n=1 align=1",
+    "12 v q1#1 n=1 align=1",
+    "13 v r1#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_lshrrev_b32 v0, 5, v4                                      // q32 = w // 32",
+    "\tv_and_b32 v1, 3, v4                                          // r4 = w % 4",
+    "\tv_mul_hi_u32 v2, v3, 3435973837                              // q5 = u // 5",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b32 v2, 2, v2",
+    "\tv_mul_hi_u32 v5, v3, 2938661835                              // q19 = u // 19",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_sub_nc_u32 v6, v3, v5",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b32 v6, 1, v6",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_nc_u32 v6, v6, v5",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b32 v5, 4, v6",
+    "\tv_mul_hi_u32 v6, v4, 2863311531                              // r12 = w % 12",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b32 v6, 3, v6",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_lo_u32 v7, v6, 12",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_sub_nc_u32 v6, v4, v7",
+    "\tv_mov_b32 v4, v3                                             // q1 = u // 1",
+    "\tv_mov_b32 v3, 0                                              // r1 = u % 1"
+   ]
+  },
+  {
+   "name": "scalar_divide_by_constants",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nsq64 = S.u32(k1 // 64, name=\"sq64\")\nsq11 = S.u32(k0 // 11, name=\"sq11\")\nsq19 = S.u32(k1 // 19, name=\"sq19\")\nsr10 = S.u32(k0 % 10, name=\"sr10\")",
+   "built": [
+    "s_lshr_b32 s:sq64#1[0]x1, s:k1#1[0]x1, 6 ; comment=\"sq64 = k1 // 64\"",
+    "s_mul_hi_u32 s:sq11#1[0]x1, s:k0#1[0]x1, 3123612579 ; comment=\"sq11 = k0 // 11\"",
+    "s_lshr_b32 s:sq11#1[0]x1, s:sq11#1[0]x1, 3",
+    "s_mul_hi_u32 s:sq19#1[0]x1, s:k1#1[0]x1, 2938661835 ; comment=\"sq19 = k1 // 19\"",
+    "s_sub_co_u32 s:t#1[0]x1, s:k1#1[0]x1, s:sq19#1[0]x1",
+    "s_lshr_b32 s:t#1[0]x1, s:t#1[0]x1, 1",
+    "s_add_co_u32 s:t#1[0]x1, s:t#1[0]x1, s:sq19#1[0]x1",
+    "s_lshr_b32 s:sq19#1[0]x1, s:t#1[0]x1, 4",
+    "s_mul_hi_u32 s:t#2[0]x1, s:k0#1[0]x1, 3435973837 ; comment=\"sr10 = k0 % 10\"",
+    "s_lshr_b32 s:t#2[0]x1, s:t#2[0]x1, 3",
+    "s_mul_i32 s:t#3[0]x1, s:t#2[0]x1, 10",
+    "s_sub_co_u32 s:sr10#1[0]x1, s:k0#1[0]x1, s:t#3[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s sq64#1 n=1 align=1",
+    "5 s sq11#1 n=1 align=1",
+    "6 s sq19#1 n=1 align=1",
+    "7 s t#1 n=1 align=1",
+    "8 s sr10#1 n=1 align=1",
+    "9 s t#2 n=1 align=1",
+    "10 s t#3 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\ts_lshr_b32 s0, s2, 6                                         // sq64 = k1 // 64",
+    "\ts_mul_hi_u32 s3, s1, 3123612579                              // sq11 = k0 // 11",
+    "\ts_lshr_b32 s3, s3, 3",
+    "\ts_mul_hi_u32 s4, s2, 2938661835                              // sq19 = k1 // 19",
+    "\ts_sub_co_u32 s5, s2, s4",
+    "\ts_lshr_b32 s5, s5, 1",
+    "\ts_add_co_u32 s5, s5, s4",
+    "\ts_lshr_b32 s4, s5, 4",
+    "\ts_mul_hi_u32 s2, s1, 3435973837                              // sr10 = k0 % 10",
+    "\ts_lshr_b32 s2, s2, 3",
+    "\ts_mul_i32 s5, s2, 10",
+    "\ts_sub_co_u32 s2, s1, s5"
+   ]
+  },
+  {
+   "name": "divide_by_divisor_kernel_arg",
+   "src": "e = b.entry(Args(n=u32, d=u32.within(2, 1 << 12).divisor()))\nn, d = e.load()\nrem = S.u32(n % d, name=\"rem\")\nquo = S.u32(n // d, name=\"quo\")\nvrem = V.u32(e.tid % d, name=\"vrem\")\nvquo = V.u32(e.tid // d, name=\"vquo\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b32 s:n#1[0]x1, s:karg[0]x2, 0'0x0' ; comment=\"n\"",
+    "s_load_b128 s:d#1[0]x4, s:karg[0]x2, 8'0x8' ; comment=\"d\"",
+    "ir.wait_regs s:n#1[0]x1, s:d#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:n#1[0]x1, s:d#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "s_mul_hi_u32 s:t#1[0]x1, s:n#1[0]x1, s:d#1[0]x1+1 ; comment=\"rem = n % d\"",
+    "ir.wait_regs s:n#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:n#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_add_co_u32 s:t#1[0]x1, s:t#1[0]x1, s:n#1[0]x1",
+    "s_add_co_ci_u32 s:t#1[0]x1+1, 0, 0",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_lshr_b64 s:t#1[0]x2, s:t#1[0]x2, s:d#1[0]x1+2",
+    "ir.wait_regs s:d#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_mul_i32 s:t#2[0]x1, s:t#1[0]x1, s:d#1[0]x1",
+    "ir.wait_regs s:n#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:n#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_sub_co_u32 s:rem#1[0]x1, s:n#1[0]x1, s:t#2[0]x1",
+    "ir.wait_regs s:n#1[0]x1, s:d#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:n#1[0]x1, s:d#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "s_mul_hi_u32 s:t#3[0]x1, s:n#1[0]x1, s:d#1[0]x1+1 ; comment=\"quo = n // d\"",
+    "ir.wait_regs s:n#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:n#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_add_co_u32 s:t#3[0]x1, s:t#3[0]x1, s:n#1[0]x1",
+    "s_add_co_ci_u32 s:t#3[0]x1+1, 0, 0",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_lshr_b64 s:t#3[0]x2, s:t#3[0]x2, s:d#1[0]x1+2",
+    "s_mov_b32 s:quo#1[0]x1, s:t#3[0]x1",
+    "ir.wait_regs s:d#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "v_mul_hi_u32 v:t#4[0]x1, v:tid[0]x1, s:d#1[0]x1+1 ; comment=\"vrem = tid % d\"",
+    "v_add_co_u32 v:t#4[0]x1, vcc_lo, v:t#4[0]x1, v:tid[0]x1",
+    "v_add_co_ci_u32 v:t#4[0]x1+1, vcc_lo, 0, 0, vcc_lo",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "v_lshrrev_b64 v:t#4[0]x2, s:d#1[0]x1+2, v:t#4[0]x2",
+    "ir.wait_regs s:d#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "v_mul_lo_u32 v:t#5[0]x1, v:t#4[0]x1, s:d#1[0]x1",
+    "v_sub_nc_u32 v:vrem#1[0]x1, v:tid[0]x1, v:t#5[0]x1",
+    "ir.wait_regs s:d#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "v_mul_hi_u32 v:t#6[0]x1, v:tid[0]x1, s:d#1[0]x1+1 ; comment=\"vquo = tid // d\"",
+    "v_add_co_u32 v:t#6[0]x1, vcc_lo, v:t#6[0]x1, v:tid[0]x1",
+    "v_add_co_ci_u32 v:t#6[0]x1+1, vcc_lo, 0, 0, vcc_lo",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:d#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "v_lshrrev_b64 v:t#6[0]x2, s:d#1[0]x1+2, v:t#6[0]x2",
+    "v_mov_b32 v:vquo#1[0]x1, v:t#6[0]x1"
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s n#1 n=1 align=1",
+    "4 s d#1 n=4 align=4",
+    "5 s rem#1 n=1 align=1",
+    "6 s t#1 n=2 align=2",
+    "7 s t#2 n=1 align=1",
+    "8 s quo#1 n=1 align=1",
+    "9 s t#3 n=2 align=2",
+    "10 v vrem#1 n=1 align=1",
+    "11 v t#4 n=2 align=2",
+    "12 v t#5 n=1 align=1",
+    "13 v vquo#1 n=1 align=1",
+    "14 v t#6 n=2 align=2"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x0                                   // n",
+    "\ts_load_b128 s[4:7], s[0:1], 0x8                              // d",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_mul_hi_u32 s0, s2, s5                                      // rem = n % d",
+    "\ts_add_co_u32 s0, s0, s2",
+    "\ts_add_co_ci_u32 s1, 0, 0",
+    "\ts_lshr_b64 s[0:1], s[0:1], s6",
+    "\ts_mul_i32 s3, s0, s4",
+    "\ts_sub_co_u32 s0, s2, s3",
+    "\ts_mul_hi_u32 s8, s2, s5                                      // quo = n // d",
+    "\ts_add_co_u32 s8, s8, s2",
+    "\ts_add_co_ci_u32 s9, 0, 0",
+    "\ts_lshr_b64 s[8:9], s[8:9], s6",
+    "\ts_mov_b32 s2, s8",
+    "\tv_mul_hi_u32 v2, v0, s5                                      // vrem = tid % d",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_u32 v2, vcc_lo, v2, v0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v3, vcc_lo, 0, 0, vcc_lo",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b64 v[2:3], s6, v[2:3]",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_lo_u32 v1, v2, s4",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_sub_nc_u32 v2, v0, v1",
+    "\tv_mul_hi_u32 v4, v0, s5                                      // vquo = tid // d",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_u32 v4, vcc_lo, v4, v0",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v5, vcc_lo, 0, 0, vcc_lo",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b64 v[4:5], s6, v[4:5]",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mov_b32 v0, v4"
+   ]
+  },
+  {
+   "name": "sixty_four_bit_add_sub",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nbase = S.ptr(name=\"base\", at=4)\nqv = V.u64(name=\"qv\", at=6)\nvi = V.i32(name=\"vi\", at=8)\nsi = S.i32(name=\"si\", at=6)\nw_sv = V.u64(base + w, name=\"w_sv\")\nw_vi = V.u64(qv + vi, name=\"w_vi\")\nw_ss = S.u64(base + k1, name=\"w_ss\")\nw_si = S.u64(base + si, name=\"w_si\")\nw_sub = V.u64(qv - u, name=\"w_sub\")\nw_subc = S.u64(base - 40, name=\"w_subc\")\nw_vv = V.u64(qv + qv, name=\"w_vv\")\nw_rev = S.u64(k0 + base, name=\"w_rev\")\nw_id = V.u64(qv + 0, name=\"w_id\")",
+   "built": [
+    "v_mov_b32 v:t#1[0]x1, s:base#1[0]x1+1 ; comment=\"w_sv = base + w\"",
+    "v_add_co_u32 v:w_sv#1[0]x1, vcc_lo, s:base#1[0]x1, v:w#1[0]x1",
+    "v_add_co_ci_u32 v:w_sv#1[0]x1+1, vcc_lo, 0, v:t#1[0]x1, vcc_lo",
+    "v_ashrrev_i32 v:t#2[0]x1, 31, v:vi#1[0]x1 ; comment=\"w_vi = qv + vi\"",
+    "v_add_co_u32 v:w_vi#1[0]x1, vcc_lo, v:qv#1[0]x1, v:vi#1[0]x1",
+    "v_add_co_ci_u32 v:w_vi#1[0]x1+1, vcc_lo, v:qv#1[0]x1+1, v:t#2[0]x1, vcc_lo",
+    "s_add_co_u32 s:w_ss#1[0]x1, s:base#1[0]x1, s:k1#1[0]x1 ; comment=\"w_ss = base + k1\"",
+    "s_add_co_ci_u32 s:w_ss#1[0]x1+1, s:base#1[0]x1+1, 0",
+    "s_ashr_i32 s:t#3[0]x1, s:si#1[0]x1, 31 ; comment=\"w_si = base + si\"",
+    "s_add_co_u32 s:w_si#1[0]x1, s:base#1[0]x1, s:si#1[0]x1",
+    "s_add_co_ci_u32 s:w_si#1[0]x1+1, s:base#1[0]x1+1, s:t#3[0]x1",
+    "v_mov_b32 v:t#4[0]x1, 0 ; comment=\"w_sub = qv - u\"",
+    "v_sub_co_u32 v:w_sub#1[0]x1, vcc_lo, v:qv#1[0]x1, v:u#1[0]x1",
+    "v_sub_co_ci_u32 v:w_sub#1[0]x1+1, vcc_lo, v:qv#1[0]x1+1, v:t#4[0]x1, vcc_lo",
+    "s_sub_co_u32 s:w_subc#1[0]x1, s:base#1[0]x1, 40 ; comment=\"w_subc = base - 40\"",
+    "s_sub_co_ci_u32 s:w_subc#1[0]x1+1, s:base#1[0]x1+1, 0",
+    "v_add_co_u32 v:w_vv#1[0]x1, vcc_lo, v:qv#1[0]x1, v:qv#1[0]x1 ; comment=\"w_vv = qv + qv\"",
+    "v_add_co_ci_u32 v:w_vv#1[0]x1+1, vcc_lo, v:qv#1[0]x1+1, v:qv#1[0]x1+1, vcc_lo",
+    "s_add_co_u32 s:w_rev#1[0]x1, s:base#1[0]x1, s:k0#1[0]x1 ; comment=\"w_rev = k0 + base\"",
+    "s_add_co_ci_u32 s:w_rev#1[0]x1+1, s:base#1[0]x1+1, 0",
+    "v_mov_b32 v:w_id#1[0]x1, v:qv#1[0]x1 ; comment=\"w_id = qv + 0\"",
+    "v_mov_b32 v:w_id#1[0]x1+1, v:qv#1[0]x1+1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s base#1 n=2 align=2 pin=4",
+    "5 v qv#1 n=2 align=2 pin=6",
+    "6 v vi#1 n=1 align=1 pin=8",
+    "7 s si#1 n=1 align=1 pin=6",
+    "8 v w_sv#1 n=2 align=2",
+    "9 v t#1 n=1 align=1",
+    "10 v w_vi#1 n=2 align=2",
+    "11 v t#2 n=1 align=1",
+    "12 s w_ss#1 n=2 align=2",
+    "13 s w_si#1 n=2 align=2",
+    "14 s t#3 n=1 align=1",
+    "15 v w_sub#1 n=2 align=2",
+    "16 v t#4 n=1 align=1",
+    "17 s w_subc#1 n=2 align=2",
+    "18 v w_vv#1 n=2 align=2",
+    "19 s w_rev#1 n=2 align=2",
+    "20 v w_id#1 n=2 align=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "qv#1",
+     "vi#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "base#1",
+     "si#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, s5                                             // w_sv = base + w",
+    "\tv_add_co_u32 v10, vcc_lo, s4, v4",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v11, vcc_lo, 0, v0, vcc_lo",
+    "\tv_ashrrev_i32 v0, 31, v8                                     // w_vi = qv + vi",
+    "\tv_add_co_u32 v4, vcc_lo, v6, v8",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v5, vcc_lo, v7, v0, vcc_lo",
+    "\ts_add_co_u32 s8, s4, s2                                      // w_ss = base + k1",
+    "\ts_add_co_ci_u32 s9, s5, 0",
+    "\ts_ashr_i32 s0, s6, 31                                        // w_si = base + si",
+    "\ts_add_co_u32 s2, s4, s6",
+    "\ts_add_co_ci_u32 s3, s5, s0",
+    "\tv_mov_b32 v0, 0                                              // w_sub = qv - u",
+    "\tv_sub_co_u32 v2, vcc_lo, v6, v3",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_sub_co_ci_u32 v3, vcc_lo, v7, v0, vcc_lo",
+    "\ts_sub_co_u32 s6, s4, 40                                      // w_subc = base - 40",
+    "\ts_sub_co_ci_u32 s7, s5, 0",
+    "\tv_add_co_u32 v0, vcc_lo, v6, v6                              // w_vv = qv + qv",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v1, vcc_lo, v7, v7, vcc_lo",
+    "\ts_add_co_u32 s0, s4, s1                                      // w_rev = k0 + base",
+    "\ts_add_co_ci_u32 s1, s5, 0",
+    "\tv_mov_b32 v8, v6                                             // w_id = qv + 0",
+    "\tv_mov_b32 v9, v7"
+   ]
+  },
+  {
+   "name": "select_kinds",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nfa, fb = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6)\nlm = S.mask(name=\"lm\", at=4)\nbase = S.u64(name=\"base\", at=6)\nsl_v = V.u32(select(w >= 20, u, 7), name=\"sl_v\")\nsl_m = V.u32(select(lm, 970919414, w), name=\"sl_m\")\nsl_s = S.u32(select(k1 < 9, 9, k1), name=\"sl_s\")\nsl_n = V.f32(select(~(fb > 2.0), fb, 1.0), name=\"sl_n\")\nsl_mod = V.f32(select(fa < fb, abs(fa), -fb), name=\"sl_mod\")\nsl_64 = S.u64(select(k0 != k1, 0, base), name=\"sl_64\")\nsl_b = V.u32(select(k0 == 4, u, w), name=\"sl_b\")",
+   "built": [
+    "v_cmp_le_u32 vcc_lo, 20, v:w#1[0]x1 ; comment=\"sl_v = select(w >= 20, u, 7)\"",
+    "v_cndmask_b32 v:sl_v#1[0]x1, 7, v:u#1[0]x1, vcc_lo",
+    "v_mov_b32 v:t#1[0]x1, 970919414 ; comment=\"sl_m = select(lm, 0x39df0df6, w)\"",
+    "v_cndmask_b32_e64 v:sl_m#1[0]x1, v:w#1[0]x1, v:t#1[0]x1, s:lm#1[0]x1",
+    "s_cmp_lt_u32 s:k1#1[0]x1, 9 ; comment=\"sl_s = select(k1 < 9, 9, k1)\"",
+    "s_cselect_b32 s:sl_s#1[0]x1, 9, s:k1#1[0]x1",
+    "v_cmp_nlt_f32 vcc_lo, 2.0, v:fb#1[0]x1 ; comment=\"sl_n = select(~(fb > 2.0), fb, 1.0)\"",
+    "v_cndmask_b32 v:sl_n#1[0]x1, 1.0, v:fb#1[0]x1, vcc_lo",
+    "v_and_b32 v:t#2[0]x1, 2147483647, v:fa#1[0]x1 ; comment=\"sl_mod = select(fa < fb, |fa|, -fb)\"",
+    "v_xor_b32 v:t#3[0]x1, 2147483648, v:fb#1[0]x1",
+    "v_cmp_lt_f32 vcc_lo, v:fa#1[0]x1, v:fb#1[0]x1",
+    "v_cndmask_b32 v:sl_mod#1[0]x1, v:t#3[0]x1, v:t#2[0]x1, vcc_lo",
+    "s_cmp_lg_u32 s:k0#1[0]x1, s:k1#1[0]x1 ; comment=\"sl_64 = select(k0 != k1, 0, base)\"",
+    "s_cselect_b64 s:sl_64#1[0]x2, 0, s:base#1[0]x2",
+    "s_cmp_eq_u32 s:k0#1[0]x1, 4 ; comment=\"sl_b = select(k0 == 4, u, w)\"",
+    "s_cselect_b32 s:t#4[0]x1, -1, 0",
+    "v_cndmask_b32_e64 v:sl_b#1[0]x1, v:w#1[0]x1, v:u#1[0]x1, s:t#4[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v fa#1 n=1 align=1 pin=5",
+    "5 v fb#1 n=1 align=1 pin=6",
+    "6 s lm#1 n=1 align=1 pin=4",
+    "7 s base#1 n=2 align=2 pin=6",
+    "8 v sl_v#1 n=1 align=1",
+    "9 v sl_m#1 n=1 align=1",
+    "10 v t#1 n=1 align=1",
+    "11 s sl_s#1 n=1 align=1",
+    "12 v sl_n#1 n=1 align=1",
+    "13 v sl_mod#1 n=1 align=1",
+    "14 v t#2 n=1 align=1",
+    "15 v t#3 n=1 align=1",
+    "16 s sl_64#1 n=2 align=2",
+    "17 v sl_b#1 n=1 align=1",
+    "18 s t#4 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "fa#1",
+     "fb#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "lm#1",
+     "base#1"
+    ]
+   },
+   "render": [
+    "\tv_cmp_le_u32 vcc_lo, 20, v4                                  // sl_v = select(w >= 20, u, 7)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32 v0, 7, v3, vcc_lo",
+    "\tv_mov_b32 v1, 970919414                                      // sl_m = select(lm, 0x39df0df6, w)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32_e64 v2, v4, v1, s4",
+    "\ts_cmp_lt_u32 s2, 9                                           // sl_s = select(k1 < 9, 9, k1)",
+    "\ts_cselect_b32 s0, 9, s2",
+    "\tv_cmp_nlt_f32 vcc_lo, 2.0, v6                                // sl_n = select(~(fb > 2.0), fb, 1.0)",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32 v1, 1.0, v6, vcc_lo",
+    "\tv_and_b32 v7, 2147483647, v5                                 // sl_mod = select(fa < fb, |fa|, -fb)",
+    "\tv_xor_b32 v8, 2147483648, v6",
+    "\tv_cmp_lt_f32 vcc_lo, v5, v6",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32 v5, v8, v7, vcc_lo",
+    "\ts_cmp_lg_u32 s1, s2                                          // sl_64 = select(k0 != k1, 0, base)",
+    "\ts_cselect_b64 s[2:3], 0, s[6:7]",
+    "\ts_cmp_eq_u32 s1, 4                                           // sl_b = select(k0 == 4, u, w)",
+    "\ts_cselect_b32 s1, -1, 0",
+    "\tv_cndmask_b32_e64 v6, v4, v3, s1"
+   ]
+  },
+  {
+   "name": "compares_to_lane_masks",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nfa, fb = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6)\nma = S.mask(u >= k1, name=\"ma\")\nmb = S.mask((w == 0) | (u >= k1), name=\"mb\")\nmc = S.mask(~mb, name=\"mc\")\nmd = S.mask(ma & mb, name=\"md\")\nme = S.mask((fa > fb) ^ md, name=\"me\")\nmf = S.mask(k1 != 7, name=\"mf\")\nmg = S.mask(9 >= w, name=\"mg\")\nmh = S.mask(O.VCC, name=\"mh\")\nmi = S.mask(~(fb < fa), name=\"mi\")\nmj = S.mask(fa == fb, name=\"mj\")",
+   "built": [
+    "v_cmp_ge_u32_e64 s:ma#1[0]x1, v:u#1[0]x1, s:k1#1[0]x1 ; comment=\"ma = u >= k1\"",
+    "v_cmp_eq_u32_e64 s:t#1[0]x1, v:w#1[0]x1, 0 ; comment=\"mb = (w == 0) | (u >= k1)\"",
+    "v_cmp_le_u32 vcc_lo, s:k1#1[0]x1, v:u#1[0]x1",
+    "s_or_b32 s:mb#1[0]x1, s:t#1[0]x1, vcc_lo",
+    "s_and_not1_b32 s:mc#1[0]x1, exec_lo, s:mb#1[0]x1 ; comment=\"mc = ~mb\"",
+    "s_and_b32 s:md#1[0]x1, s:ma#1[0]x1, s:mb#1[0]x1 ; comment=\"md = ma & mb\"",
+    "v_cmp_gt_f32_e64 s:t#2[0]x1, v:fa#1[0]x1, v:fb#1[0]x1 ; comment=\"me = (fa > fb) ^ md\"",
+    "s_xor_b32 s:me#1[0]x1, s:t#2[0]x1, s:md#1[0]x1",
+    "s_cmp_lg_u32 s:k1#1[0]x1, 7 ; comment=\"mf = k1 != 7\"",
+    "s_cselect_b32 s:mf#1[0]x1, -1, 0",
+    "v_cmp_le_u32_e64 s:mg#1[0]x1, v:w#1[0]x1, 9 ; comment=\"mg = w <= 9\"",
+    "s_mov_b32 s:mh#1[0]x1, vcc_lo ; comment=\"mh = vcc\"",
+    "v_cmp_nlt_f32_e64 s:mi#1[0]x1, v:fb#1[0]x1, v:fa#1[0]x1 ; comment=\"mi = ~(fb < fa)\"",
+    "v_cmp_eq_f32_e64 s:mj#1[0]x1, v:fa#1[0]x1, v:fb#1[0]x1 ; comment=\"mj = fa == fb\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v fa#1 n=1 align=1 pin=5",
+    "5 v fb#1 n=1 align=1 pin=6",
+    "6 s ma#1 n=1 align=1",
+    "7 s mb#1 n=1 align=1",
+    "8 s t#1 n=1 align=1",
+    "9 s mc#1 n=1 align=1",
+    "10 s md#1 n=1 align=1",
+    "11 s me#1 n=1 align=1",
+    "12 s t#2 n=1 align=1",
+    "13 s mf#1 n=1 align=1",
+    "14 s mg#1 n=1 align=1",
+    "15 s mh#1 n=1 align=1",
+    "16 s mi#1 n=1 align=1",
+    "17 s mj#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "fa#1",
+     "fb#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cmp_ge_u32_e64 s0, v3, s2                                  // ma = u >= k1",
+    "\tv_cmp_eq_u32_e64 s1, v4, 0                                   // mb = (w == 0) | (u >= k1)",
+    "\tv_cmp_le_u32 vcc_lo, s2, v3",
+    "\ts_or_b32 s3, s1, vcc_lo",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_and_not1_b32 s1, exec_lo, s3                               // mc = ~mb",
+    "\ts_and_b32 s4, s0, s3                                         // md = ma & mb",
+    "\tv_cmp_gt_f32_e64 s0, v5, v6                                  // me = (fa > fb) ^ md",
+    "\ts_xor_b32 s3, s0, s4",
+    "\ts_cmp_lg_u32 s2, 7                                           // mf = k1 != 7",
+    "\ts_cselect_b32 s0, -1, 0",
+    "\tv_cmp_le_u32_e64 s2, v4, 9                                   // mg = w <= 9",
+    "\ts_mov_b32 s4, vcc_lo                                         // mh = vcc",
+    "\tv_cmp_nlt_f32_e64 s5, v6, v5                                 // mi = ~(fb < fa)",
+    "\tv_cmp_eq_f32_e64 s6, v5, v6                                  // mj = fa == fb"
+   ]
+  },
+  {
+   "name": "compare_operands_swapped_for_vcc",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\npa = V.u32(select(w <= 30, u, w), name=\"pa\")\npb = V.u32(select(u > k1, u, w), name=\"pb\")\npc = V.u32(select(u != w, w, u), name=\"pc\")\npd = V.u32(select(k0 <= k1, w, u), name=\"pd\")",
+   "built": [
+    "v_cmp_ge_u32 vcc_lo, 30, v:w#1[0]x1 ; comment=\"pa = select(w <= 30, u, w)\"",
+    "v_cndmask_b32 v:pa#1[0]x1, v:w#1[0]x1, v:u#1[0]x1, vcc_lo",
+    "v_cmp_lt_u32 vcc_lo, s:k1#1[0]x1, v:u#1[0]x1 ; comment=\"pb = select(u > k1, u, w)\"",
+    "v_cndmask_b32 v:pb#1[0]x1, v:w#1[0]x1, v:u#1[0]x1, vcc_lo",
+    "v_cmp_ne_u32 vcc_lo, v:u#1[0]x1, v:w#1[0]x1 ; comment=\"pc = select(u != w, w, u)\"",
+    "v_cndmask_b32 v:pc#1[0]x1, v:u#1[0]x1, v:w#1[0]x1, vcc_lo",
+    "s_cmp_le_u32 s:k0#1[0]x1, s:k1#1[0]x1 ; comment=\"pd = select(k0 <= k1, w, u)\"",
+    "s_cselect_b32 s:t#1[0]x1, -1, 0",
+    "v_cndmask_b32_e64 v:pd#1[0]x1, v:u#1[0]x1, v:w#1[0]x1, s:t#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v pa#1 n=1 align=1",
+    "5 v pb#1 n=1 align=1",
+    "6 v pc#1 n=1 align=1",
+    "7 v pd#1 n=1 align=1",
+    "8 s t#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cmp_ge_u32 vcc_lo, 30, v4                                  // pa = select(w <= 30, u, w)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32 v0, v4, v3, vcc_lo",
+    "\tv_cmp_lt_u32 vcc_lo, s2, v3                                  // pb = select(u > k1, u, w)",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32 v1, v4, v3, vcc_lo",
+    "\tv_cmp_ne_u32 vcc_lo, v3, v4                                  // pc = select(u != w, w, u)",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32 v2, v3, v4, vcc_lo",
+    "\ts_cmp_le_u32 s1, s2                                          // pd = select(k0 <= k1, w, u)",
+    "\ts_cselect_b32 s0, -1, 0",
+    "\tv_cndmask_b32_e64 v5, v3, v4, s0"
+   ]
+  },
+  {
+   "name": "mask_counts_and_ranks",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nlm = S.mask(name=\"lm\", at=6)\nex = S.u32(popcount(O.EXEC), name=\"ex\")\nrk = V.u32(rank(lm), name=\"rk\")\npv = V.u32(popcount(w), name=\"pv\")\nfm = S.u32(first(lm), name=\"fm\")\npk = S.u32(popcount(k1), name=\"pk\")\nre = V.u32(rank(O.EXEC, 11), name=\"re\")\npm = S.u32(popcount(lm), name=\"pm\")",
+   "built": [
+    "s_bcnt1_i32_b32 s:ex#1[0]x1, exec_lo ; comment=\"ex = popcount(exec)\"",
+    "v_mbcnt_lo_u32_b32 v:rk#1[0]x1, s:lm#1[0]x1, 0 ; comment=\"rk = rank(lm, 0)\"",
+    "v_bcnt_u32_b32 v:pv#1[0]x1, v:w#1[0]x1, 0 ; comment=\"pv = popcount(w)\"",
+    "s_ctz_i32_b32 s:fm#1[0]x1, s:lm#1[0]x1 ; comment=\"fm = first(lm)\"",
+    "s_bcnt1_i32_b32 s:pk#1[0]x1, s:k1#1[0]x1 ; comment=\"pk = popcount(k1)\"",
+    "v_mbcnt_lo_u32_b32 v:re#1[0]x1, exec_lo, 11 ; comment=\"re = rank(exec, 11)\"",
+    "s_bcnt1_i32_b32 s:pm#1[0]x1, s:lm#1[0]x1 ; comment=\"pm = popcount(lm)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s lm#1 n=1 align=1 pin=6",
+    "5 s ex#1 n=1 align=1",
+    "6 v rk#1 n=1 align=1",
+    "7 v pv#1 n=1 align=1",
+    "8 s fm#1 n=1 align=1",
+    "9 s pk#1 n=1 align=1",
+    "10 v re#1 n=1 align=1",
+    "11 s pm#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "lm#1"
+    ]
+   },
+   "render": [
+    "\ts_bcnt1_i32_b32 s0, exec_lo                                  // ex = popcount(exec)",
+    "\tv_mbcnt_lo_u32_b32 v0, s6, 0                                 // rk = rank(lm, 0)",
+    "\tv_bcnt_u32_b32 v1, v4, 0                                     // pv = popcount(w)",
+    "\ts_ctz_i32_b32 s1, s6                                         // fm = first(lm)",
+    "\ts_bcnt1_i32_b32 s3, s2                                       // pk = popcount(k1)",
+    "\tv_mbcnt_lo_u32_b32 v2, exec_lo, 11                           // re = rank(exec, 11)",
+    "\ts_bcnt1_i32_b32 s2, s6                                       // pm = popcount(lm)"
+   ]
+  },
+  {
+   "name": "lane_reads_and_writes",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nr_s = S.u32(lane_read(w, k1), name=\"r_s\")\nr_c = S.u32(lane_read(u, 17), name=\"r_c\")\nf_v = S.u32(first_lane(w), name=\"f_v\")\nf_s = S.u32(first_lane(k0), name=\"f_s\")\nu[...] = lane_write(u, k0, k1)\nw[...] = lane_write(w, 30, k0)\nu[...] = lane_write(u, k1, 1259753855)",
+   "built": [
+    "v_readlane_b32 s:r_s#1[0]x1, v:w#1[0]x1, s:k1#1[0]x1 ; comment=\"r_s = lane_read(w, k1)\"",
+    "v_readlane_b32 s:r_c#1[0]x1, v:u#1[0]x1, 17 ; comment=\"r_c = lane_read(u, 17)\"",
+    "v_readfirstlane_b32 s:f_v#1[0]x1, v:w#1[0]x1 ; comment=\"f_v = first_lane(w)\"",
+    "s_mov_b32 s:f_s#1[0]x1, s:k0#1[0]x1 ; comment=\"f_s = first_lane(k0)\"",
+    "s_mov_b32 m0, s:k0#1[0]x1 ; comment=\"u = lane_write(u, k0, k1)\"",
+    "v_writelane_b32 v:u#1[0]x1, s:k1#1[0]x1, m0",
+    "v_writelane_b32 v:w#1[0]x1, s:k0#1[0]x1, 30 ; comment=\"w = lane_write(w, 30, k0)\"",
+    "s_mov_b32 m0, s:k1#1[0]x1 ; comment=\"u = lane_write(u, k1, 0x4b16517f)\"",
+    "v_writelane_b32 v:u#1[0]x1, 1259753855, m0"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s r_s#1 n=1 align=1",
+    "5 s r_c#1 n=1 align=1",
+    "6 s f_v#1 n=1 align=1",
+    "7 s f_s#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_readlane_b32 s0, v4, s2                                    // r_s = lane_read(w, k1)",
+    "\tv_readlane_b32 s3, v3, 17                                    // r_c = lane_read(u, 17)",
+    "\tv_readfirstlane_b32 s4, v4                                   // f_v = first_lane(w)",
+    "\ts_mov_b32 s5, s1                                             // f_s = first_lane(k0)",
+    "\ts_mov_b32 m0, s1                                             // u = lane_write(u, k0, k1)",
+    "\tv_writelane_b32 v3, s2, m0",
+    "\tv_writelane_b32 v4, s1, 30                                   // w = lane_write(w, 30, k0)",
+    "\ts_mov_b32 m0, s2                                             // u = lane_write(u, k1, 0x4b16517f)",
+    "\ts_delay_alu 2                                                // hazard: instid0(VALU_DEP_2)",
+    "\tv_writelane_b32 v3, 1259753855, m0"
+   ]
+  },
+  {
+   "name": "lane_shuffles",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nsa = V.u32(shuffle(k1, u), name=\"sa\")\nsb = V.u32(shuffle(w, w + 2), name=\"sb\")",
+   "built": [
+    "v_mov_b32 v:t#1[0]x1, s:k1#1[0]x1 ; comment=\"sa = shuffle(k1, u)\"",
+    "v_lshlrev_b32 v:t#2[0]x1, 2, v:u#1[0]x1",
+    "ds_bpermute_b32 v:sa#1[0]x1, v:t#2[0]x1, v:t#1[0]x1",
+    "ir.wait_regs v:sa#1[0]x1 {counter=load, said=the shuffle, regions=()}",
+    "ir.wait_regs v:sa#1[0]x1 {counter=store, said=the shuffle, regions=()}",
+    "ir.wait_regs v:sa#1[0]x1 {counter=ds, said=the shuffle, regions=()}",
+    "ir.wait_regs v:sa#1[0]x1 {counter=km, said=the shuffle, regions=()}",
+    "v_add_nc_u32 v:t#4[0]x1, 2, v:w#1[0]x1 ; comment=\"sb = shuffle(w, w + 2)\" wait_uses=[v:sa#1[0]x1]",
+    "v_lshlrev_b32 v:t#3[0]x1, 2, v:t#4[0]x1",
+    "ds_bpermute_b32 v:sb#1[0]x1, v:t#3[0]x1, v:w#1[0]x1",
+    "ir.wait_regs v:sb#1[0]x1 {counter=load, said=the shuffle, regions=()}",
+    "ir.wait_regs v:sb#1[0]x1 {counter=store, said=the shuffle, regions=()}",
+    "ir.wait_regs v:sb#1[0]x1 {counter=ds, said=the shuffle, regions=()}",
+    "ir.wait_regs v:sb#1[0]x1 {counter=km, said=the shuffle, regions=()}"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v sa#1 n=1 align=1",
+    "5 v t#1 n=1 align=1",
+    "6 v t#2 n=1 align=1",
+    "7 v sb#1 n=1 align=1",
+    "8 v t#3 n=1 align=1",
+    "9 v t#4 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, s2                                             // sa = shuffle(k1, u)",
+    "\tv_lshlrev_b32 v1, 2, v3",
+    "\tds_bpermute_b32 v2, v1, v0",
+    "\ts_wait_dscnt 0                                               // the shuffle",
+    "\tv_add_nc_u32 v0, 2, v4                                       // sb = shuffle(w, w + 2)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v1, 2, v0",
+    "\tds_bpermute_b32 v0, v1, v4",
+    "\ts_wait_dscnt 0                                               // the shuffle"
+   ]
+  },
+  {
+   "name": "cross_lane_reductions",
+   "src": "fa, fb = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6)\n\nra = V.f32(across(fb, \"add\", 32), name=\"ra\")\nrb = V.f32(across(fa, \"min\", 4), name=\"rb\")\nrc = V.f32(across(fa, \"max\", 8), name=\"rc\")",
+   "built": [
+    "v_add_f32_dpp v:ra#1[0]x1, v:fb#1[0]x1, v:fb#1[0]x1 {dpp=quad_perm:[1,0,3,2], row_mask=15, bank_mask=15} ; comment=\"ra = across(fb, add, 32)\"",
+    "v_add_f32_dpp v:ra#1[0]x1, v:ra#1[0]x1, v:ra#1[0]x1 {dpp=quad_perm:[2,3,0,1], row_mask=15, bank_mask=15}",
+    "v_add_f32_dpp v:ra#1[0]x1, v:ra#1[0]x1, v:ra#1[0]x1 {dpp=row_half_mirror, row_mask=15, bank_mask=15}",
+    "v_add_f32_dpp v:ra#1[0]x1, v:ra#1[0]x1, v:ra#1[0]x1 {dpp=row_mirror, row_mask=15, bank_mask=15}",
+    "s_mov_b32 s:t#1[0]x1, 1985229328",
+    "s_mov_b32 s:t#2[0]x1, 4275878552",
+    "v_permlanex16_b32 v:t#3[0]x1, v:ra#1[0]x1, s:t#1[0]x1, s:t#2[0]x1",
+    "v_add_f32 v:ra#1[0]x1, v:ra#1[0]x1, v:t#3[0]x1",
+    "v_min_num_f32_dpp v:rb#1[0]x1, v:fa#1[0]x1, v:fa#1[0]x1 {dpp=quad_perm:[1,0,3,2], row_mask=15, bank_mask=15} ; comment=\"rb = across(fa, min, 4)\"",
+    "v_min_num_f32_dpp v:rb#1[0]x1, v:rb#1[0]x1, v:rb#1[0]x1 {dpp=quad_perm:[2,3,0,1], row_mask=15, bank_mask=15}",
+    "v_max_num_f32_dpp v:rc#1[0]x1, v:fa#1[0]x1, v:fa#1[0]x1 {dpp=quad_perm:[1,0,3,2], row_mask=15, bank_mask=15} ; comment=\"rc = across(fa, max, 8)\"",
+    "v_max_num_f32_dpp v:rc#1[0]x1, v:rc#1[0]x1, v:rc#1[0]x1 {dpp=quad_perm:[2,3,0,1], row_mask=15, bank_mask=15}",
+    "v_max_num_f32_dpp v:rc#1[0]x1, v:rc#1[0]x1, v:rc#1[0]x1 {dpp=row_half_mirror, row_mask=15, bank_mask=15}"
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v ra#1 n=1 align=1",
+    "3 s t#1 n=1 align=1",
+    "4 s t#2 n=1 align=1",
+    "5 v t#3 n=1 align=1",
+    "6 v rb#1 n=1 align=1",
+    "7 v rc#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1"
+    ]
+   },
+   "render": [
+    "\tv_add_f32_dpp v0, v6, v6 quad_perm:[1,0,3,2] row_mask:0xf bank_mask:0xf // ra = across(fb, add, 32)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 quad_perm:[2,3,0,1] row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 row_half_mirror row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 row_mirror row_mask:0xf bank_mask:0xf",
+    "\ts_mov_b32 s0, 1985229328",
+    "\ts_mov_b32 s1, 4275878552",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_permlanex16_b32 v1, v0, s0, s1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32 v0, v0, v1",
+    "\tv_min_num_f32_dpp v1, v5, v5 quad_perm:[1,0,3,2] row_mask:0xf bank_mask:0xf // rb = across(fa, min, 4)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_min_num_f32_dpp v1, v1, v1 quad_perm:[2,3,0,1] row_mask:0xf bank_mask:0xf",
+    "\tv_max_num_f32_dpp v2, v5, v5 quad_perm:[1,0,3,2] row_mask:0xf bank_mask:0xf // rc = across(fa, max, 8)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_max_num_f32_dpp v2, v2, v2 quad_perm:[2,3,0,1] row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_max_num_f32_dpp v2, v2, v2 row_half_mirror row_mask:0xf bank_mask:0xf"
+   ]
+  },
+  {
+   "name": "row_prefix_scan",
+   "src": "fa = V.f32(name=\"fa\", at=9)\npre = V.f32(scan(fa, \"max\", 16), name=\"pre\")",
+   "built": [
+    "v_mov_b32 v:pre#1[0]x1, v:fa#1[0]x1 ; comment=\"pre = scan(fa, max, 16)\"",
+    "v_max_num_f32_dpp v:pre#1[0]x1, v:pre#1[0]x1, v:pre#1[0]x1 {dpp=row_shr:1, row_mask=15, bank_mask=15}",
+    "v_max_num_f32_dpp v:pre#1[0]x1, v:pre#1[0]x1, v:pre#1[0]x1 {dpp=row_shr:2, row_mask=15, bank_mask=15}",
+    "v_max_num_f32_dpp v:pre#1[0]x1, v:pre#1[0]x1, v:pre#1[0]x1 {dpp=row_shr:4, row_mask=15, bank_mask=15}",
+    "v_max_num_f32_dpp v:pre#1[0]x1, v:pre#1[0]x1, v:pre#1[0]x1 {dpp=row_shr:8, row_mask=15, bank_mask=15}"
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=9",
+    "1 v pre#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, v9                                             // pre = scan(fa, max, 16)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_max_num_f32_dpp v0, v0, v0 row_shr:1 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_max_num_f32_dpp v0, v0, v0 row_shr:2 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_max_num_f32_dpp v0, v0, v0 row_shr:4 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_max_num_f32_dpp v0, v0, v0 row_shr:8 row_mask:0xf bank_mask:0xf"
+   ]
+  },
+  {
+   "name": "raw_ops_inside_trees",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\no1 = V.u32(op('v_add3_u32', w, k0, u) << 3, name=\"o1\")\no2 = S.u32(op('s_bfe_u32', k1, 0x30008), name=\"o2\")\no3 = V.u32(op('v_add3_u32', u, 9, k1), name=\"o3\")\no4 = V.f32(op('v_min_num_f32', f32(w), -1.0), name=\"o4\")\no5 = V.u32(op('v.mul.lo.u32', w, 6, ty=u32), name=\"o5\")\no6 = V.u32(op('v_mad_u32_u24', u, k1, w, ty=u32), name=\"o6\")",
+   "built": [
+    "v_add3_u32 v:t#1[0]x1, v:w#1[0]x1, s:k0#1[0]x1, v:u#1[0]x1 ; comment=\"o1 = v_add3_u32(w, k0, u) << 3\"",
+    "v_lshlrev_b32 v:o1#1[0]x1, 3, v:t#1[0]x1",
+    "s_bfe_u32 s:o2#1[0]x1, s:k1#1[0]x1, 196616 ; comment=\"o2 = s_bfe_u32(k1, 0x30008)\"",
+    "v_add3_u32 v:o3#1[0]x1, v:u#1[0]x1, 9, s:k1#1[0]x1 ; comment=\"o3 = v_add3_u32(u, 9, k1)\"",
+    "v_min_num_f32_e64 v:o4#1[0]x1, v:w#1[0]x1, -1.0 ; comment=\"o4 = v_min_num_f32(f32(w), -1.0)\"",
+    "v_mul_lo_u32 v:o5#1[0]x1, v:w#1[0]x1, 6 ; comment=\"o5 = v.mul.lo.u32(w, 6)\"",
+    "v_mad_u32_u24 v:o6#1[0]x1, v:u#1[0]x1, s:k1#1[0]x1, v:w#1[0]x1 ; comment=\"o6 = v_mad_u32_u24(u, k1, w)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v o1#1 n=1 align=1",
+    "5 v t#1 n=1 align=1",
+    "6 s o2#1 n=1 align=1",
+    "7 v o3#1 n=1 align=1",
+    "8 v o4#1 n=1 align=1",
+    "9 v o5#1 n=1 align=1",
+    "10 v o6#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_add3_u32 v0, v4, s1, v3                                    // o1 = v_add3_u32(w, k0, u) << 3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v1, 3, v0",
+    "\ts_bfe_u32 s0, s2, 196616                                     // o2 = s_bfe_u32(k1, 0x30008)",
+    "\tv_add3_u32 v0, v3, 9, s2                                     // o3 = v_add3_u32(u, 9, k1)",
+    "\tv_min_num_f32_e64 v2, v4, -1.0                               // o4 = v_min_num_f32(f32(w), -1.0)",
+    "\tv_mul_lo_u32 v5, v4, 6                                       // o5 = v.mul.lo.u32(w, 6)",
+    "\tv_mad_u32_u24 v6, v3, s2, v4                                 // o6 = v_mad_u32_u24(u, k1, w)"
+   ]
+  },
+  {
+   "name": "shared_tree_reemitted",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\ntr = (w << 2) ^ u\none = V.u32(tr - 3, name=\"one\")\ntwo = V.u32(tr, name=\"two\")",
+   "built": [
+    "v_lshlrev_b32 v:t#2[0]x1, 2, v:w#1[0]x1 ; comment=\"one = ((w << 2) ^ u) - 3\"",
+    "v_xor_b32 v:t#1[0]x1, v:t#2[0]x1, v:u#1[0]x1",
+    "v_subrev_nc_u32 v:one#1[0]x1, 3, v:t#1[0]x1",
+    "v_lshlrev_b32 v:t#3[0]x1, 2, v:w#1[0]x1 ; comment=\"two = (w << 2) ^ u\"",
+    "v_xor_b32 v:two#1[0]x1, v:t#3[0]x1, v:u#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v one#1 n=1 align=1",
+    "5 v t#1 n=1 align=1",
+    "6 v t#2 n=1 align=1",
+    "7 v two#1 n=1 align=1",
+    "8 v t#3 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_lshlrev_b32 v0, 2, v4                                      // one = ((w << 2) ^ u) - 3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v1, v0, v3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_subrev_nc_u32 v0, 3, v1",
+    "\tv_lshlrev_b32 v1, 2, v4                                      // two = (w << 2) ^ u",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v2, v1, v3"
+   ]
+  },
+  {
+   "name": "augmented_statements",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\ncell = V.u32(1, n=3, name=\"cell\")\ncell[2] = w - cell[2]\ncell[1] ^= u\ncell[1] -= 6\ncell[1] += k1\ncell[1] |= 12\ncell[1] &= w\ncell[1] *= 5\ncell[1] >>= 3\ncell[1] <<= k0\ntot = S.u32(2, name=\"tot\")\ntot *= k1\ntot -= 1",
+   "built": [
+    "v_mov_b32 v:cell#1[0]x1, 1 ; comment=\"cell[0] = 1\"",
+    "v_mov_b32 v:cell#1[0]x1+1, 1 ; comment=\"cell[1] = 1\"",
+    "v_mov_b32 v:cell#1[0]x1+2, 1 ; comment=\"cell[2] = 1\"",
+    "v_sub_nc_u32 v:cell#1[0]x1+2, v:w#1[0]x1, v:cell#1[0]x1+2 ; comment=\"cell[2] = w - cell[2]\"",
+    "v_xor_b32 v:cell#1[0]x1+1, v:cell#1[0]x1+1, v:u#1[0]x1 ; comment=\"cell[1] = cell[1] ^ u\"",
+    "v_subrev_nc_u32 v:cell#1[0]x1+1, 6, v:cell#1[0]x1+1 ; comment=\"cell[1] = cell[1] - 6\"",
+    "v_add_nc_u32 v:cell#1[0]x1+1, s:k1#1[0]x1, v:cell#1[0]x1+1 ; comment=\"cell[1] = cell[1] + k1\"",
+    "v_or_b32 v:cell#1[0]x1+1, 12, v:cell#1[0]x1+1 ; comment=\"cell[1] = cell[1] | 12\"",
+    "v_and_b32 v:cell#1[0]x1+1, v:cell#1[0]x1+1, v:w#1[0]x1 ; comment=\"cell[1] = cell[1] & w\"",
+    "v_mul_lo_u32 v:cell#1[0]x1+1, v:cell#1[0]x1+1, 5 ; comment=\"cell[1] = cell[1] * 5\"",
+    "v_lshrrev_b32 v:cell#1[0]x1+1, 3, v:cell#1[0]x1+1 ; comment=\"cell[1] = cell[1] >> 3\"",
+    "v_lshlrev_b32 v:cell#1[0]x1+1, s:k0#1[0]x1, v:cell#1[0]x1+1 ; comment=\"cell[1] = cell[1] << k0\"",
+    "s_mov_b32 s:tot#1[0]x1, 2 ; comment=\"tot = 2\"",
+    "s_mul_i32 s:tot#1[0]x1, s:tot#1[0]x1, s:k1#1[0]x1 ; comment=\"tot = tot * k1\"",
+    "s_sub_co_u32 s:tot#1[0]x1, s:tot#1[0]x1, 1 ; comment=\"tot = tot - 1\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v cell#1 n=3 align=2",
+    "5 s tot#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 1                                              // cell[0] = 1",
+    "\tv_mov_b32 v1, 1                                              // cell[1] = 1",
+    "\tv_mov_b32 v2, 1                                              // cell[2] = 1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_sub_nc_u32 v2, v4, v2                                      // cell[2] = w - cell[2]",
+    "\ts_delay_alu 3                                                // hazard: instid0(VALU_DEP_3)",
+    "\tv_xor_b32 v1, v1, v3                                         // cell[1] = cell[1] ^ u",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_subrev_nc_u32 v1, 6, v1                                    // cell[1] = cell[1] - 6",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_nc_u32 v1, s2, v1                                      // cell[1] = cell[1] + k1",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_or_b32 v1, 12, v1                                          // cell[1] = cell[1] | 12",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_and_b32 v1, v1, v4                                         // cell[1] = cell[1] & w",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_lo_u32 v1, v1, 5                                       // cell[1] = cell[1] * 5",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b32 v1, 3, v1                                      // cell[1] = cell[1] >> 3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshlrev_b32 v1, s1, v1                                     // cell[1] = cell[1] << k0",
+    "\ts_mov_b32 s0, 2                                              // tot = 2",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_mul_i32 s0, s0, s2                                         // tot = tot * k1",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_sub_co_u32 s0, s0, 1                                       // tot = tot - 1"
+   ]
+  },
+  {
+   "name": "comment_spelling",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=4)\nvec = V.u32(n=3, name=\"vec\")\nvec[2] = u - 8192\ntmp = V.u32()\ntmp[...] = w + 100000\nhi = S.u32(gp.hi ^ 2, name=\"hi\")\narr = S.u32(n=3, name=\"arr\")\narr[1] = k1\nvec[0] = w + 4095",
+   "built": [
+    "v_subrev_nc_u32 v:vec#1[0]x1+2, 8192, v:u#1[0]x1 ; comment=\"vec[2] = u - 0x2000\"",
+    "v_add_nc_u32 v:t#1[0]x1, 100000, v:w#1[0]x1 ; comment=\"t#1 = w + 0x186a0\"",
+    "s_xor_b32 s:hi#1[0]x1, s:gp#1[0]x1+1, 2 ; comment=\"hi = gp.hi ^ 2\"",
+    "s_mov_b32 s:arr#1[0]x1+1, s:k1#1[0]x1 ; comment=\"arr[1] = k1\"",
+    "v_add_nc_u32 v:vec#1[0]x1, 4095, v:w#1[0]x1 ; comment=\"vec[0] = w + 4095\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s gp#1 n=2 align=2 pin=4",
+    "5 v vec#1 n=3 align=2",
+    "6 v t#1 n=1 align=1",
+    "7 s hi#1 n=1 align=1",
+    "8 s arr#1 n=3 align=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "gp#1"
+    ]
+   },
+   "render": [
+    "\tv_subrev_nc_u32 v2, 8192, v3                                 // vec[2] = u - 0x2000",
+    "\tv_add_nc_u32 v1, 100000, v4                                  // t#1 = w + 0x186a0",
+    "\ts_xor_b32 s0, s5, 2                                          // hi = gp.hi ^ 2",
+    "\ts_mov_b32 s1, s2                                             // arr[1] = k1",
+    "\tv_add_nc_u32 v0, 4095, v4                                    // vec[0] = w + 4095"
+   ]
+  },
+  {
+   "name": "packed_mul_refused",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\npp = V.f32x2(pair(fa, fb * -1.0), name=\"pp\")\nsq = V.f32x2(pp * pp, name=\"sq\")",
+   "error": {
+    "class": "ExprError",
+    "message": "v.pk.mul.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "packed_fma_refused",
+   "src": "pa, pb = V.f32x2(name=\"pa\"), V.f32x2(name=\"pb\")\nV.f32x2(fma(pa, pb, pa), name=\"pf\")",
+   "error": {
+    "class": "ExprError",
+    "message": "v.pk.fma.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "packed_negate",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\npa = V.f32x2(pair(fa + fb, fc * 0.5), name=\"pa\")\nV.f32x2(-pa, name=\"pn\")\nV.f32x2(pa + pa, name=\"pq\")",
+   "error": {
+    "class": "ExprError",
+    "message": "v.pk.add.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "pair_swap_through_temp",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\npp = V.f32x2(name=\"pp\", at=10)\npp[...] = pair(pp.hi, pp.lo * 0.5)",
+   "built": [
+    "v_mul_f32 v:t#1[0]x1, 0.5, v:pp#1[0]x1 ; comment=\"pp = pair(pp.hi, pp.lo * 0.5)\"",
+    "v_mov_b32 v:pp#1[0]x1, v:pp#1[0]x1+1",
+    "v_mov_b32 v:pp#1[0]x1+1, v:t#1[0]x1"
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v pp#1 n=2 align=2 pin=10",
+    "4 v t#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1",
+     "pp#1"
+    ]
+   },
+   "render": [
+    "\tv_mul_f32 v0, 0.5, v10                                       // pp = pair(pp.hi, pp.lo * 0.5)",
+    "\tv_mov_b32 v10, v11",
+    "\ts_delay_alu 2                                                // hazard: instid0(VALU_DEP_2)",
+    "\tv_mov_b32 v11, v0"
+   ]
+  },
+  {
+   "name": "storage_format_unpacks",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nub = V.f32(unpack(w, \"e5m2\"), name=\"ub\")\nuh1 = V.f32(unpack(u, \"f16\", at=1), name=\"uh1\")\nuf = V.f32(unpack(u, \"e4m3fn\"), name=\"uf\")\nuh0 = V.f32(unpack(w, \"f16\"), name=\"uh0\")",
+   "built": [
+    "v_cvt_f32_bf8 v:ub#1[0]x1, v:w#1[0]x1 ; comment=\"ub = unpack(w, e5m2)\"",
+    "v_lshrrev_b32 v:t#1[0]x1, 16, v:u#1[0]x1 ; comment=\"uh1 = unpack(u, f16, at=1)\"",
+    "v_cvt_f32_f16 v:uh1#1[0]x1, v:t#1[0]x1",
+    "v_cvt_f32_fp8 v:uf#1[0]x1, v:u#1[0]x1 ; comment=\"uf = unpack(u, e4m3fn)\"",
+    "v_cvt_f32_f16 v:uh0#1[0]x1, v:w#1[0]x1 ; comment=\"uh0 = unpack(w, f16)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v ub#1 n=1 align=1",
+    "5 v uh1#1 n=1 align=1",
+    "6 v t#1 n=1 align=1",
+    "7 v uf#1 n=1 align=1",
+    "8 v uh0#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cvt_f32_bf8 v0, v4                                         // ub = unpack(w, e5m2)",
+    "\tv_lshrrev_b32 v1, 16, v3                                     // uh1 = unpack(u, f16, at=1)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cvt_f32_f16 v2, v1",
+    "\tv_cvt_f32_fp8 v1, v3                                         // uf = unpack(u, e4m3fn)",
+    "\tv_cvt_f32_f16 v3, v4                                         // uh0 = unpack(w, f16)"
+   ]
+  },
+  {
+   "name": "fp8_pair_unpack_pack_low",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\npq = V.f32x2(unpack2(w, \"e5m2\"), name=\"pq\")\npf = V.f32x2(unpack2(u, \"e4m3fn\"), name=\"pf\")\nout = V.u32(7, name=\"out\")\nout[...] = pack2(pf.hi, pq.lo, \"e5m2\", into=out)",
+   "built": [
+    "v_cvt_pk_f32_bf8 v:pq#1[0]x2, v:w#1[0]x1 ; comment=\"pq = unpack2(w, e5m2)\"",
+    "v_cvt_pk_f32_fp8 v:pf#1[0]x2, v:u#1[0]x1 ; comment=\"pf = unpack2(u, e4m3fn)\"",
+    "v_mov_b32 v:out#1[0]x1, 7 ; comment=\"out = 7\"",
+    "v_cvt_pk_bf8_f32 v:out#1[0]x1, v:pf#1[0]x1+1, v:pq#1[0]x1 ; comment=\"out = pack2(pf.hi, pq.lo, e5m2, into=out)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v pq#1 n=2 align=2",
+    "5 v pf#1 n=2 align=2",
+    "6 v out#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cvt_pk_f32_bf8 v[0:1], v4                                  // pq = unpack2(w, e5m2)",
+    "\tv_cvt_pk_f32_fp8 v[4:5], v3                                  // pf = unpack2(u, e4m3fn)",
+    "\tv_mov_b32 v2, 7                                              // out = 7",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cvt_pk_bf8_f32 v2, v5, v0                                  // out = pack2(pf.hi, pq.lo, e5m2, into=out)"
+   ]
+  },
+  {
+   "name": "fp8_pack_high_word",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\npq = V.f32x2(unpack2(u, \"e5m2\"), name=\"pq\")\nout = V.u32(u, name=\"out\")\nout[...] = pack2(pq.hi, pq.lo, \"e4m3fn\", into=out, at=1)",
+   "built": [
+    "v_cvt_pk_f32_bf8 v:pq#1[0]x2, v:u#1[0]x1 ; comment=\"pq = unpack2(u, e5m2)\"",
+    "v_mov_b32 v:out#1[0]x1, v:u#1[0]x1 ; comment=\"out = u\"",
+    "v_cvt_pk_fp8_f32 v:out#1[0]x1, v:pq#1[0]x1+1, v:pq#1[0]x1 {op_sel=(0, 0, 1)} ; comment=\"out = pack2(pq.hi, pq.lo, e4m3fn, into=out, at=1)\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v pq#1 n=2 align=2",
+    "5 v out#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cvt_pk_f32_bf8 v[0:1], v3                                  // pq = unpack2(u, e5m2)",
+    "\tv_mov_b32 v2, v3                                             // out = u",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cvt_pk_fp8_f32 v2, v1, v0 op_sel:[0,0,1]                   // out = pack2(pq.hi, pq.lo, e4m3fn, into=out, at=1)"
+   ]
+  },
+  {
+   "name": "fp8_unpack_byte_index",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.f32(unpack(w, \"e5m2\", at=1), name=\"bad\")",
+   "error": {
+    "class": "ExprError",
+    "message": "unpack(at=1): 0 only (the elements from the dword's low bits)"
+   }
+  },
+  {
+   "name": "float_literals_staged",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n\nff = V.f32(fma(fa, 10.0, 0.75), name=\"ff\")\nfs = V.f32(fb - 7.0, name=\"fs\")\nft = V.f32(fc * 1e-20, name=\"ft\")",
+   "built": [
+    "v_mov_b32 v:t#1[0]x1, 1061158912 ; comment=\"ff = fma(fa, 10.0, 0.75)\"",
+    "v_fma_f32 v:ff#1[0]x1, v:fa#1[0]x1, 1092616192, v:t#1[0]x1",
+    "v_subrev_f32 v:fs#1[0]x1, 1088421888, v:fb#1[0]x1 ; comment=\"fs = fb - 7.0\"",
+    "v_mul_f32 v:ft#1[0]x1, 507307272, v:fc#1[0]x1 ; comment=\"ft = fc * 1e-20\""
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v ff#1 n=1 align=1",
+    "4 v t#1 n=1 align=1",
+    "5 v fs#1 n=1 align=1",
+    "6 v ft#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 1061158912                                     // ff = fma(fa, 10.0, 0.75)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_fma_f32 v1, v5, 1092616192, v0",
+    "\tv_subrev_f32 v0, 1088421888, v6                              // fs = fb - 7.0",
+    "\tv_mul_f32 v2, 507307272, v7                                  // ft = fc * 1e-20"
+   ]
+  },
+  {
+   "name": "i32_minus_u32",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nsg, sh = V.i32(name=\"sg\", at=8), V.i32(name=\"sh\", at=9)\nV.i32(sg - w)",
+   "error": {
+    "class": "ExprError",
+    "message": "sg - w: i32 with u32 (types do not mix: cast one - u32(x), i32(x), f32(x) reinterpret, no instruction)"
+   }
+  },
+  {
+   "name": "lane_tree_into_sgpr",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.u32(k1 * u)",
+   "error": {
+    "class": "ExprError",
+    "message": "k1 * u: a vector value into an SGPR (v_readfirstlane is never implied: first_lane(x))"
+   }
+  },
+  {
+   "name": "compare_as_python_bool",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nflag = not (w == k1)",
+   "error": {
+    "class": "ExprError",
+    "message": "w == k1: an expression is not a Python bool (a branch is b.when(c); a chain of compares is (a < b) & (b < c); a value is select(c, 1, 0))"
+   }
+  },
+  {
+   "name": "compare_into_u32_value",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.u32(u >= w)",
+   "error": {
+    "class": "ExprError",
+    "message": "v:t#1 = u >= w: a condition is no u32 (select(c, 1, 0); a mask: S.mask(c))"
+   }
+  },
+  {
+   "name": "f32_or",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.f32(fc | fa)",
+   "error": {
+    "class": "ExprError",
+    "message": "fc | fa: an f32 takes + - * (bits: u32(x))"
+   }
+  },
+  {
+   "name": "remainder_by_zero",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.u32(u % 0)",
+   "error": {
+    "class": "ExprError",
+    "message": "u % 0: by a positive constant or a divisor argument (u32.within(lo, hi).divisor())"
+   }
+  },
+  {
+   "name": "i32_remainder",
+   "src": "sg = V.i32(name=\"sg\", at=2)\nV.i32(sg % 5)",
+   "error": {
+    "class": "ExprError",
+    "message": "sg % 5: a u32's (cast: u32(x))"
+   }
+  },
+  {
+   "name": "remainder_of_constant",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.u32(w + u32(40) % 6)",
+   "error": {
+    "class": "ExprError",
+    "message": "40 % 6: of a constant (compute it in Python)"
+   }
+  },
+  {
+   "name": "dotted_op_untyped",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nop(\"v.mul.hi.u32\", w, k0)",
+   "error": {
+    "class": "ExprError",
+    "message": "op('v.mul.hi.u32'): its result's type (ty=)"
+   }
+  },
+  {
+   "name": "pack_f16_pair_absent",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.u32(pack2(fc * 2.0, fa, \"f16\"))",
+   "error": {
+    "class": "ExprError",
+    "message": "v.cvt.pk.f16.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "median_of_three_floats",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.f32(med3(fc, fa, fb))",
+   "built": [
+    "v_med3_num_f32 v:t#1[0]x1, v:fc#1[0]x1, v:fa#1[0]x1, v:fb#1[0]x1 ; comment=\"t#1 = med3(fc, fa, fb)\""
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v t#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_med3_num_f32 v0, v7, v5, v6                                // t#1 = med3(fc, fa, fb)"
+   ]
+  },
+  {
+   "name": "wave_scan_32",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.f32(scan(fb, \"add\", 32))",
+   "built": [
+    "v_mov_b32 v:t#1[0]x1, v:fb#1[0]x1 ; comment=\"t#1 = scan(fb, add, 32)\"",
+    "v_add_f32_dpp v:t#1[0]x1, v:t#1[0]x1, v:t#1[0]x1 {dpp=row_shr:1, row_mask=15, bank_mask=15}",
+    "v_add_f32_dpp v:t#1[0]x1, v:t#1[0]x1, v:t#1[0]x1 {dpp=row_shr:2, row_mask=15, bank_mask=15}",
+    "v_add_f32_dpp v:t#1[0]x1, v:t#1[0]x1, v:t#1[0]x1 {dpp=row_shr:4, row_mask=15, bank_mask=15}",
+    "v_add_f32_dpp v:t#1[0]x1, v:t#1[0]x1, v:t#1[0]x1 {dpp=row_shr:8, row_mask=15, bank_mask=15}",
+    "v_readlane_b32 s:t#2[0]x1, v:t#1[0]x1, 15",
+    "v_add_f32 v:t#3[0]x1, s:t#2[0]x1, v:t#1[0]x1",
+    "s_mov_b32 s:t#4[0]x1, 4294901760",
+    "v_cndmask_b32_e64 v:t#1[0]x1, v:t#1[0]x1, v:t#3[0]x1, s:t#4[0]x1"
+   ],
+   "values": [
+    "0 v fa#1 n=1 align=1 pin=5",
+    "1 v fb#1 n=1 align=1 pin=6",
+    "2 v fc#1 n=1 align=1 pin=7",
+    "3 v t#1 n=1 align=1",
+    "4 s t#2 n=1 align=1",
+    "5 v t#3 n=1 align=1",
+    "6 s t#4 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fa#1",
+     "fb#1",
+     "fc#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, v6                                             // t#1 = scan(fb, add, 32)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 row_shr:1 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 row_shr:2 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 row_shr:4 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32_dpp v0, v0, v0 row_shr:8 row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_readlane_b32 s0, v0, 15",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_f32 v1, s0, v0",
+    "\ts_mov_b32 s0, 4294901760",
+    "\ts_wait_alu depctr_sa_sdst(0)                                 // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cndmask_b32_e64 v0, v0, v1, s0"
+   ]
+  },
+  {
+   "name": "scan_64_lanes_wave32",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.f32(scan(fc, \"min\", 64))",
+   "error": {
+    "class": "ExprError",
+    "message": "scan(fc, min, 64): 64 lanes on a 32-lane target"
+   }
+  },
+  {
+   "name": "packed_sub_absent",
+   "src": "pr = V.f32x2(name=\"pr\")\nV.f32x2(pr - pr)",
+   "error": {
+    "class": "ExprError",
+    "message": "v.pk.add.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "vector_value_in_formula",
+   "src": "vec = V.u32(n=3, name=\"vec\")\nV.u32(vec - 1)",
+   "error": {
+    "class": "ExprError",
+    "message": "v:vec#1: 3 elements in a formula (one: v:vec#1[j])"
+   }
+  },
+  {
+   "name": "statement_into_four_dwords",
+   "src": "blk = S.u32(n=4, name=\"blk\")\nblk[...] = 7",
+   "error": {
+    "class": "ExprError",
+    "message": "s:blk#1 = 7: a statement writes one element, not 4 - each: for e in x: e[...] = .."
+   }
+  },
+  {
+   "name": "false_as_operand",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.u32(w * False)",
+   "error": {
+    "class": "ExprError",
+    "message": "False: a bool is not a constant of a type (0 / 1, or a compare)"
+   }
+  },
+  {
+   "name": "tuple_as_operand",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.u32(u - (2, 3))",
+   "error": {
+    "class": "ExprError",
+    "message": "(2, 3): not a value, a constant or an expression"
+   }
+  },
+  {
+   "name": "constant_of_129_bits",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.u32(w ^ (1 << 128))",
+   "error": {
+    "class": "ExprError",
+    "message": "340282366920938463463374607431768211456: a constant past 128 bits"
+   }
+  },
+  {
+   "name": "u64_plus_large_constant",
+   "src": "base = S.u64(name=\"base\", at=2)\nS.u64(base + (5 << 32))",
+   "built": [
+    "s_add_co_u32 s:t#1[0]x1, s:base#1[0]x1, 0 ; comment=\"t#1 = base + 0x500000000\"",
+    "s_add_co_ci_u32 s:t#1[0]x1+1, s:base#1[0]x1+1, 5"
+   ],
+   "values": [
+    "0 s base#1 n=2 align=2 pin=2",
+    "1 s t#1 n=2 align=2"
+   ],
+   "records": {
+    "s.pinned": [
+     "base#1"
+    ]
+   },
+   "render": [
+    "\ts_add_co_u32 s0, s2, 0                                       // t#1 = base + 0x500000000",
+    "\ts_add_co_ci_u32 s1, s3, 5"
+   ]
+  },
+  {
+   "name": "u64_constant_half_split",
+   "src": "base = S.u64(name=\"base\", at=4)\nhneg = S.u64(base + (-7), name=\"hneg\")\nhmul = S.u64(base + 0x300000000, name=\"hmul\")\nhall = S.u64(base + (2**64 - 2), name=\"hall\")\nhsub = S.u64(base - (7 << 32), name=\"hsub\")",
+   "built": [
+    "s_add_co_u32 s:hneg#1[0]x1, s:base#1[0]x1, -7 ; comment=\"hneg = base + -7\"",
+    "s_add_co_ci_u32 s:hneg#1[0]x1+1, s:base#1[0]x1+1, -1",
+    "s_add_co_u32 s:hmul#1[0]x1, s:base#1[0]x1, 0 ; comment=\"hmul = base + 0x300000000\"",
+    "s_add_co_ci_u32 s:hmul#1[0]x1+1, s:base#1[0]x1+1, 3",
+    "s_add_co_u32 s:hall#1[0]x1, s:base#1[0]x1, -2 ; comment=\"hall = base + 0xfffffffffffffffe\"",
+    "s_add_co_ci_u32 s:hall#1[0]x1+1, s:base#1[0]x1+1, -1",
+    "s_sub_co_u32 s:hsub#1[0]x1, s:base#1[0]x1, 0 ; comment=\"hsub = base - 0x700000000\"",
+    "s_sub_co_ci_u32 s:hsub#1[0]x1+1, s:base#1[0]x1+1, 7"
+   ],
+   "values": [
+    "0 s base#1 n=2 align=2 pin=4",
+    "1 s hneg#1 n=2 align=2",
+    "2 s hmul#1 n=2 align=2",
+    "3 s hall#1 n=2 align=2",
+    "4 s hsub#1 n=2 align=2"
+   ],
+   "records": {
+    "s.pinned": [
+     "base#1"
+    ]
+   },
+   "render": [
+    "\ts_add_co_u32 s0, s4, -7                                      // hneg = base + -7",
+    "\ts_add_co_ci_u32 s1, s5, -1",
+    "\ts_add_co_u32 s2, s4, 0                                       // hmul = base + 0x300000000",
+    "\ts_add_co_ci_u32 s3, s5, 3",
+    "\ts_add_co_u32 s6, s4, -2                                      // hall = base + 0xfffffffffffffffe",
+    "\ts_add_co_ci_u32 s7, s5, -1",
+    "\ts_sub_co_u32 s8, s4, 0                                       // hsub = base - 0x700000000",
+    "\ts_sub_co_ci_u32 s9, s5, 7"
+   ]
+  },
+  {
+   "name": "u64_vector_constant_halves",
+   "src": "qv = V.u64(name=\"qv\", at=4)\nvneg = V.u64(qv + (-12), name=\"vneg\")\nvbig = V.u64(qv - (1 << 44), name=\"vbig\")\nvhi = V.u64(qv + (3 << 32), name=\"vhi\")",
+   "built": [
+    "v_add_co_u32 v:vneg#1[0]x1, vcc_lo, -12, v:qv#1[0]x1 ; comment=\"vneg = qv + -12\"",
+    "v_add_co_ci_u32 v:vneg#1[0]x1+1, vcc_lo, -1, v:qv#1[0]x1+1, vcc_lo",
+    "v_mov_b32 v:t#1[0]x1, 0 ; comment=\"vbig = qv - 0x100000000000\"",
+    "v_mov_b32 v:t#2[0]x1, 4096",
+    "v_sub_co_u32 v:vbig#1[0]x1, vcc_lo, v:qv#1[0]x1, v:t#1[0]x1",
+    "v_sub_co_ci_u32 v:vbig#1[0]x1+1, vcc_lo, v:qv#1[0]x1+1, v:t#2[0]x1, vcc_lo",
+    "v_add_co_u32 v:vhi#1[0]x1, vcc_lo, 0, v:qv#1[0]x1 ; comment=\"vhi = qv + 0x300000000\"",
+    "v_add_co_ci_u32 v:vhi#1[0]x1+1, vcc_lo, 3, v:qv#1[0]x1+1, vcc_lo"
+   ],
+   "values": [
+    "0 v qv#1 n=2 align=2 pin=4",
+    "1 v vneg#1 n=2 align=2",
+    "2 v vbig#1 n=2 align=2",
+    "3 v t#1 n=1 align=1",
+    "4 v t#2 n=1 align=1",
+    "5 v vhi#1 n=2 align=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "qv#1"
+    ]
+   },
+   "render": [
+    "\tv_add_co_u32 v0, vcc_lo, -12, v4                             // vneg = qv + -12",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v1, vcc_lo, -1, v5, vcc_lo",
+    "\tv_mov_b32 v2, 0                                              // vbig = qv - 0x100000000000",
+    "\tv_mov_b32 v3, 4096",
+    "\ts_delay_alu 2                                                // hazard: instid0(VALU_DEP_2)",
+    "\tv_sub_co_u32 v6, vcc_lo, v4, v2",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_sub_co_ci_u32 v7, vcc_lo, v5, v3, vcc_lo",
+    "\tv_add_co_u32 v2, vcc_lo, 0, v4                               // vhi = qv + 0x300000000",
+    "\ts_wait_alu depctr_va_vcc(0)                                  // hazard",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_co_ci_u32 v3, vcc_lo, 3, v5, vcc_lo"
+   ]
+  },
+  {
+   "name": "u64_constant_above_range",
+   "src": "base = S.u64(name=\"base\", at=2)\nS.u64(base + 0x10000000000000007)",
+   "error": {
+    "class": "ExprError",
+    "message": "0x10000000000000007: a constant outside the u64 range (-2^63 .. 2^64 - 1)"
+   }
+  },
+  {
+   "name": "u64_constant_below_range",
+   "src": "base = S.u64(name=\"base\", at=2)\nS.u64(base + (-(2**63) - 9))",
+   "error": {
+    "class": "ExprError",
+    "message": "-0x8000000000000009: a constant outside the u64 range (-2^63 .. 2^64 - 1)"
+   }
+  },
+  {
+   "name": "signed_zero_constants",
+   "src": "fb = V.f32(name=\"fb\", at=3)\nnz = S.f32(-0.0, name=\"nz\")\npz = V.f32(0.0, name=\"pz\")\nmz = V.f32(fb * -0.0, name=\"mz\")\nvz = V.f32(-0.0, name=\"vz\")",
+   "built": [
+    "s_mov_b32 s:nz#1[0]x1, 2147483648 ; comment=\"nz = -0.0\"",
+    "v_mov_b32 v:pz#1[0]x1, 0 ; comment=\"pz = 0.0\"",
+    "v_mul_f32 v:mz#1[0]x1, 2147483648, v:fb#1[0]x1 ; comment=\"mz = fb * -0.0\"",
+    "v_mov_b32 v:vz#1[0]x1, 2147483648 ; comment=\"vz = -0.0\""
+   ],
+   "values": [
+    "0 v fb#1 n=1 align=1 pin=3",
+    "1 s nz#1 n=1 align=1",
+    "2 v pz#1 n=1 align=1",
+    "3 v mz#1 n=1 align=1",
+    "4 v vz#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "fb#1"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, 2147483648                                     // nz = -0.0",
+    "\tv_mov_b32 v0, 0                                              // pz = 0.0",
+    "\tv_mul_f32 v1, 2147483648, v3                                 // mz = fb * -0.0",
+    "\tv_mov_b32 v2, 2147483648                                     // vz = -0.0"
+   ]
+  },
+  {
+   "name": "u64_times_constant",
+   "src": "qv = V.u64(name=\"qv\", at=2)\nV.u64(qv * 4)",
+   "error": {
+    "class": "ExprError",
+    "message": "qv * 4: a u64 takes + and - (its halves: .lo / .hi)"
+   }
+  },
+  {
+   "name": "vector_u32_minus_u64",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nqv = V.u64(name=\"qv\", at=6)\nV.u64(w - qv)",
+   "error": {
+    "class": "ExprError",
+    "message": "w - qv: a u32 minus a u64"
+   }
+  },
+  {
+   "name": "float_constant_scalar_u32",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.u32(k0 * 0.25)",
+   "error": {
+    "class": "ExprError",
+    "message": "0.25: a float constant where a u32 is"
+   }
+  },
+  {
+   "name": "u32_tree_into_f32",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.f32(w - 2)",
+   "error": {
+    "class": "ExprError",
+    "message": "v:t#1 = w - 2: a u32 into an f32 (cast: f32(x))"
+   }
+  },
+  {
+   "name": "mask_from_integer",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.mask(k1 + 1)",
+   "error": {
+    "class": "ExprError",
+    "message": "s:t#1 = k1 + 1: a mask from a condition"
+   }
+  },
+  {
+   "name": "conditions_multiplied",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.mask((u > 4) * (w == 1))",
+   "error": {
+    "class": "ExprError",
+    "message": "* of lane masks / conditions: & | ^ ~"
+   }
+  },
+  {
+   "name": "condition_compared",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n(u == 2) >= (k0 != w)",
+   "error": {
+    "class": "ExprError",
+    "message": "(u == 2) >= (k0 != w): a compare of numbers (an f32x2: of .lo, .hi)"
+   }
+  },
+  {
+   "name": "invert_f32_tree",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\n~(fa + fb)",
+   "error": {
+    "class": "ExprError",
+    "message": "~(fa + fb): an integer's bits or a condition"
+   }
+  },
+  {
+   "name": "negate_scalar_u32",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n-k0",
+   "error": {
+    "class": "ExprError",
+    "message": "-k0: a float's (an integer's negation: 0 - x)"
+   }
+  },
+  {
+   "name": "f32_plus_pair",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\npr = V.f32x2(name=\"pr\")\nV.f32x2(fc + pr)",
+   "error": {
+    "class": "ExprError",
+    "message": "fc + pr: f32 with f32x2 (types do not mix: cast one - u32(x), i32(x), f32(x) reinterpret, no instruction)"
+   }
+  },
+  {
+   "name": "pair_xor",
+   "src": "pr = V.f32x2(name=\"pr\")\nV.f32x2(pr ^ pr)",
+   "error": {
+    "class": "ExprError",
+    "message": "pr ^ pr: an f32x2 takes + - * of two f32x2 (a broadcast: the scalar in a pair first)"
+   }
+  },
+  {
+   "name": "pair_equality",
+   "src": "pr = V.f32x2(name=\"pr\")\nselect(pr == pr, 3, 4)",
+   "error": {
+    "class": "ExprError",
+    "message": "pr == pr: a compare of numbers (an f32x2: of .lo, .hi)"
+   }
+  },
+  {
+   "name": "select_on_float",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nselect(fa, fb, fc)",
+   "error": {
+    "class": "ExprError",
+    "message": "select(fa, ..): a condition first"
+   }
+  },
+  {
+   "name": "select_of_pairs",
+   "src": "pr = V.f32x2(name=\"pr\")\nselect(pr.hi > pr.lo, pr, pr)",
+   "error": {
+    "class": "ExprError",
+    "message": "select(.., pr, pr): of dwords (an f32x2: .lo and .hi apart)"
+   }
+  },
+  {
+   "name": "scalar_select_vector_compare",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.u32(select(w != k0, k1, 8))",
+   "error": {
+    "class": "ExprError",
+    "message": "select(w != k0, k1, 8): a vector value into an SGPR (v_readfirstlane is never implied: first_lane(x))"
+   }
+  },
+  {
+   "name": "scalar_med3",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.u32(med3(k0, 6, k1))",
+   "error": {
+    "class": "ExprError",
+    "message": "med3(k0, 6, k1): min3 / max3 / med3 are VALU ops: write it into a V value (in SGPRs: two min / max)"
+   }
+  },
+  {
+   "name": "maximum_of_masks",
+   "src": "lm = S.mask(name=\"lm\")\nmax(lm, lm)",
+   "error": {
+    "class": "ExprError",
+    "message": "max: of numbers (u32, i32, f32)"
+   }
+  },
+  {
+   "name": "first_of_vector",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nfirst(u)",
+   "error": {
+    "class": "ExprError",
+    "message": "first(u): of a lane mask"
+   }
+  },
+  {
+   "name": "popcount_of_float_tree",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\npopcount(fb * 2.0)",
+   "error": {
+    "class": "ExprError",
+    "message": "popcount(fb * 2.0): an integer's (u32, i32)"
+   }
+  },
+  {
+   "name": "raw_op_unknown_type",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nop(\"v_cvt_f32_ubyte2\", w)",
+   "error": {
+    "class": "ExprError",
+    "message": "op('v_cvt_f32_ubyte2'): its result's type (ty=)"
+   }
+  },
+  {
+   "name": "unpack_bf16_high",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nunpack(w, \"bf16\", at=1)",
+   "error": {
+    "class": "ExprError",
+    "message": "unpack(.., bf16): bf16 is bf16_lo / bf16_hi / pk_bf16 (shifts, v_cvt_pk_bf16_f32)"
+   }
+  },
+  {
+   "name": "unpack_unknown_format",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nunpack(u, \"e3m2\")",
+   "error": {
+    "class": "ExprError",
+    "message": "unpack(.., 'e3m2'): the formats it converts are f16, e4m3fn, e5m2"
+   }
+  },
+  {
+   "name": "unpack_negative_index",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nunpack(u, \"f16\", at=-1)",
+   "error": {
+    "class": "ExprError",
+    "message": "unpack(at=-1): the element of the dword, 0 .. 1"
+   }
+  },
+  {
+   "name": "pack_f16_with_half",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\ndst = V.u32(name=\"dst\")\npack2(fb, fc, \"f16\", into=dst, at=1)",
+   "error": {
+    "class": "ExprError",
+    "message": "pack2(.., f16): a whole dword (no into=, at=)"
+   }
+  },
+  {
+   "name": "pack_fp8_without_target",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\npack2(fc, fa, \"e5m2\")",
+   "error": {
+    "class": "ExprError",
+    "message": "pack2(.., e5m2): into= the dword it is written into (its other bits kept)"
+   }
+  },
+  {
+   "name": "pack_fp8_into_other",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\ndst = V.u32(name=\"dst\")\nother = V.u32(name=\"other\")\nother[...] = pack2(fa, fb, \"e5m2\", into=dst, at=1)",
+   "error": {
+    "class": "ExprError",
+    "message": "pack2(fa, fb, e5m2, into=dst, at=1): written into dst itself (dst[...] = pack2(a, b, e5m2, into=dst): its other bits kept)"
+   }
+  },
+  {
+   "name": "lane_write_into_other",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nw[...] = lane_write(u, k1, 9)",
+   "error": {
+    "class": "ExprError",
+    "message": "lane_write(u, k1, 9): written into u itself (u[...] = lane_write(u, k, s): the other lanes kept)"
+   }
+  },
+  {
+   "name": "fma_scalar_with_pairs",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\npr = V.f32x2(name=\"pr\")\nfma(fa, pr, pr)",
+   "error": {
+    "class": "ExprError",
+    "message": "fma(fa, pr, pr): three f32x2, or none"
+   }
+  },
+  {
+   "name": "across_one_lane",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nacross(fb, \"add\", 12)",
+   "error": {
+    "class": "ExprError",
+    "message": "across(lanes=12): 2, 4, 8, 16, 32 or 64"
+   }
+  },
+  {
+   "name": "across_full_wave64",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.f32(across(fc, \"min\", 64))",
+   "error": {
+    "class": "ExprError",
+    "message": "across over 64 lanes: a wave of 32 lanes"
+   }
+  },
+  {
+   "name": "across_xor",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nacross(fa, \"xor\", 8)",
+   "error": {
+    "class": "ExprError",
+    "message": "across(.., 'xor'): max, min, add"
+   }
+  },
+  {
+   "name": "scan_quad",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nscan(fb, \"max\", 4)",
+   "error": {
+    "class": "ExprError",
+    "message": "scan(lanes=4): 16, 32 or 64"
+   }
+  },
+  {
+   "name": "convert_float_tree_to_f32",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\ncvt_f32(fa * fb)",
+   "error": {
+    "class": "ExprError",
+    "message": "cvt_f32(fa * fb): an integer's (u32, i32)"
+   }
+  },
+  {
+   "name": "mad24_of_floats",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nmad24(fb, fc, 1)",
+   "error": {
+    "class": "ExprError",
+    "message": "mad24(fb): an integer's (u32, i32)"
+   }
+  },
+  {
+   "name": "pack_bf16_pair_absent",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.u32(pk_bf16(fc, fc * 0.5))",
+   "error": {
+    "class": "ExprError",
+    "message": "v.cvt.pk.bf16.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "round_bf16_absent",
+   "src": "fa, fb, fc = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6), V.f32(name=\"fc\", at=7)\nV.f32(bf16(fa + fb))",
+   "error": {
+    "class": "ExprError",
+    "message": "v.cvt.pk.bf16.f32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "fp8_pair_high_word",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nV.f32x2(unpack2(u, \"e5m2\", at=2))",
+   "error": {
+    "class": "ExprError",
+    "message": "unpack2(at=2): 0 only (the elements from the dword's low bits)"
+   }
+  },
+  {
+   "name": "scalar_u64_ordered_compare",
+   "src": "pa = S.u64(name=\"pa\", at=2)\npb = S.u64(name=\"pb\", at=4)\nS.u32(select(pa >= pb, 4, 5))",
+   "error": {
+    "class": "ExprError",
+    "message": "a scalar u64 compares == or != (s_cmp_eq_u64 / s_cmp_lg_u64), not >="
+   }
+  },
+  {
+   "name": "mask_of_lane_select",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nS.mask(select(u != w, u, w))",
+   "error": {
+    "class": "ExprError",
+    "message": "s:t#1 = select(u != w, u, w): a mask from a condition"
+   }
+  }
+ ]
+}

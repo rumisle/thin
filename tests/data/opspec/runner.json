@@ -1,0 +1,1129 @@
+{
+ "notation": "Each call is executed by thin.opspec.check, with host arithmetic confined to\nsmall Probe calls returned by real registered bindings.  Probe.emulate/run logs\nthe call and writes or faults; it does not implement any check/selection logic.\nA result is the list of Failures expanded to every public scenario field plus\nrerun() and str().  LOG is recorded separately after every case, including\nrefusals.  The gpu case stubs only tensor transfer and synchronization in the\nreplay harness, exactly as the public replay test does.  The group section uses\nreal emulated group handles and tensors, replacing only group.emulate with a\nrecording dispatcher that computes the prescribed rank-wise result.",
+ "file": "<test>/opspec/runner.py",
+ "setup": "class Kernel:\n    def __init__(self, label):\n        self.name, self.args, self.address = label, {}, 'runner:' + label\n\nLOG = []\n\nclass Probe:\n    def __init__(self, kernel, args, *, grid=(3, 1, 1), co_resident=False,\n                 action=None, fault=None):\n        self.kernel, self.args, self.grid = kernel, dict(args), tuple(grid)\n        self.co_resident, self.overread, self.group = co_resident, {}, None\n        self.action, self.fault = action, fault\n    def _invoke(self, sched=None, method='emulate'):\n        entry = {'call': method, 'kernel': self.kernel.name}\n        if method == 'emulate':\n            entry['sched'] = sched\n        LOG.append(entry)\n        if self.fault is not None:\n            raise DeviceFault(self.fault)\n        if self.action is not None:\n            self.action(self)\n    def emulate(self, sched=None):\n        self._invoke(sched)\n    def run(self):\n        self._invoke(method='run')\n\nclass Accumulate(Spec, name='authored.accumulate'):\n    length = Int(lo=2)\n    dists = {'amplitude': [1.0, 1.0e20]}\n    def signature(op):\n        return {'left': In('f32', op.length), 'right': In('f32', op.length),\n                'answer': Out('f32', op.length)}\n    def inputs(op, seed, *, amplitude=1.0):\n        positions = np.arange(op.length, dtype=np.float64)\n        left = ((2 * positions + seed + 1) * amplitude).astype(np.float32)\n        right = np.full(op.length, (seed + 3) * amplitude, np.float64).astype(np.float32)\n        return {'left': left, 'right': right}\n    def check(op, inputs, outputs):\n        want = inputs['left'] + inputs['right']\n        got = outputs['answer']\n        wrong = np.flatnonzero(got.view(np.uint32) != want.view(np.uint32))\n        if not len(wrong):\n            return None\n        at = int(wrong[0])\n        return f'answer[{at}] = {float(got[at])}, want {float(want[at])} ({len(wrong)} wrong)'\n\ndef addition_action(omit_last=False):\n    def invoke(call):\n        value = call.args['left'] + call.args['right']\n        target = call.args['answer']\n        if omit_last:\n            target[:-1] = value[:-1]\n        else:\n            target[:] = value\n    return invoke\n\ndef register(label, *, tunables=None, omit_last=False, fault=None, co_resident=False, calls=1):\n    @implements(Accumulate, tunables=tunables,\n                needs={'co_resident': True} if co_resident else None)\n    def bind(op, **chosen):\n        return [Probe(Kernel(f'{label}#{index}'),\n                      {'left': op.left, 'right': op.right, 'answer': op.answer},\n                      co_resident=co_resident, action=addition_action(omit_last), fault=fault)\n                for index in range(calls)]\n    bind.__name__ = bind.__qualname__ = label\n    bind.implementation.fn.__name__ = label\n    return bind\n\nregister('accurate', tunables={'lanes': [16, 32]})\nregister('truncated', omit_last=True, tunables={'lanes': [16]})\nregister('faulting', fault='synthetic missing memory')\nregister('resident', co_resident=True)\nregister('pipeline', calls=2)\n\ndef failure_facts(op, **arguments):\n    LOG.clear()\n    failures = check(op, **arguments)\n    return [{'impl': f.impl, 'tunables': dict(f.tunables), 'seed': f.seed,\n             'dist': dict(f.dist), 'sched': f.sched, 'device': f.device,\n             'why': f.why, 'rerun': f.rerun(), 'str': str(f)} for f in failures]\n",
+ "SCHEDS": [
+  null,
+  {
+   "order": "reverse"
+  },
+  {
+   "order": 1
+  },
+  {
+   "resident": 1
+  },
+  {
+   "order": "reverse",
+   "resident": 1
+  },
+  {
+   "jitter": 1
+  },
+  {
+   "wave_jitter": 1
+  }
+ ],
+ "cases": [
+  {
+   "case_": "three seeds, two distribution points and all default schedules",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), device='emulated')",
+   "ok": [],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse",
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse",
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse",
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse",
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse",
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse",
+      "resident": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    }
+   ]
+  },
+  {
+   "case_": "one seed and one schedule still visit both distribution points",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), device='emulated', seeds=(4,), scheds=({'order': 'reverse'},))",
+   "ok": [],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": {
+      "order": "reverse"
+     }
+    }
+   ]
+  },
+  {
+   "case_": "an explicit implementation and tunable are carried through checking",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), impl='accurate', lanes=32, seeds=(3,), scheds=(None,))",
+   "ok": [],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    }
+   ]
+  },
+  {
+   "case_": "a wrong output retains implementation, tunable, seed, dist, schedule and rerun text",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), impl='truncated', seeds=(2,), scheds=(None, {'jitter': 2}))",
+   "ok": [
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 2,
+     "dist": {
+      "amplitude": 1.0
+     },
+     "sched": null,
+     "device": "emulated",
+     "why": "answer[6] = nan, want 20.0 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1.0]}, scheds=(None,), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 20.0 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1.0]}, scheds=(None,), device='emulated')"
+    },
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 2,
+     "dist": {
+      "amplitude": 1.0
+     },
+     "sched": {
+      "jitter": 2
+     },
+     "device": "emulated",
+     "why": "answer[6] = nan, want 20.0 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1.0]}, scheds=({'jitter': 2},), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 20.0 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1.0]}, scheds=({'jitter': 2},), device='emulated')"
+    },
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 2,
+     "dist": {
+      "amplitude": 1e+20
+     },
+     "sched": null,
+     "device": "emulated",
+     "why": "answer[6] = nan, want 2.0000000400817547e+21 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1e+20]}, scheds=(None,), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 2.0000000400817547e+21 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1e+20]}, scheds=(None,), device='emulated')"
+    },
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 2,
+     "dist": {
+      "amplitude": 1e+20
+     },
+     "sched": {
+      "jitter": 2
+     },
+     "device": "emulated",
+     "why": "answer[6] = nan, want 2.0000000400817547e+21 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1e+20]}, scheds=({'jitter': 2},), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 2.0000000400817547e+21 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(2,), dists={'amplitude': [1e+20]}, scheds=({'jitter': 2},), device='emulated')"
+    }
+   ],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "truncated#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "truncated#0",
+     "sched": {
+      "jitter": 2
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "truncated#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "truncated#0",
+     "sched": {
+      "jitter": 2
+     }
+    }
+   ]
+  },
+  {
+   "case_": "a distribution override replaces the declared points",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), impl='truncated', seeds=(1,), scheds=(None,), dists={'amplitude': [3.0]})",
+   "ok": [
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 1,
+     "dist": {
+      "amplitude": 3.0
+     },
+     "sched": null,
+     "device": "emulated",
+     "why": "answer[6] = nan, want 54.0 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(1,), dists={'amplitude': [3.0]}, scheds=(None,), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 54.0 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(1,), dists={'amplitude': [3.0]}, scheds=(None,), device='emulated')"
+    }
+   ],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "truncated#0",
+     "sched": null
+    }
+   ]
+  },
+  {
+   "case_": "an empty override uses inputs defaults and yields one point",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), seeds=(0,), scheds=(None,), dists={})",
+   "ok": [],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "accurate#0",
+     "sched": null
+    }
+   ]
+  },
+  {
+   "case_": "a named distribution with no values is refused",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), seeds=(0,), scheds=(None,), dists={'amplitude': []})",
+   "refused": "ValueError",
+   "message": "authored.accumulate: dists ['amplitude'] list no values",
+   "calls": []
+  },
+  {
+   "case_": "an unknown distribution key is refused before running",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), dists={'offset': [2]})",
+   "refused": "ValueError",
+   "message": "authored.accumulate: dists ['offset']: its data parameters are ['amplitude']",
+   "calls": []
+  },
+  {
+   "case_": "DeviceFault becomes a Failure at every distribution point",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), impl='faulting', seeds=(5,), scheds=(None,))",
+   "ok": [
+    {
+     "impl": "authored.accumulate/faulting",
+     "tunables": {},
+     "seed": 5,
+     "dist": {
+      "amplitude": 1.0
+     },
+     "sched": null,
+     "device": "emulated",
+     "why": "fault: synthetic missing memory",
+     "rerun": "thin.check(op, impl='faulting', seeds=(5,), dists={'amplitude': [1.0]}, scheds=(None,), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/faulting {}: fault: synthetic missing memory\n  rerun: thin.check(op, impl='faulting', seeds=(5,), dists={'amplitude': [1.0]}, scheds=(None,), device='emulated')"
+    },
+    {
+     "impl": "authored.accumulate/faulting",
+     "tunables": {},
+     "seed": 5,
+     "dist": {
+      "amplitude": 1e+20
+     },
+     "sched": null,
+     "device": "emulated",
+     "why": "fault: synthetic missing memory",
+     "rerun": "thin.check(op, impl='faulting', seeds=(5,), dists={'amplitude': [1e+20]}, scheds=(None,), device='emulated')",
+     "str": "authored.accumulate{length=7} authored.accumulate/faulting {}: fault: synthetic missing memory\n  rerun: thin.check(op, impl='faulting', seeds=(5,), dists={'amplitude': [1e+20]}, scheds=(None,), device='emulated')"
+    }
+   ],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "faulting#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "faulting#0",
+     "sched": null
+    }
+   ]
+  },
+  {
+   "case_": "default schedules whose residency is below the grid are skipped",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), impl='resident', seeds=(0,), dists={'amplitude': [1.0]})",
+   "ok": [],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "resident#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "resident#0",
+     "sched": {
+      "order": "reverse"
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "resident#0",
+     "sched": {
+      "order": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "resident#0",
+     "sched": {
+      "jitter": 1
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "resident#0",
+     "sched": {
+      "wave_jitter": 1
+     }
+    }
+   ]
+  },
+  {
+   "case_": "multiple calls execute in binding order for each schedule",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), impl='pipeline', seeds=(0,), dists={'amplitude': [1.0]}, scheds=(None, {'resident': 3}))",
+   "ok": [],
+   "calls": [
+    {
+     "call": "emulate",
+     "kernel": "pipeline#0",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "pipeline#1",
+     "sched": null
+    },
+    {
+     "call": "emulate",
+     "kernel": "pipeline#0",
+     "sched": {
+      "resident": 3
+     }
+    },
+    {
+     "call": "emulate",
+     "kernel": "pipeline#1",
+     "sched": {
+      "resident": 3
+     }
+    }
+   ]
+  },
+  {
+   "case_": "an empty schedule collection performs no emulated runs",
+   "gpu_copies_stubbed": false,
+   "call": "r = failure_facts(Accumulate(length=7), seeds=(0,), scheds=())",
+   "ok": [],
+   "calls": []
+  },
+  {
+   "case_": "GPU checking calls run once per seed/point and records device gpu",
+   "gpu_copies_stubbed": true,
+   "call": "r = failure_facts(Accumulate(length=7), impl='truncated', seeds=(0, 1), dists={'amplitude': [1.0]}, device='gpu')",
+   "ok": [
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 0,
+     "dist": {
+      "amplitude": 1.0
+     },
+     "sched": null,
+     "device": "gpu",
+     "why": "answer[6] = nan, want 16.0 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(0,), dists={'amplitude': [1.0]}, scheds=(None,), device='gpu')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 16.0 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(0,), dists={'amplitude': [1.0]}, scheds=(None,), device='gpu')"
+    },
+    {
+     "impl": "authored.accumulate/truncated",
+     "tunables": {
+      "lanes": 16
+     },
+     "seed": 1,
+     "dist": {
+      "amplitude": 1.0
+     },
+     "sched": null,
+     "device": "gpu",
+     "why": "answer[6] = nan, want 18.0 (1 wrong)",
+     "rerun": "thin.check(op, impl='truncated', lanes=16, seeds=(1,), dists={'amplitude': [1.0]}, scheds=(None,), device='gpu')",
+     "str": "authored.accumulate{length=7} authored.accumulate/truncated {'lanes': 16}: answer[6] = nan, want 18.0 (1 wrong)\n  rerun: thin.check(op, impl='truncated', lanes=16, seeds=(1,), dists={'amplitude': [1.0]}, scheds=(None,), device='gpu')"
+    }
+   ],
+   "calls": [
+    {
+     "call": "run",
+     "kernel": "truncated#0"
+    },
+    {
+     "call": "run",
+     "kernel": "truncated#0"
+    }
+   ]
+  }
+ ],
+ "group": {
+  "setup": "class RankTotal(Spec, name='authored.rank_total', group='world'):\n    world = Int(lo=2, hi=6)\n    length = Int(lo=1)\n    def signature(op):\n        return {'source': In('u32', op.length), 'total': Out('u32', op.length)}\n    def inputs(op, seed):\n        return [{'source': (np.arange(op.length, dtype=np.uint32) + 7 * rank + seed)}\n                for rank in range(op.world)]\n    def check(op, inputs, outputs):\n        want = sum(i['source'].astype(np.uint64) for i in inputs).astype(np.uint32)\n        for rank, output in enumerate(outputs):\n            wrong = np.flatnonzero(output['total'] != want)\n            if len(wrong):\n                at = int(wrong[0])\n                return (f'rank {rank}: total[{at}] = {int(output[\"total\"][at]):#x}, '\n                        f'want {int(want[at]):#x}')\n        return None\n\nclass SharedTotal(Spec, name='authored.shared_total', group='world'):\n    world = Int(lo=2, hi=6)\n    length = Int(lo=1)\n    def signature(op):\n        return {'table': In('u32', op.world, op.length, shared=True),\n                'answer': Out('u32', op.length)}\n    def inputs(op, seed):\n        return [{'table': np.full((op.world, op.length), 20 * rank + seed + 1, np.uint32)}\n                for rank in range(op.world)]\n    def check(op, inputs, outputs):\n        for rank, output in enumerate(outputs):\n            want = sum(i['table'][rank].astype(np.uint64) for i in inputs).astype(np.uint32)\n            if not np.array_equal(output['answer'], want):\n                return f'rank {rank}: answer {output[\"answer\"].tolist()} != {want.tolist()}'\n        return None\n\nROUND_ACTION = {}\nCURRENT_OP = {}\n\ndef rank_calls(op, label, count=1, co_resident=False):\n    return [Probe(Kernel(f'{label}#{index}'), dict(op.tensors), grid=(2, 1, 1),\n                  co_resident=co_resident) for index in range(count)]\n\ndef total_action(wrong_rank=None):\n    def invoke(round_calls):\n        sources = [c.args['source'] for c in round_calls]\n        for call in round_calls:\n            call.args['total'][:] = sum(sources)\n            if call.group.rank == wrong_rank:\n                call.args['total'][0] = 0\n    return invoke\n\n@implements(RankTotal)\ndef total(op):\n    ROUND_ACTION['run'] = total_action()\n    return rank_calls(op, 'total')\n\n@implements(RankTotal)\ndef total_wrong(op):\n    ROUND_ACTION['run'] = total_action(wrong_rank=1)\n    return rank_calls(op, 'total_wrong')\n\n@implements(RankTotal)\ndef total_ragged(op):\n    ROUND_ACTION['run'] = total_action()\n    return rank_calls(op, 'total_ragged', count=1 + op.rank)\n\n@implements(RankTotal, needs={'co_resident': True})\ndef total_resident(op):\n    ROUND_ACTION['run'] = total_action()\n    return rank_calls(op, 'total_resident', co_resident=True)\n\n@implements(SharedTotal)\ndef shared_total(op):\n    def invoke(round_calls):\n        for call in round_calls:\n            copies = call.group.team.peers_of(call.args['table'])\n            call.args['answer'][:] = sum(c[call.group.rank] for c in copies)\n    ROUND_ACTION['run'] = invoke\n    return rank_calls(op, 'shared_total')\n\ndef recording_group_run(calls, sched=None, staged=()):\n    def staged_label(item):\n        for call in calls:\n            for name, value in call.args.items():\n                peers = call.group.team.peers_of(value)\n                if peers is not None:\n                    for rank, copy in enumerate(peers):\n                        if copy is item:\n                            return f'{CURRENT_OP[\"op\"].key()}.{name}[rank {rank}]'\n        return '<unknown>'\n    LOG.append({'call': 'group.emulate',\n                'bounds': [f'{c.kernel.name} rank {c.group.rank}' for c in calls],\n                'sched': sched, 'staged': [staged_label(s) for s in staged]})\n    ROUND_ACTION['run'](calls[:calls[0].group.world])\n\ndef group_failure_facts(op, **arguments):\n    LOG.clear()\n    CURRENT_OP['op'] = op\n    return [{'impl': f.impl, 'tunables': dict(f.tunables), 'seed': f.seed,\n             'dist': dict(f.dist), 'sched': f.sched, 'device': f.device,\n             'why': f.why, 'rerun': f.rerun(), 'str': str(f)}\n            for f in check(op, **arguments)]\n\nunmodified_group_run = group.emulate\ngroup.emulate = recording_group_run\n",
+  "teardown": "group.emulate = unmodified_group_run",
+  "cases": [
+   {
+    "case_": "default schedules plus both group-skew schedules; each round is issued twice",
+    "call": "r = group_failure_facts(RankTotal(world=2, length=3), impl='total', seeds=(0,))",
+    "ok": [],
+    "calls": [
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": null,
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "order": "reverse"
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "order": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "resident": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "order": "reverse",
+       "resident": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "jitter": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "wave_jitter": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "skew": [
+        0,
+        40
+       ],
+       "speed": [
+        1,
+        0.0625
+       ]
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "skew": [
+        0,
+        40
+       ],
+       "speed": [
+        1,
+        0.0625
+       ],
+       "resident": 1
+      },
+      "staged": []
+     }
+    ]
+   },
+   {
+    "case_": "explicit non-default schedules do not gain group-skew entries",
+    "call": "r = group_failure_facts(RankTotal(world=3, length=3), impl='total', seeds=(0, 1), scheds=(None,))",
+    "ok": [],
+    "calls": [
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 2",
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 2"
+      ],
+      "sched": null,
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 2",
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 2"
+      ],
+      "sched": null,
+      "staged": []
+     }
+    ]
+   },
+   {
+    "case_": "an equal copy of defaults is recognized and gains group-skew entries",
+    "call": "r = group_failure_facts(RankTotal(world=2, length=3), impl='total', seeds=(0,), scheds=tuple(list(SCHEDS)))",
+    "ok": [],
+    "calls": [
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": null,
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "order": "reverse"
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "order": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "resident": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "order": "reverse",
+       "resident": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "jitter": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "wave_jitter": 1
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "skew": [
+        0,
+        40
+       ],
+       "speed": [
+        1,
+        0.0625
+       ]
+      },
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total#0 rank 0",
+       "total#0 rank 1",
+       "total#0 rank 0",
+       "total#0 rank 1"
+      ],
+      "sched": {
+       "skew": [
+        0,
+        40
+       ],
+       "speed": [
+        1,
+        0.0625
+       ],
+       "resident": 1
+      },
+      "staged": []
+     }
+    ]
+   },
+   {
+    "case_": "a rank's wrong output yields complete Failure records at each schedule",
+    "call": "r = group_failure_facts(RankTotal(world=2, length=3), impl='total_wrong', seeds=(0,), scheds=(None, {'jitter': 1}))",
+    "ok": [
+     {
+      "impl": "authored.rank_total/total_wrong",
+      "tunables": {},
+      "seed": 0,
+      "dist": {},
+      "sched": null,
+      "device": "emulated",
+      "why": "rank 1: total[0] = 0x0, want 0x7",
+      "rerun": "thin.check(op, impl='total_wrong', seeds=(0,), dists={}, scheds=(None,), device='emulated')",
+      "str": "authored.rank_total{length=3,world=2} authored.rank_total/total_wrong {}: rank 1: total[0] = 0x0, want 0x7\n  rerun: thin.check(op, impl='total_wrong', seeds=(0,), dists={}, scheds=(None,), device='emulated')"
+     },
+     {
+      "impl": "authored.rank_total/total_wrong",
+      "tunables": {},
+      "seed": 0,
+      "dist": {},
+      "sched": {
+       "jitter": 1
+      },
+      "device": "emulated",
+      "why": "rank 1: total[0] = 0x0, want 0x7",
+      "rerun": "thin.check(op, impl='total_wrong', seeds=(0,), dists={}, scheds=({'jitter': 1},), device='emulated')",
+      "str": "authored.rank_total{length=3,world=2} authored.rank_total/total_wrong {}: rank 1: total[0] = 0x0, want 0x7\n  rerun: thin.check(op, impl='total_wrong', seeds=(0,), dists={}, scheds=({'jitter': 1},), device='emulated')"
+     }
+    ],
+    "calls": [
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total_wrong#0 rank 0",
+       "total_wrong#0 rank 1",
+       "total_wrong#0 rank 0",
+       "total_wrong#0 rank 1"
+      ],
+      "sched": null,
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total_wrong#0 rank 0",
+       "total_wrong#0 rank 1",
+       "total_wrong#0 rank 0",
+       "total_wrong#0 rank 1"
+      ],
+      "sched": {
+       "jitter": 1
+      },
+      "staged": []
+     }
+    ]
+   },
+   {
+    "case_": "different bounds counts on different ranks are refused before a group run",
+    "call": "r = group_failure_facts(RankTotal(world=2, length=3), impl='total_ragged', seeds=(0,), scheds=(None,))",
+    "refused": "ValueError",
+    "message": "authored.rank_total{length=3,world=2}: the ranks lower to [1, 2] calls: one count",
+    "calls": []
+   },
+   {
+    "case_": "residency considers every rank's co-resident calls",
+    "call": "r = group_failure_facts(RankTotal(world=2, length=3), impl='total_resident', seeds=(0,), scheds=(None, {'resident': 1}, group.slow(2, resident=1), {'resident': 2}))",
+    "ok": [],
+    "calls": [
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total_resident#0 rank 0",
+       "total_resident#0 rank 1",
+       "total_resident#0 rank 0",
+       "total_resident#0 rank 1"
+      ],
+      "sched": null,
+      "staged": []
+     },
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "total_resident#0 rank 0",
+       "total_resident#0 rank 1",
+       "total_resident#0 rank 0",
+       "total_resident#0 rank 1"
+      ],
+      "sched": {
+       "resident": 2
+      },
+      "staged": []
+     }
+    ]
+   },
+   {
+    "case_": "each shared input has a real group copy and all copies are staged",
+    "call": "r = group_failure_facts(SharedTotal(world=2, length=3), seeds=(0,), scheds=(None,))",
+    "ok": [],
+    "calls": [
+     {
+      "call": "group.emulate",
+      "bounds": [
+       "shared_total#0 rank 0",
+       "shared_total#0 rank 1",
+       "shared_total#0 rank 0",
+       "shared_total#0 rank 1"
+      ],
+      "sched": null,
+      "staged": [
+       "authored.shared_total{length=3,world=2}.table[rank 0]",
+       "authored.shared_total{length=3,world=2}.table[rank 1]"
+      ]
+     }
+    ]
+   },
+   {
+    "case_": "inputs returning fewer ranks than the group are refused",
+    "call": "saved_inputs = RankTotal.inputs\nRankTotal.inputs = lambda op, seed: [{'source': np.zeros(op.length, np.uint32)}]\ntry:\n    r = group_failure_facts(RankTotal(world=2, length=3), impl='total', seeds=(0,), scheds=(None,))\nfinally:\n    RankTotal.inputs = saved_inputs",
+    "refused": "ValueError",
+    "message": "authored.rank_total: inputs gives 1 ranks' inputs, its world is 2",
+    "calls": []
+   }
+  ]
+ }
+}

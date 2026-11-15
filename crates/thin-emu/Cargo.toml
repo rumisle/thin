@@ -1,0 +1,41 @@
+[package]
+name = "thin-emu"
+description = "The thin emulator: runs assembly on the CPU with measured numerical semantics, provenance tags, memory, LDS race and scope models, and the GEMM checker"
+keywords = ["gpu", "emulator", "amdgpu", "provenance"]
+categories = ["emulators"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+thin-test-support = { path = "../../tests/rust" }
+serde_json.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-targets.workspace = true
+thin-dsl.workspace = true
+thin-codegen.workspace = true
+
+
+[lints]
+workspace = true
+
+[[test]]
+name = "emu"
+harness = false
+
+[[test]]
+name = "emu_tags"
+harness = false

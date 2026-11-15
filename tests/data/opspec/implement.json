@@ -1,0 +1,2152 @@
+{
+ "notation": "Executable in the same namespace and document order as spec.json.  Each\nscenario declares a fresh Spec subclass, registers its implementations, then runs\nits lowering and candidates calls.  Kernel and Probe are deliberately minimal\nstand-ins at the public binding boundary; Arg records expose the kernel argument\nmetadata consumed by thin.  inspect_lower records the selected implementation,\nchosen tunables, bound calls, and the exact field/group/tunable view seen by the\nbinding.  inspect_candidates records implementation order, Cartesian tunable\norder, and served ranges.  No outcome is supplied by these programs: replay\nexecutes every statement with thin and captures returned values or refusals.",
+ "file": "<test>/opspec/implement.py",
+ "setup": "class Arg:\n    def __init__(self, lo=None, hi=None, width=4, kind=\"u32\"):\n        self.lo, self.hi, self.bytes, self.kind = lo, hi, width, kind\n\nclass Kernel:\n    def __init__(self, label, arguments=(), address=None):\n        self.name = label\n        self.args = dict(arguments)\n        self.address = address or \"authored:\" + label\n\nclass Probe:\n    def __init__(self, kernel, args=None, grid=(1, 1, 1), co_resident=False, overread=None):\n        self.kernel = kernel\n        self.args = dict(args or {})\n        self.grid = tuple(grid)\n        self.co_resident = co_resident\n        self.overread = dict(overread or {})\n        self.group = None\n\nOBSERVED = {}\n\ndef field_fact(value):\n    if isinstance(value, Field):\n        return {\"kind\": \"Field\", \"value\": int(value), \"range\": list(value.range)}\n    return {\"kind\": type(value).__name__, \"value\": value}\n\ndef call_fact(call):\n    return {\"kernel\": call.kernel.name, \"grid\": list(call.grid),\n            \"co_resident\": call.co_resident, \"overread\": dict(call.overread),\n            \"group\": None if call.group is None else repr(call.group)}\n\ndef binding(label, plans):\n    \"\"\"A new binding over explicit kernel/argument/binding plans.\"\"\"\n    def bind(op, **tunables):\n        OBSERVED.clear()\n        OBSERVED.update(fields={n: field_fact(v) for n, v in op.field_values().items()},\n                        group=None if op.group is None else repr(op.group),\n                        tunables=dict(tunables))\n        calls = []\n        for plan in plans:\n            records = {n: Arg(*spec) for n, spec in plan.get(\"arguments\", {}).items()}\n            kernel = Kernel(plan.get(\"kernel\", label), records)\n            args = {}\n            for arg, source in plan.get(\"bind\", {}).items():\n                args[arg] = op.tensors[source] if source in op.tensors else getattr(op, source)\n            calls.append(Probe(kernel, args, co_resident=plan.get(\"co_resident\", False),\n                               overread=plan.get(\"overread\")))\n        return calls[0] if len(plans) == 1 and plans[0].get(\"single\") else calls\n    bind.__name__ = bind.__qualname__ = label\n    return bind\n\nclass Transform(Spec, name=\"authored.transform\"):\n    count = Int(lo=1)\n    tile = Int(default=2, lo=2, hi=24)\n    variant = Choice(\"forward\", \"reverse\", default=\"forward\")\n    def signature(op):\n        return {\"src\": In(\"f32\", op.count), \"dst\": Out(\"f32\", op.count)}\n\ndef buffers_for(fields):\n    return {\"src\": np.zeros(fields[\"count\"], np.float32),\n            \"dst\": np.zeros(fields[\"count\"], np.float32)}\n\ndef inspect_lower(cls, fields, impl=None, tunables=None, tensors=True):\n    kw = dict(fields)\n    if tensors:\n        kw.update(buffers_for(fields))\n    impl_record, chosen, calls = lowered(cls(**kw), impl, **(tunables or {}))\n    return {\"impl\": impl_record.name, \"tunables\": chosen,\n            \"calls\": [call_fact(c) for c in calls], \"observed\": dict(OBSERVED)}\n\ndef inspect_candidates(cls, fields):\n    return [{\"impl\": record.name, \"tunables\": chosen,\n             \"served\": {n: list(bounds) for n, bounds in served.items()}}\n            for record, chosen, served in candidates(cls(**fields))]\n",
+ "scenarios": [
+  {
+   "case": "covering pairs and explicit tunables",
+   "setup": "class Select(Transform, name='authored.selection'):\n    pass",
+   "implementations": [
+    {
+     "case_": "a predicate and two tunables in product order",
+     "call": "implements(Select, tunables={'block': [32, 96], 'unroll': [1, 3]}, covers=lambda op, **t: op.count <= 80 and t['block'] * t['unroll'] >= 96)(binding('filtered', [{'arguments': {'count': (1, 4096, 4)}, 'bind': {'src': 'src', 'dst': 'dst', 'count': 'count'}}]))"
+    },
+    {
+     "case_": "an unconditional fallback",
+     "call": "implements(Select, tunables={'block': [192]})(binding('fallback', [{'arguments': {'count': (1, 4096, 4)}, 'bind': {'src': 'src', 'dst': 'dst', 'count': 'count'}}]))"
+    }
+   ],
+   "cases": [
+    {
+     "behavior": "first covering pair and all product pairs",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9})",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "ok": {
+       "impl": "authored.selection/filtered",
+       "tunables": {
+        "block": 32,
+        "unroll": 3
+       },
+       "calls": [
+        {
+         "kernel": "filtered",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 9
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        }
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "only the fallback covers a large count",
+     "lowered_call": "r = inspect_lower(Select, {'count': 900})",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 900})",
+     "fields": {
+      "count": 900
+     },
+     "lowered": {
+      "ok": {
+       "impl": "authored.selection/fallback",
+       "tunables": {
+        "block": 192
+       },
+       "calls": [
+        {
+         "kernel": "fallback",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 900
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {
+         "block": 192
+        }
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "the named pair defaults to its first, non-covering tunables",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, impl='filtered')",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.selection/filtered {'block': 32, 'unroll': 1} does not cover authored.selection{count=9,tile=2,variant=forward}"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "one override retains defaults for the other tunables",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, impl='filtered', tunables={'unroll': 3})",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "ok": {
+       "impl": "authored.selection/filtered",
+       "tunables": {
+        "block": 32,
+        "unroll": 3
+       },
+       "calls": [
+        {
+         "kernel": "filtered",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 9
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        }
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "both tunables explicitly selected",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, impl='filtered', tunables={'block': 96, 'unroll': 1})",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "ok": {
+       "impl": "authored.selection/filtered",
+       "tunables": {
+        "block": 96,
+        "unroll": 1
+       },
+       "calls": [
+        {
+         "kernel": "filtered",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 9
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        }
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "an explicitly named pair accepts an experimental tunable value",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, impl='filtered', tunables={'block': 777, 'unroll': 3})",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "ok": {
+       "impl": "authored.selection/filtered",
+       "tunables": {
+        "block": 777,
+        "unroll": 3
+       },
+       "calls": [
+        {
+         "kernel": "filtered",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 9
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {
+         "block": 777,
+         "unroll": 3
+        }
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "the named implementation's predicate refuses the op",
+     "lowered_call": "r = inspect_lower(Select, {'count': 900}, impl='filtered')",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 900})",
+     "fields": {
+      "count": 900
+     },
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.selection/filtered {'block': 32, 'unroll': 1} does not cover authored.selection{count=900,tile=2,variant=forward}"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "an unknown short name",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, impl='missing')",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.selection: no implementation 'missing' (of ['authored.selection/filtered', 'authored.selection/fallback'])"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "tunables cannot be supplied without an implementation",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, tunables={'block': 32})",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.selection{count=9,tile=2,variant=forward}: tunables ['block'] without an implementation: name it (impl=) - the first covering one would take its own"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "lowering refuses before selection when signature tensors are absent",
+     "lowered_call": "r = inspect_lower(Select, {'count': 9}, tensors=False)",
+     "candidates_call": "r = inspect_candidates(Select, {'count': 9})",
+     "fields": {
+      "count": 9
+     },
+     "lowered": {
+      "refused": "TypeError",
+      "message": "authored.selection{count=9,tile=2,variant=forward}: lowered without its tensors ['dst', 'src']"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 32,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 1
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/filtered",
+        "tunables": {
+         "block": 96,
+         "unroll": 3
+        },
+        "served": {}
+       },
+       {
+        "impl": "authored.selection/fallback",
+        "tunables": {
+         "block": 192
+        },
+        "served": {}
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "case": "served ranges become coverage and Field values",
+   "setup": "class Served(Transform, name='authored.served'):\n    pass",
+   "implementations": [
+    {
+     "case_": "a narrow served range",
+     "call": "implements(Served, tunables={'width': [16]}, serves=lambda op, **_: {'count': (1, 48)})(binding('local', [{'arguments': {'count': (1, 4096, 4)}, 'bind': {'count': 'count', 'src': 'src', 'dst': 'dst'}}]))"
+    },
+    {
+     "case_": "two served Int fields including open kernel metadata",
+     "call": "implements(Served, serves=lambda op, **_: {'count': (1, 5000), 'tile': (2, 24)})(binding('wide', [{'arguments': {'count': (1, 8192, 4), 'tile': (None, None, 4)}, 'bind': {'count': 'count', 'tile': 'tile', 'src': 'src', 'dst': 'dst'}}]))"
+    }
+   ],
+   "cases": [
+    {
+     "behavior": "the binding receives one Field range",
+     "lowered_call": "r = inspect_lower(Served, {'count': 12})",
+     "candidates_call": "r = inspect_candidates(Served, {'count': 12})",
+     "lowered": {
+      "ok": {
+       "impl": "authored.served/local",
+       "tunables": {
+        "width": 16
+       },
+       "calls": [
+        {
+         "kernel": "local",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "Field",
+          "value": 12,
+          "range": [
+           1,
+           48
+          ]
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {
+         "width": 16
+        }
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.served/local",
+        "tunables": {
+         "width": 16
+        },
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.served/wide",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ],
+         "tile": [
+          2,
+          24
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "the fallback receives two Field ranges",
+     "lowered_call": "r = inspect_lower(Served, {'count': 60})",
+     "candidates_call": "r = inspect_candidates(Served, {'count': 60})",
+     "lowered": {
+      "ok": {
+       "impl": "authored.served/wide",
+       "tunables": {},
+       "calls": [
+        {
+         "kernel": "wide",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "Field",
+          "value": 60,
+          "range": [
+           1,
+           5000
+          ]
+         },
+         "tile": {
+          "kind": "Field",
+          "value": 2,
+          "range": [
+           2,
+           24
+          ]
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {}
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.served/wide",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ],
+         "tile": [
+          2,
+          24
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "an explicitly selected range explains why it does not cover",
+     "lowered_call": "r = inspect_lower(Served, {'count': 60}, impl='local')",
+     "candidates_call": "r = inspect_candidates(Served, {'count': 60})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.served/local {'width': 16} does not cover authored.served{count=60,tile=2,variant=forward} (serves count 1 .. 48, not 60)"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.served/wide",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ],
+         "tile": [
+          2,
+          24
+         ]
+        }
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "case": "invalid served declarations",
+   "setup": "class InvalidRanges(Transform, name='authored.invalid_ranges'):\n    pass",
+   "implementations": [
+    {
+     "case_": "a Choice is not a served Int field",
+     "call": "implements(InvalidRanges, serves=lambda op, **_: {'variant': (0, 1)})(binding('not_int', [{'arguments': {'count': (1, 4096, 4)}}]))"
+    },
+    {
+     "case_": "the lower end precedes the field bound",
+     "call": "implements(InvalidRanges, serves=lambda op, **_: {'tile': (1, 8)})(binding('below', [{'arguments': {'count': (1, 4096, 4)}}]))"
+    },
+    {
+     "case_": "the upper end exceeds the field bound",
+     "call": "implements(InvalidRanges, serves=lambda op, **_: {'tile': (2, 25)})(binding('above', [{'arguments': {'count': (1, 4096, 4)}}]))"
+    },
+    {
+     "case_": "crossed served bounds",
+     "call": "implements(InvalidRanges, serves=lambda op, **_: {'count': (9, 2)})(binding('reversed', [{'arguments': {'count': (1, 4096, 4)}}]))"
+    },
+    {
+     "case_": "an unknown served field",
+     "call": "implements(InvalidRanges, serves=lambda op, **_: {'mystery': (1, 4)})(binding('unknown', [{'arguments': {'count': (1, 4096, 4)}}]))"
+    }
+   ],
+   "cases": [
+    {
+     "behavior": "a Choice is not a served Int field",
+     "lowered_call": "r = inspect_lower(InvalidRanges, {'count': 5})",
+     "candidates_call": "r = inspect_candidates(InvalidRanges, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/not_int serves variant: not an Int field of authored.invalid_ranges"
+     },
+     "candidates": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/not_int serves variant: not an Int field of authored.invalid_ranges"
+     }
+    },
+    {
+     "behavior": "the lower end precedes the field bound",
+     "lowered_call": "r = inspect_lower(InvalidRanges, {'count': 5}, impl='below')",
+     "candidates_call": "r = inspect_candidates(InvalidRanges, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/below {} serves tile 1 .. 8: outside the field's 2 .. 24"
+     },
+     "candidates": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/not_int serves variant: not an Int field of authored.invalid_ranges"
+     }
+    },
+    {
+     "behavior": "the upper end exceeds the field bound",
+     "lowered_call": "r = inspect_lower(InvalidRanges, {'count': 5}, impl='above')",
+     "candidates_call": "r = inspect_candidates(InvalidRanges, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/above {} serves tile 2 .. 25: outside the field's 2 .. 24"
+     },
+     "candidates": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/not_int serves variant: not an Int field of authored.invalid_ranges"
+     }
+    },
+    {
+     "behavior": "crossed served bounds",
+     "lowered_call": "r = inspect_lower(InvalidRanges, {'count': 5}, impl='reversed')",
+     "candidates_call": "r = inspect_candidates(InvalidRanges, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/reversed {} serves count 9 .. 2: outside the field's 1 .. None"
+     },
+     "candidates": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/not_int serves variant: not an Int field of authored.invalid_ranges"
+     }
+    },
+    {
+     "behavior": "an unknown served field",
+     "lowered_call": "r = inspect_lower(InvalidRanges, {'count': 5}, impl='unknown')",
+     "candidates_call": "r = inspect_candidates(InvalidRanges, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/unknown serves mystery: not an Int field of authored.invalid_ranges"
+     },
+     "candidates": {
+      "refused": "ValueError",
+      "message": "authored.invalid_ranges/not_int serves variant: not an Int field of authored.invalid_ranges"
+     }
+    }
+   ]
+  },
+  {
+   "case": "bound kernels must honour served ranges",
+   "setup": "class Honoured(Transform, name='authored.honoured'):\n    pass",
+   "implementations": [
+    {
+     "case_": "the served interval exceeds an explicit kernel interval",
+     "call": "implements(Honoured, serves=lambda op, **_: {'count': (1, 5000)})(binding('too_narrow', [{'arguments': {'count': (1, 512, 4)}}]))"
+    },
+    {
+     "case_": "no bound kernel takes the served field",
+     "call": "implements(Honoured, serves=lambda op, **_: {'count': (1, 48)})(binding('absent_argument', [{'arguments': {'src': (None, None, 8)}}]))"
+    },
+    {
+     "case_": "open u16 kernel bounds imply 0 through 65535",
+     "call": "implements(Honoured, serves=lambda op, **_: {'count': (1, 70000)})(binding('narrow_unsigned', [{'arguments': {'count': (None, None, 2)}}]))"
+    },
+    {
+     "case_": "open u32 kernel bounds honour the interval",
+     "call": "implements(Honoured, serves=lambda op, **_: {'count': (1, 70000)})(binding('wide_unsigned', [{'arguments': {'count': (None, None, 4)}}]))"
+    },
+    {
+     "case_": "every bound kernel, not only the first, must honour the range",
+     "call": "implements(Honoured, serves=lambda op, **_: {'count': (1, 48)})(binding('second_too_narrow', [{'kernel': 'first', 'arguments': {'count': (1, 48, 4)}}, {'kernel': 'second', 'arguments': {'count': (2, 48, 4)}}]))"
+    },
+    {
+     "case_": "an empty binding has no served argument",
+     "call": "implements(Honoured, serves=lambda op, **_: {'count': (1, 48)})(binding('no_calls', []))"
+    }
+   ],
+   "cases": [
+    {
+     "behavior": "the served interval exceeds an explicit kernel interval",
+     "lowered_call": "r = inspect_lower(Honoured, {'count': 5}, impl='too_narrow')",
+     "candidates_call": "r = inspect_candidates(Honoured, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.honoured/too_narrow {} serves count 1 .. 5000, but too_narrow takes count in 1 .. 512"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.honoured/too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/absent_argument",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/narrow_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/wide_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/second_too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/no_calls",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "no bound kernel takes the served field",
+     "lowered_call": "r = inspect_lower(Honoured, {'count': 5}, impl='absent_argument')",
+     "candidates_call": "r = inspect_candidates(Honoured, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.honoured/absent_argument {} serves count, but no kernel it binds takes count: a served field is a kernel argument"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.honoured/too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/absent_argument",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/narrow_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/wide_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/second_too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/no_calls",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "open u16 kernel bounds imply 0 through 65535",
+     "lowered_call": "r = inspect_lower(Honoured, {'count': 5}, impl='narrow_unsigned')",
+     "candidates_call": "r = inspect_candidates(Honoured, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.honoured/narrow_unsigned {} serves count 1 .. 70000, but narrow_unsigned takes count in 0 .. 65535"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.honoured/too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/absent_argument",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/narrow_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/wide_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/second_too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/no_calls",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "open u32 kernel bounds honour the interval",
+     "lowered_call": "r = inspect_lower(Honoured, {'count': 5}, impl='wide_unsigned')",
+     "candidates_call": "r = inspect_candidates(Honoured, {'count': 5})",
+     "lowered": {
+      "ok": {
+       "impl": "authored.honoured/wide_unsigned",
+       "tunables": {},
+       "calls": [
+        {
+         "kernel": "wide_unsigned",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "Field",
+          "value": 5,
+          "range": [
+           1,
+           70000
+          ]
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {}
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.honoured/too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/absent_argument",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/narrow_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/wide_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/second_too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/no_calls",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "every bound kernel, not only the first, must honour the range",
+     "lowered_call": "r = inspect_lower(Honoured, {'count': 5}, impl='second_too_narrow')",
+     "candidates_call": "r = inspect_candidates(Honoured, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.honoured/second_too_narrow {} serves count 1 .. 48, but second takes count in 2 .. 48"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.honoured/too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/absent_argument",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/narrow_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/wide_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/second_too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/no_calls",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "an empty binding has no served argument",
+     "lowered_call": "r = inspect_lower(Honoured, {'count': 5}, impl='no_calls')",
+     "candidates_call": "r = inspect_candidates(Honoured, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.honoured/no_calls {} serves count, but no kernel it binds takes count: a served field is a kernel argument"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.honoured/too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          5000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/absent_argument",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/narrow_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/wide_unsigned",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          70000
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/second_too_narrow",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       },
+       {
+        "impl": "authored.honoured/no_calls",
+        "tunables": {},
+        "served": {
+         "count": [
+          1,
+          48
+         ]
+        }
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "case": "declared and bound deployment needs",
+   "setup": "class Requirements(Transform, name='authored.requirements'):\n    pass",
+   "implementations": [
+    {
+     "case_": "an unknown deployment requirement",
+     "call": "implements(Requirements, needs={'spin': True})(binding('unknown_need', []))",
+     "refused": "ValueError",
+     "message": "authored.requirements: needs ['spin']: one of ['co_resident', 'overread']"
+    },
+    {
+     "case_": "overread bytes must be positive",
+     "call": "implements(Requirements, needs={'overread': {'src': 0}})(binding('zero_overread', []))",
+     "refused": "ValueError",
+     "message": "authored.requirements: needs overread {'src': 0}: {tensor: bytes}, a positive int each"
+    },
+    {
+     "case_": "overread must be a tensor table",
+     "call": "implements(Requirements, needs={'overread': [8]})(binding('overread_not_table', []))",
+     "refused": "ValueError",
+     "message": "authored.requirements: needs overread [8]: {tensor: bytes}, a positive int each"
+    },
+    {
+     "case_": "a requirement with no co-resident bound",
+     "call": "implements(Requirements, needs={'co_resident': True})(binding('co_required_not_bound', [{}]))"
+    },
+    {
+     "case_": "an undeclared co-resident bound",
+     "call": "implements(Requirements)(binding('co_bound_not_required', [{'co_resident': True}]))"
+    },
+    {
+     "case_": "a bound reads farther than declared",
+     "call": "implements(Requirements, needs={'overread': {'src': 32}})(binding('overread_too_large', [{'bind': {'src': 'src'}, 'overread': {'src': 96}}]))"
+    },
+    {
+     "case_": "a bound overreads a tensor omitted from needs",
+     "call": "implements(Requirements)(binding('overread_undeclared_tensor', [{'bind': {'dst': 'dst'}, 'overread': {'dst': 4}}]))"
+    },
+    {
+     "case_": "needs names a tensor outside the signature",
+     "call": "implements(Requirements, needs={'overread': {'side': 4}})(binding('overread_unknown_tensor', [{}]))"
+    },
+    {
+     "case_": "an argument not holding an op tensor cannot satisfy overread needs",
+     "call": "implements(Requirements, needs={'overread': {'src': 32}})(binding('overread_non_tensor_arg', [{'arguments': {'count': (1, 4096, 4)}, 'bind': {'count': 'count'}, 'overread': {'count': 4}}]))"
+    },
+    {
+     "case_": "co-residency and both overread limits agree",
+     "call": "implements(Requirements, needs={'co_resident': True, 'overread': {'src': 32}})(binding('compatible', [{'kernel': 'lead', 'bind': {'src': 'src'}, 'co_resident': True, 'overread': {'src': 32}}, {'kernel': 'tail', 'bind': {'src': 'src'}, 'overread': {'src': 8}}]))"
+    },
+    {
+     "case_": "one Probe may be returned directly",
+     "call": "implements(Requirements)(binding('single_probe', [{'single': True}]))"
+    }
+   ],
+   "cases": [
+    {
+     "behavior": "a requirement with no co-resident bound",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='co_required_not_bound')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.requirements/co_required_not_bound {}: needs co_resident True, its kernels none co-resident"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "an undeclared co-resident bound",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='co_bound_not_required')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.requirements/co_bound_not_required {}: needs co_resident False, its kernels ['co_bound_not_required'] co-resident"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "a bound reads farther than declared",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='overread_too_large')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.requirements/overread_too_large {}: overread_too_large overreads src by 96 bytes, the implementation declares 32"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "a bound overreads a tensor omitted from needs",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='overread_undeclared_tensor')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.requirements/overread_undeclared_tensor {}: overread_undeclared_tensor overreads dst by 4 bytes, the implementation declares 0"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "needs names a tensor outside the signature",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='overread_unknown_tensor')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.requirements/overread_unknown_tensor: needs overread ['side']: not tensors of authored.requirements"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "an argument not holding an op tensor cannot satisfy overread needs",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='overread_non_tensor_arg')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.requirements/overread_non_tensor_arg {}: overread_non_tensor_arg overreads count by 4 bytes, the implementation declares no tensor of the op there"
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "co-residency and both overread limits agree",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='compatible')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "ok": {
+       "impl": "authored.requirements/compatible",
+       "tunables": {},
+       "calls": [
+        {
+         "kernel": "lead",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": true,
+         "overread": {
+          "src": 32
+         },
+         "group": null
+        },
+        {
+         "kernel": "tail",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {
+          "src": 8
+         },
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 5
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {}
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    },
+    {
+     "behavior": "one Probe may be returned directly",
+     "lowered_call": "r = inspect_lower(Requirements, {'count': 5}, impl='single_probe')",
+     "candidates_call": "r = inspect_candidates(Requirements, {'count': 5})",
+     "lowered": {
+      "ok": {
+       "impl": "authored.requirements/single_probe",
+       "tunables": {},
+       "calls": [
+        {
+         "kernel": "single_probe",
+         "grid": [
+          1,
+          1,
+          1
+         ],
+         "co_resident": false,
+         "overread": {},
+         "group": null
+        }
+       ],
+       "observed": {
+        "fields": {
+         "count": {
+          "kind": "int",
+          "value": 5
+         },
+         "tile": {
+          "kind": "int",
+          "value": 2
+         },
+         "variant": {
+          "kind": "str",
+          "value": "forward"
+         }
+        },
+        "group": null,
+        "tunables": {}
+       }
+      }
+     },
+     "candidates": {
+      "ok": [
+       {
+        "impl": "authored.requirements/co_required_not_bound",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/co_bound_not_required",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_too_large",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_undeclared_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_unknown_tensor",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/overread_non_tensor_arg",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/compatible",
+        "tunables": {},
+        "served": {}
+       },
+       {
+        "impl": "authored.requirements/single_probe",
+        "tunables": {},
+        "served": {}
+       }
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "case": "a spec without implementations",
+   "setup": "class Empty(Transform, name='authored.empty'):\n    pass",
+   "implementations": [],
+   "cases": [
+    {
+     "behavior": "no implementation covers the op",
+     "lowered_call": "r = inspect_lower(Empty, {'count': 5})",
+     "candidates_call": "r = inspect_candidates(Empty, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "no implementation covers authored.empty{count=5,tile=2,variant=forward}"
+     },
+     "candidates": {
+      "ok": []
+     }
+    },
+    {
+     "behavior": "no registered name exists",
+     "lowered_call": "r = inspect_lower(Empty, {'count': 5}, impl='anything')",
+     "candidates_call": "r = inspect_candidates(Empty, {'count': 5})",
+     "lowered": {
+      "refused": "ValueError",
+      "message": "authored.empty: no implementation 'anything' (of [])"
+     },
+     "candidates": {
+      "ok": []
+     }
+    }
+   ]
+  }
+ ],
+ "other_setup": "class Parent(Transform, name='authored.parent'):\n    pass\nimplements(Parent)(binding('parent_impl', [{'bind': {'src': 'src', 'dst': 'dst'}}]))\nclass Child(Parent, name='authored.child'):\n    pass\nclass Inventory(Transform, name='authored.inventory'):\n    pass\narray4 = np.zeros(4, np.float32)\n\nclass TeamOp(Spec, name='authored.team', group='world'):\n    world = Int(lo=2, hi=6)\n    count = Int(lo=1)\n    def signature(op):\n        return {'src': In('f32', op.count)}\nimplements(TeamOp, tunables={'mode': [1]})(binding('team_plain', [{'bind': {'src': 'src'}}]))\nclass TeamServed(TeamOp, name='authored.team_served'):\n    pass\nimplements(TeamServed, serves=lambda op, **_: {'count': (1, 48)})(\n    binding('team_served', [{'arguments': {'count': (1, 48, 4)}, 'bind': {'count': 'count'}}]))\n\nclass SharedTeam(Spec, name='authored.shared_team', group='world'):\n    world = Int(lo=2, hi=6)\n    count = Int(lo=1)\n    def signature(op):\n        return {'shared': In('u32', op.count, shared=True)}\nimplements(SharedTeam, serves=lambda op, **_: {'count': (1, 48)})(binding('shared_served', []))\n\nteam_handles = group.emulated(2)\nshared_copy = team_handles[0].tensor('shared_words', 'u32', (4,))\n\ndef inspect_team(cls):\n    OBSERVED.clear()\n    tensors = {'src': np.zeros(4, np.float32)} if 'src' in cls(count=4, world=2).signature() else {}\n    op = cls(world=2, count=4, group=team_handles[1], **tensors)\n    record, chosen, calls = lowered(op)\n    return {'impl': record.name, 'calls': [call_fact(c) for c in calls],\n            'observed': dict(OBSERVED)}\n\nclass NoValues(Transform, name='authored.no_values'):\n    pass\n",
+ "other": [
+  {
+   "case_": "implementation registries are per class, not inherited",
+   "call": "r = inspect_lower(Child, {'count': 4})",
+   "refused": "ValueError",
+   "message": "no implementation covers authored.child{count=4,tile=2,variant=forward}"
+  },
+  {
+   "case_": "a registered function still must belong to this exact spec",
+   "call": "r = inspect_lower(Child, {'count': 4}, impl=implementations(Parent)[0].fn)",
+   "refused": "ValueError",
+   "message": "authored.parent/parent_impl implements authored.parent, not authored.child"
+  },
+  {
+   "case_": "the registered binding function itself is a selector",
+   "call": "r = lowered(Parent(count=4, src=array4, dst=array4), implementations(Parent)[0].fn)[0].name",
+   "ok": "authored.parent/parent_impl"
+  },
+  {
+   "case_": "a fresh class has an empty declaration-order inventory",
+   "call": "r = [record.name for record in implementations(Inventory)]",
+   "ok": []
+  },
+  {
+   "case_": "lowering assigns the rank handle to every returned call",
+   "call": "r = inspect_team(TeamOp)",
+   "ok": {
+    "impl": "authored.team/team_plain",
+    "calls": [
+     {
+      "kernel": "team_plain",
+      "grid": [
+       1,
+       1,
+       1
+      ],
+      "co_resident": false,
+      "overread": {},
+      "group": "Group(emulated, rank 1 of 2)"
+     }
+    ],
+    "observed": {
+     "fields": {
+      "world": {
+       "kind": "int",
+       "value": 2
+      },
+      "count": {
+       "kind": "int",
+       "value": 4
+      }
+     },
+     "group": "Group(emulated, rank 1 of 2)",
+     "tunables": {
+      "mode": 1
+     }
+    }
+   }
+  },
+  {
+   "case_": "a group op cannot lower as a rank-less call",
+   "call": "r = lower(TeamOp(world=2, count=4, src=array4))",
+   "refused": "TypeError",
+   "message": "authored.team{count=4,world=2}: a group op is one rank's call - made with group= its rank's handle"
+  },
+  {
+   "case_": "the served-field view preserves the rank handle visible to the binding",
+   "call": "r = inspect_team(TeamServed)",
+   "ok": {
+    "impl": "authored.team_served/team_served",
+    "calls": [
+     {
+      "kernel": "team_served",
+      "grid": [
+       1,
+       1,
+       1
+      ],
+      "co_resident": false,
+      "overread": {},
+      "group": "Group(emulated, rank 1 of 2)"
+     }
+    ],
+    "observed": {
+     "fields": {
+      "world": {
+       "kind": "int",
+       "value": 2
+      },
+      "count": {
+       "kind": "Field",
+       "value": 4,
+       "range": [
+        1,
+        48
+       ]
+      }
+     },
+     "group": "Group(emulated, rank 1 of 2)",
+     "tunables": {}
+    }
+   }
+  },
+  {
+   "case_": "a shared group tensor survives view reconstruction before argument validation",
+   "call": "r = lower(SharedTeam(world=2, count=4, shared=shared_copy, group=team_handles[0]))",
+   "refused": "ValueError",
+   "message": "authored.shared_team/shared_served {} serves count, but no kernel it binds takes count: a served field is a kernel argument"
+  },
+  {
+   "case_": "an arbitrary callable is not an implementation selector",
+   "call": "r = lower(Parent(count=4, src=array4, dst=array4), impl=lambda op: [])",
+   "refused": "ValueError",
+   "message": "authored.parent: <lambda> is no registered implementation (@implements)"
+  },
+  {
+   "case_": "empty tunable domains are refused at declaration",
+   "call": "r = implements(NoValues, tunables={'block': ()})",
+   "refused": "ValueError",
+   "message": "authored.no_values: tunables ['block'] list no values"
+  },
+  {
+   "case_": "an explicitly selected implementation refuses undeclared tunables",
+   "call": "r = lower(Parent(count=4, src=array4, dst=array4), impl='parent_impl', mystery=1)",
+   "refused": "ValueError",
+   "message": "authored.parent/parent_impl: no tunables ['mystery'] (its tunables: [])"
+  }
+ ]
+}

@@ -1,0 +1,132 @@
+{
+ "target": "gfx1201",
+ "notation": "Authored gfx1201 notation: vN/sN and v[a:b]/s[a:b] name values placed at physical registers; named physical registers, integer immediates and @label operands are supported. {name=value|...} gives fields. '; m0_set=C' and '; waves=0bMASK' attach IR attributes. Abstract stream op/br/brw/jmp/end/label tokens denote concrete native instructions. Native results are entry states unless their key says otherwise.",
+ "cases": [
+  {
+   "name": "unannotated_writes",
+   "lines": [
+    "s_mov_b32 m0, 12",
+    "s_mov_b32 m0, 12",
+    "s_endpgm"
+   ],
+   "redundant": []
+  },
+  {
+   "name": "marked_repetition_and_change",
+   "lines": [
+    "s_mov_b32 m0, 12 ; m0_set=12",
+    "v_mov_b32 v41, 81",
+    "s_mov_b32 m0, 12 ; m0_set=12",
+    "s_mov_b32 m0, 13 ; m0_set=13",
+    "s_mov_b32 m0, 13 ; m0_set=13",
+    "s_endpgm"
+   ],
+   "redundant": [
+    2,
+    4
+   ]
+  },
+  {
+   "name": "unknown_scalar_clears_fact",
+   "lines": [
+    "s_mov_b32 m0, 14 ; m0_set=14",
+    "s_mov_b32 m0, s24",
+    "s_mov_b32 m0, 14 ; m0_set=14",
+    "s_endpgm"
+   ],
+   "redundant": []
+  },
+  {
+   "name": "plain_write_does_not_establish_fact",
+   "lines": [
+    "s_mov_b32 m0, 15",
+    "s_mov_b32 m0, 15 ; m0_set=15",
+    "s_endpgm"
+   ],
+   "redundant": []
+  },
+  {
+   "name": "diamond_fact_intersection",
+   "lines": [
+    "s_mov_b32 m0, 16 ; m0_set=16",
+    "s_cbranch_scc1 @right_m0",
+    "s_mov_b32 m0, 17 ; m0_set=17",
+    "right_m0:",
+    "s_mov_b32 m0, 16 ; m0_set=16",
+    "s_cbranch_scc1 @last_m0",
+    "s_mov_b32 m0, 16 ; m0_set=16",
+    "last_m0:",
+    "s_mov_b32 m0, 16 ; m0_set=16",
+    "s_endpgm"
+   ],
+   "redundant": [
+    6,
+    8
+   ]
+  },
+  {
+   "name": "stable_loop_fact",
+   "lines": [
+    "s_mov_b32 m0, 18 ; m0_set=18",
+    "m0_cycle:",
+    "s_mov_b32 m0, 18 ; m0_set=18",
+    "v_mov_b32 v42, 82",
+    "s_cbranch_scc1 @m0_cycle",
+    "s_endpgm"
+   ],
+   "redundant": [
+    2
+   ]
+  },
+  {
+   "name": "loop_with_changing_fact",
+   "lines": [
+    "s_mov_b32 m0, 19 ; m0_set=19",
+    "m0_changing:",
+    "s_mov_b32 m0, 19 ; m0_set=19",
+    "s_mov_b32 m0, 20 ; m0_set=20",
+    "s_cbranch_scc1 @m0_changing",
+    "s_endpgm"
+   ],
+   "redundant": []
+  },
+  {
+   "name": "unreached_repetition",
+   "lines": [
+    "s_branch @m0_target",
+    "s_mov_b32 m0, 21 ; m0_set=21",
+    "s_mov_b32 m0, 21 ; m0_set=21",
+    "m0_middle:",
+    "s_mov_b32 m0, 21 ; m0_set=21",
+    "s_endpgm",
+    "m0_target:",
+    "s_mov_b32 m0, 21 ; m0_set=21",
+    "s_endpgm"
+   ],
+   "redundant": []
+  },
+  {
+   "name": "no_state_after_unconditional_end",
+   "lines": [
+    "s_mov_b32 m0, 22 ; m0_set=22",
+    "s_cbranch_scc0 @m0_join",
+    "s_endpgm",
+    "s_mov_b32 m0, 23 ; m0_set=23",
+    "m0_join:",
+    "s_mov_b32 m0, 22 ; m0_set=22",
+    "s_endpgm"
+   ],
+   "redundant": [
+    5
+   ]
+  },
+  {
+   "name": "entry_has_unknown_m0",
+   "lines": [
+    "s_mov_b32 m0, 17 ; m0_set=17",
+    "s_endpgm"
+   ],
+   "redundant": []
+  }
+ ]
+}

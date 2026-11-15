@@ -1,0 +1,147 @@
+{
+ "notation": "Synthetic race fields evaluated by metron record serialization and schema/group reading; timestamps are masked.",
+ "schema": "metron/5",
+ "race_fields": {
+  "point": "vadd n=1024 seed 0",
+  "state": {
+   "warm": [],
+   "code": "warm"
+  },
+  "status": "decided",
+  "rounds": 6,
+  "arms": {
+   "ref": {
+    "us": 10.0,
+    "ci": [
+     9.9,
+     10.2
+    ],
+    "times": [
+     10.0,
+     9.9,
+     10.2,
+     10.1,
+     9.95,
+     10.05
+    ],
+    "wrong": null,
+    "checked": true,
+    "fingerprint": "torch 2.x",
+    "ranks_us": [
+     10.0
+    ]
+   },
+   "b": {
+    "us": 9.0,
+    "ci": [
+     8.9,
+     9.1
+    ],
+    "times": [
+     9.0,
+     8.9,
+     9.1,
+     9.05,
+     8.95,
+     9.0
+    ],
+    "wrong": null,
+    "checked": true,
+    "fingerprint": "abcd",
+    "ranks_us": [
+     9.0
+    ]
+   },
+   "wrong": {
+    "us": null,
+    "ci": null,
+    "times": [],
+    "wrong": "check: copy 0: z[3] = nan, want 1.0 (1 wrong)",
+    "checked": true,
+    "fingerprint": "ef01",
+    "ranks_us": null
+   }
+  }
+ },
+ "lines": [
+  "{\"arm\": \"ref\", \"checked\": true, \"ci\": [9.9, 10.2], \"conditions\": {\"budget_s\": 5.0, \"bytes\": {\"x\": 4096}, \"calls\": 2, \"cold_copies\": 2, \"copies\": 2, \"empty_us\": 2.5, \"prelude_us\": 0.0, \"rotated\": [\"x\"], \"rounds_changed_inputs\": 0, \"seed\": 0, \"within\": 0.02, \"world\": 1}, \"device\": {\"amdgpu\": \"D\", \"arch\": \"gfx1201\", \"cus\": 32, \"exclusive\": \"1\", \"firmware\": {\"mec_fw_version\": \"0x1\"}, \"name\": \"AMD Radeon RX 9070 XT\", \"pci\": \"0000:03:00.0\", \"vbios\": \"V\"}, \"fingerprint\": \"torch 2.x\", \"flags\": [\"constant:y\"], \"level\": \"rounds of one race\", \"phases_s\": {\"after\": 0.01, \"judge\": 0.2, \"lay_out\": 0.1, \"rounds\": 1.0}, \"point\": \"vadd n=1024 seed 0\", \"ranks_us\": [10.0], \"reference\": \"ref\", \"rounds\": 6, \"schema\": \"metron/5\", \"state\": {\"code\": \"warm\", \"warm\": []}, \"status\": \"decided\", \"time\": \"#TIME#\", \"times\": [10.0, 9.9, 10.2, 10.1, 9.95, 10.05], \"us\": 10.0, \"validators\": {\"amdgpu\": \"D\", \"arch\": \"gfx1201\", \"hip\": \"H\", \"launches\": \"plain\", \"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"vbios\": \"V\"}, \"verdict\": null, \"wrong\": null}",
+  "{\"arm\": \"b\", \"checked\": true, \"ci\": [8.9, 9.1], \"conditions\": {\"budget_s\": 5.0, \"bytes\": {\"x\": 4096}, \"calls\": 2, \"cold_copies\": 2, \"copies\": 2, \"empty_us\": 2.5, \"prelude_us\": 0.0, \"rotated\": [\"x\"], \"rounds_changed_inputs\": 0, \"seed\": 0, \"within\": 0.02, \"world\": 1}, \"device\": {\"amdgpu\": \"D\", \"arch\": \"gfx1201\", \"cus\": 32, \"exclusive\": \"1\", \"firmware\": {\"mec_fw_version\": \"0x1\"}, \"name\": \"AMD Radeon RX 9070 XT\", \"pci\": \"0000:03:00.0\", \"vbios\": \"V\"}, \"fingerprint\": \"abcd\", \"flags\": [\"constant:y\"], \"level\": \"rounds of one race\", \"phases_s\": {\"after\": 0.01, \"judge\": 0.2, \"lay_out\": 0.1, \"rounds\": 1.0}, \"point\": \"vadd n=1024 seed 0\", \"ranks_us\": [9.0], \"reference\": \"ref\", \"rounds\": 6, \"schema\": \"metron/5\", \"state\": {\"code\": \"warm\", \"warm\": []}, \"status\": \"decided\", \"time\": \"#TIME#\", \"times\": [9.0, 8.9, 9.1, 9.05, 8.95, 9.0], \"us\": 9.0, \"validators\": {\"amdgpu\": \"D\", \"arch\": \"gfx1201\", \"hip\": \"H\", \"launches\": \"plain\", \"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"vbios\": \"V\"}, \"verdict\": {\"ci\": [0.8921568627450981, 0.9], \"is\": \"faster\", \"ratio\": 0.8975147514751476}, \"wrong\": null}",
+  "{\"arm\": \"wrong\", \"checked\": true, \"ci\": null, \"conditions\": {\"budget_s\": 5.0, \"bytes\": {\"x\": 4096}, \"calls\": 2, \"cold_copies\": 2, \"copies\": 2, \"empty_us\": 2.5, \"prelude_us\": 0.0, \"rotated\": [\"x\"], \"rounds_changed_inputs\": 0, \"seed\": 0, \"within\": 0.02, \"world\": 1}, \"device\": {\"amdgpu\": \"D\", \"arch\": \"gfx1201\", \"cus\": 32, \"exclusive\": \"1\", \"firmware\": {\"mec_fw_version\": \"0x1\"}, \"name\": \"AMD Radeon RX 9070 XT\", \"pci\": \"0000:03:00.0\", \"vbios\": \"V\"}, \"fingerprint\": \"ef01\", \"flags\": [\"constant:y\"], \"level\": \"rounds of one race\", \"phases_s\": {\"after\": 0.01, \"judge\": 0.2, \"lay_out\": 0.1, \"rounds\": 1.0}, \"point\": \"vadd n=1024 seed 0\", \"ranks_us\": null, \"reference\": \"ref\", \"rounds\": 6, \"schema\": \"metron/5\", \"state\": {\"code\": \"warm\", \"warm\": []}, \"status\": \"decided\", \"time\": \"#TIME#\", \"times\": [], \"us\": null, \"validators\": {\"amdgpu\": \"D\", \"arch\": \"gfx1201\", \"hip\": \"H\", \"launches\": \"plain\", \"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"vbios\": \"V\"}, \"verdict\": null, \"wrong\": \"check: copy 0: z[3] = nan, want 1.0 (1 wrong)\"}"
+ ],
+ "verdicts": {
+  "b": {
+   "ratio": 0.8975147514751476,
+   "ci": [
+    0.8921568627450981,
+    0.9
+   ],
+   "is": "faster"
+  }
+ },
+ "ranked": [
+  "b",
+  "ref"
+ ],
+ "versus_error": {
+  "error": "ValueError",
+  "message": "wrong against ref: both timed (check: copy 0: z[3] = nan, want 1.0 (1 wrong))"
+ },
+ "read": {
+  "lines": [
+   "{\"schema\": \"metron/5\", \"validators\": {\"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"hip\": \"H\", \"amdgpu\": \"D\", \"vbios\": \"V\", \"arch\": \"gfx1201\", \"launches\": \"plain\"}, \"arm\": \"a\"}",
+   "",
+   "not json",
+   "{\"schema\": \"metron/5\", \"arm\": \"no validators\"}",
+   "{\"schema\": \"metron/5\", \"validators\": {\"metron\": \"0123456789abcdef\", \"torch\": \"other\", \"hip\": \"H\", \"amdgpu\": \"D\", \"vbios\": \"V\", \"arch\": \"gfx1201\", \"launches\": \"plain\"}, \"arm\": \"b\"}",
+   "{\"schema\": \"metron/1.2\", \"validators\": {\"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"hip\": \"H\", \"amdgpu\": \"D\", \"vbios\": \"V\", \"arch\": \"gfx1201\"}, \"arm\": \"old\"}",
+   "{\"schema\": \"metron/5\", \"validators\": {\"arch\": \"gfx1201\", \"vbios\": \"V\", \"amdgpu\": \"D\", \"hip\": \"H\", \"torch\": \"T\", \"metron\": \"0123456789abcdef\", \"launches\": \"plain\"}, \"arm\": \"c\"}",
+   "{\"schema\": \"metron/5\", \"validators\": {\"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"hip\": \"H\", \"amdgpu\": \"D\", \"vbios\": \"V\", \"arch\": \"gfx1201\", \"launches\": \"graph\"}, \"arm\": \"d\"}",
+   "{\"schema\": \"metron/4\", \"validators\": {\"metron\": \"0123456789abcdef\", \"torch\": \"T\", \"hip\": \"H\", \"amdgpu\": \"D\", \"vbios\": \"V\", \"arch\": \"gfx1201\"}, \"arm\": \"old4\"}"
+  ],
+  "groups": [
+   [
+    {
+     "metron": "0123456789abcdef",
+     "torch": "T",
+     "hip": "H",
+     "amdgpu": "D",
+     "vbios": "V",
+     "arch": "gfx1201",
+     "launches": "plain"
+    },
+    [
+     "a",
+     "c"
+    ]
+   ],
+   [
+    {
+     "metron": "0123456789abcdef",
+     "torch": "other",
+     "hip": "H",
+     "amdgpu": "D",
+     "vbios": "V",
+     "arch": "gfx1201",
+     "launches": "plain"
+    },
+    [
+     "b"
+    ]
+   ],
+   [
+    {
+     "metron": "0123456789abcdef",
+     "torch": "T",
+     "hip": "H",
+     "amdgpu": "D",
+     "vbios": "V",
+     "arch": "gfx1201",
+     "launches": "graph"
+    },
+    [
+     "d"
+    ]
+   ]
+  ]
+ }
+}

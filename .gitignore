@@ -1,0 +1,14 @@
+/target/
+/.venv/
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+/dist/
+/build/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+AMD_GPU_MR_ISA_XML_*.zip
+
+/.cache/

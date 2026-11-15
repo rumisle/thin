@@ -1,0 +1,894 @@
+{
+ "notation": "Independently authored gfx1201 kernels. src runs with a fresh Builder, V, S and the public DSL names; derive places it and compile_kernel(symbol, wgsize=, max_grid=) produces s, the manifest, summary and pass timing keys. Placement seconds are masked as #.## s. code_object fields, including all digests, are computed from the native encoding and code-object reader.",
+ "kernels": [
+  {
+   "name": "scaled_merge_b128",
+   "what": "predicated f32 data flow with scalar-argument and two VMEM waits",
+   "symbol": "authored_scaled_merge",
+   "wgsize": 128,
+   "max_grid": [
+    32768
+   ],
+   "wg": 1,
+   "src": "k = b.entry(Args(left=ptr, right=ptr, result=ptr,\n                      count=u32.within(2, 1 << 24)), wg=1, wgsize=128)\nleft, right, result, count = k.load()\npos = V.u32(k.tid + k.wgid * 128, name=\"pos\")\nwith b.lanes(pos < count):\n    byte_at = V.u32(pos * 4, name=\"byte_at\")\n    x, y = V.f32(name=\"x\"), V.f32(name=\"y\")\n    b.emit(O.global_load(x, byte_at, left))\n    b.emit(O.global_load(y, byte_at, right))\n    b.wait(x, y, \"both input vectors ready\")\n    mixed = V.f32(x * 1.25 + y, name=\"mixed\")\n    b.emit(O.global_store(byte_at, mixed, result))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "left",
+     "offset": 0
+    },
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "right",
+     "offset": 8
+    },
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "result",
+     "offset": 16
+    },
+    {
+     "bytes": 4,
+     "hi": 16777216,
+     "kind": "u32",
+     "lo": 2,
+     "name": "count",
+     "offset": 24
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_scaled_merge\n\t.globl\tauthored_scaled_merge\n\t.p2align\t8\n\t.type\tauthored_scaled_merge,@function\nauthored_scaled_merge:\n\ts_mov_b32 s2, ttmp9                                          // wgid#1: ttmp9\n\ts_load_b128 s[4:7], s[0:1], 0x0                              // left, right\n\ts_load_b64 s[8:9], s[0:1], 0x10                              // result\n\ts_load_b32 s3, s[0:1], 0x18                                  // count\n\tv_lshl_add_u32 v1, s2, 7, v0                                 // pos = tid + (wgid * 128)\n\ts_wait_kmcnt 0                                               // kernel arguments\n\tv_cmp_gt_u32 vcc_lo, s3, v1                                  // pos < count\n\ts_mov_b32 exec_lo, vcc_lo\n\tv_lshlrev_b32 v0, 2, v1                                      // byte_at = pos * 4\n\tglobal_load_b32 v1, v0, s[4:5]\n\tglobal_load_b32 v2, v0, s[6:7]\n\ts_wait_loadcnt 0                                             // both input vectors ready\n\tv_mul_f32 v3, 1067450368, v1                                 // mixed = (x * 1.25) + y\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_add_f32 v1, v3, v2\n\tglobal_store_b32 v0, v1, s[8:9]\n\ts_mov_b32 exec_lo, -1\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_scaled_merge\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 28\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 4\n\t\t.amdhsa_next_free_sgpr 10\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_scaled_merge, .Lfunc_end0-authored_scaled_merge\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           28\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 28\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 128\n    .name:           authored_scaled_merge\n    .private_segment_fixed_size: 0\n    .sgpr_count:     12\n    .sgpr_spill_count: 0\n    .symbol:         authored_scaled_merge.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     4\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"left\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"right\", \"offset\": 8}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"result\", \"offset\": 16}, {\"bytes\": 4, \"hi\": 16777216, \"kind\": \"u32\", \"lo\": 2, \"name\": \"count\", \"offset\": 24}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 28, \"lds\": 0, \"max_grid\": [32768], \"mix\": {\"delay\": 1, \"salu\": 3, \"smem\": 3, \"valu\": 5, \"vmem\": 3, \"wait\": 2}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:count#1, s:kargx2, 0x18\", \"base\": 0, \"peak\": 10, \"phase\": \"(derived)\", \"size\": null, \"used\": 10}], \"v\": [{\"at\": \"v_mul_f32 v:t#1@<string>:11, 1067450368, v:x#1\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 4}]}, \"resident\": 16, \"sgpr\": 10, \"symbol\": \"authored_scaled_merge\", \"vgpr\": 4, \"wgsize\": 128, \"wgy\": 0}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"left\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"right\", \"offset\": 8}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"result\", \"offset\": 16}, {\"bytes\": 4, \"hi\": 16777216, \"kind\": \"u32\", \"lo\": 2, \"name\": \"count\", \"offset\": 24}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 28, \"lds\": 0, \"max_grid\": [32768], \"mix\": {\"delay\": 1, \"salu\": 3, \"smem\": 3, \"valu\": 5, \"vmem\": 3, \"wait\": 2}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:count#1, s:kargx2, 0x18\", \"base\": 0, \"peak\": 10, \"phase\": \"(derived)\", \"size\": null, \"used\": 10}], \"v\": [{\"at\": \"v_mul_f32 v:t#1@<string>:11, 1067450368, v:x#1\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 4}]}, \"resident\": 16, \"sgpr\": 10, \"symbol\": \"authored_scaled_merge\", \"vgpr\": 4, \"wgsize\": 128, \"wgy\": 0}",
+   "manifest": {
+    "symbol": "authored_scaled_merge",
+    "kernarg_bytes": 28,
+    "lds": 0,
+    "wgsize": 128,
+    "wgy": 0,
+    "vgpr": 4,
+    "agpr": 0,
+    "sgpr": 10,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "left",
+      "offset": 0
+     },
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "right",
+      "offset": 8
+     },
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "result",
+      "offset": 16
+     },
+     {
+      "bytes": 4,
+      "hi": 16777216,
+      "kind": "u32",
+      "lo": 2,
+      "name": "count",
+      "offset": 24
+     }
+    ],
+    "build": {},
+    "resident": 16,
+    "mix": {
+     "delay": 1,
+     "salu": 3,
+     "smem": 3,
+     "valu": 5,
+     "vmem": 3,
+     "wait": 2
+    },
+    "notes": [],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_load_b32 s:count#1, s:kargx2, 0x18",
+       "base": 0,
+       "peak": 10,
+       "phase": "(derived)",
+       "size": null,
+       "used": 10
+      }
+     ],
+     "v": [
+      {
+       "at": "v_mul_f32 v:t#1@<string>:11, 1067450368, v:x#1",
+       "base": 0,
+       "peak": 4,
+       "phase": "(derived)",
+       "size": null,
+       "used": 4
+      }
+     ]
+    },
+    "max_grid": [
+     32768
+    ]
+   },
+   "summary": "authored_scaled_merge: 17 instructions, vgpr 4 agpr 0 sgpr 10, 16 WGs per CU\n  v derived: 4 registers for a peak of 4 live at `v_mul_f32 v:t#1@<string>:11, 1067450368, v:x#1` (7 values; #.## s)\n  s derived: 10 registers for a peak of 10 live at `s_load_b32 s:count#1, s:kargx2, 0x18` (5 values; #.## s)\n  ranges: 3 address offsets proven not to wrap, 0 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges"
+   ],
+   "code_object": {
+    "sha256": "e8743b1b68139f0d953f8709941239e0a91ea6325d2d29c1e34dff44fd48f762",
+    "bytes": 2488,
+    "text_hex": "750082be004100f4000000f8002200f4100000f8c00000f4180000f8010046d6020e01040000c7bf0302987c6a00febe82020030040005ee0100000000000000060005ee02000000000000000000c0bfff0206100000a03f010087bf03050206088006ee0000800000000000c100febe0000b0bf",
+    "descriptor_hex": "00000000000000001c00000000000000801000000000000000000000000000000000000000000000000000000000000000000fe0840000000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "c011a4d6fa3433f7110bff447a78db19e017c30f73074f7d3cdcdc4375934660",
+     "descriptor": "a732cfaee326a87b4b86433109a25afad06771ca39f122c7233a89a1d94b1e6d",
+     "metadata": "a07ecf0c0cc962f4020ba32d0f928c9ad4ca5f50e2793beb393125f54dc3cd8e"
+    }
+   }
+  },
+  {
+   "name": "scalar_reuse_b64",
+   "what": "scalar destination rewrites after VALU reads, delay and ALU waits",
+   "symbol": "authored_scalar_reuse",
+   "wgsize": 64,
+   "max_grid": [
+    8192
+   ],
+   "wg": 1,
+   "src": "k = b.entry(Args(out=ptr, count=u32.within(3, 1 << 19)), wg=1, wgsize=64)\nout, count = k.load()\nlane = V.u32(k.wgid * 64 + k.tid, name=\"lane\")\na = S.u32(count * 13 + 2, name=\"a\")\nc = S.u32(count * 5 + 7, name=\"c\")\nd = S.u32(count * 17 + 1, name=\"d\")\ne = S.u32(count * 3 + 11, name=\"e\")\nfirst = V.u32(lane + a, name=\"first\")\nsecond = V.u32(first + c, name=\"second\")\nthird = V.u32(second ^ d, name=\"third\")\nacc = V.u32(third + e, name=\"acc\")\nwith b.lanes(lane < count):\n    where = V.u32(lane * 4, name=\"where\")\n    b.emit(O.global_store(where, acc, out))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "out",
+     "offset": 0
+    },
+    {
+     "bytes": 4,
+     "hi": 524288,
+     "kind": "u32",
+     "lo": 3,
+     "name": "count",
+     "offset": 8
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_scalar_reuse\n\t.globl\tauthored_scalar_reuse\n\t.p2align\t8\n\t.type\tauthored_scalar_reuse,@function\nauthored_scalar_reuse:\n\ts_mov_b32 s2, ttmp9                                          // wgid#1: ttmp9\n\ts_load_b64 s[4:5], s[0:1], 0x0                               // out\n\ts_load_b32 s3, s[0:1], 0x8                                   // count\n\tv_lshl_add_u32 v1, s2, 6, v0                                 // lane = (wgid * 64) + tid\n\ts_wait_kmcnt 0                                               // kernel arguments\n\ts_mul_i32 s0, s3, 13                                         // a = (count * 13) + 2\n\ts_add_co_u32 s1, s0, 2\n\ts_mul_i32 s0, s3, 5                                          // c = (count * 5) + 7\n\ts_add_co_u32 s2, s0, 7\n\ts_mul_i32 s0, s3, 17                                         // d = (count * 17) + 1\n\ts_add_co_u32 s6, s0, 1\n\ts_mul_i32 s0, s3, 3                                          // e = (count * 3) + 11\n\ts_add_co_u32 s7, s0, 11\n\tv_add_nc_u32 v0, s1, v1                                      // first = lane + a\n\ts_wait_alu depctr_sa_sdst(0)                                 // hazard\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_add_nc_u32 v2, s2, v0                                      // second = first + c\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_xor_b32 v0, s6, v2                                         // third = second ^ d\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_add_nc_u32 v2, s7, v0                                      // acc = third + e\n\tv_cmp_gt_u32 vcc_lo, s3, v1                                  // lane < count\n\ts_mov_b32 exec_lo, vcc_lo\n\tv_lshlrev_b32 v0, 2, v1                                      // where = lane * 4\n\tglobal_store_b32 v0, v2, s[4:5]\n\ts_mov_b32 exec_lo, -1\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_scalar_reuse\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 12\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 3\n\t\t.amdhsa_next_free_sgpr 8\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_scalar_reuse, .Lfunc_end0-authored_scalar_reuse\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           12\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 12\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 64\n    .name:           authored_scalar_reuse\n    .private_segment_fixed_size: 0\n    .sgpr_count:     10\n    .sgpr_spill_count: 0\n    .symbol:         authored_scalar_reuse.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     3\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}, {\"bytes\": 4, \"hi\": 524288, \"kind\": \"u32\", \"lo\": 3, \"name\": \"count\", \"offset\": 8}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 12, \"lds\": 0, \"max_grid\": [8192], \"mix\": {\"delay\": 3, \"salu\": 11, \"smem\": 2, \"valu\": 7, \"vmem\": 1, \"wait\": 2}, \"notes\": [\"SALU 11 > VALU + MFMA 7 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)\"], \"phases\": {\"s\": [{\"at\": \"s_add_co_u32 s:e#1, s:t#4@<string>:7, 11\", \"base\": 0, \"peak\": 8, \"phase\": \"(derived)\", \"size\": null, \"used\": 8}], \"v\": [{\"at\": \"v_add_nc_u32 v:second#1, s:c#1, v:first#1\", \"base\": 0, \"peak\": 3, \"phase\": \"(derived)\", \"size\": null, \"used\": 3}]}, \"resident\": 32, \"sgpr\": 8, \"symbol\": \"authored_scalar_reuse\", \"vgpr\": 3, \"wgsize\": 64, \"wgy\": 0}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}, {\"bytes\": 4, \"hi\": 524288, \"kind\": \"u32\", \"lo\": 3, \"name\": \"count\", \"offset\": 8}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 12, \"lds\": 0, \"max_grid\": [8192], \"mix\": {\"delay\": 3, \"salu\": 11, \"smem\": 2, \"valu\": 7, \"vmem\": 1, \"wait\": 2}, \"notes\": [\"SALU 11 > VALU + MFMA 7 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)\"], \"phases\": {\"s\": [{\"at\": \"s_add_co_u32 s:e#1, s:t#4@<string>:7, 11\", \"base\": 0, \"peak\": 8, \"phase\": \"(derived)\", \"size\": null, \"used\": 8}], \"v\": [{\"at\": \"v_add_nc_u32 v:second#1, s:c#1, v:first#1\", \"base\": 0, \"peak\": 3, \"phase\": \"(derived)\", \"size\": null, \"used\": 3}]}, \"resident\": 32, \"sgpr\": 8, \"symbol\": \"authored_scalar_reuse\", \"vgpr\": 3, \"wgsize\": 64, \"wgy\": 0}",
+   "manifest": {
+    "symbol": "authored_scalar_reuse",
+    "kernarg_bytes": 12,
+    "lds": 0,
+    "wgsize": 64,
+    "wgy": 0,
+    "vgpr": 3,
+    "agpr": 0,
+    "sgpr": 8,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "out",
+      "offset": 0
+     },
+     {
+      "bytes": 4,
+      "hi": 524288,
+      "kind": "u32",
+      "lo": 3,
+      "name": "count",
+      "offset": 8
+     }
+    ],
+    "build": {},
+    "resident": 32,
+    "mix": {
+     "delay": 3,
+     "salu": 11,
+     "smem": 2,
+     "valu": 7,
+     "vmem": 1,
+     "wait": 2
+    },
+    "notes": [
+     "SALU 11 > VALU + MFMA 7 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)"
+    ],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_add_co_u32 s:e#1, s:t#4@<string>:7, 11",
+       "base": 0,
+       "peak": 8,
+       "phase": "(derived)",
+       "size": null,
+       "used": 8
+      }
+     ],
+     "v": [
+      {
+       "at": "v_add_nc_u32 v:second#1, s:c#1, v:first#1",
+       "base": 0,
+       "peak": 3,
+       "phase": "(derived)",
+       "size": null,
+       "used": 3
+      }
+     ]
+    },
+    "max_grid": [
+     8192
+    ]
+   },
+   "summary": "authored_scalar_reuse: 26 instructions, vgpr 3 agpr 0 sgpr 8, 32 WGs per CU\n  note: SALU 11 > VALU + MFMA 7 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)\n  v derived: 3 registers for a peak of 3 live at `v_add_nc_u32 v:second#1, s:c#1, v:first#1` (7 values; #.## s)\n  s derived: 8 registers for a peak of 8 live at `s_add_co_u32 s:e#1, s:t#4@<string>:7, 11` (12 values; #.## s)\n  ranges: 1 address offsets proven not to wrap, 0 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges"
+   ],
+   "code_object": {
+    "sha256": "91e145b494603b1948344e5b831db40475a9996a88f732a455d2252eda5bdf96",
+    "bytes": 2496,
+    "text_hex": "750082be002100f4000000f8c00000f4080000f8010046d6020c01040000c7bf038d0096008201800385009600870280039100960081068003830096008b07800102004a9eff88bf010087bf0200044a010087bf0604003a010087bf0700044a0302987c6a00febe82020030048006ee0000000100000000c100febe0000b0bf",
+    "descriptor_hex": "00000000000000000c00000000000000801000000000000000000000000000000000000000000000000000000000000000000fe0840000000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "e399c70b7b774ef42b7707c39f8106da6c2d2495c21f7cf9aec987205d53d7b0",
+     "descriptor": "ce6573276bc44a201445779e3b9d0d89f497a6aba0343077b23e9ca420695a04",
+     "metadata": "608b52e483120ad36e63454a9b5b07441c0299b8f215e425f000c92505bffd60"
+    }
+   }
+  },
+  {
+   "name": "guarded_permute_b64",
+   "what": "v_cmpx to permlane16 dependency and its separating move",
+   "symbol": "authored_guarded_permute",
+   "wgsize": 64,
+   "max_grid": [
+    4096
+   ],
+   "wg": 1,
+   "src": "k = b.entry(Args(out=ptr, count=u32.within(2, 1 << 18)), wg=1, wgsize=64)\nout, count = k.load()\nlane = V.u32(k.wgid * 64 + k.tid, name=\"lane\")\nsignal = V.u32(lane ^ 5, name=\"signal\")\nwith b.lanes(lane < count):\n    where = V.u32(lane * 4, name=\"where\")\n    control = S.u32(0x60517243, name=\"control\")\n    shuffled = V.u32(name=\"shuffled\")\n    with b.raw_exec(\"stop a lane immediately before the shuffle\"):\n        b.emit(O.op(\"v_cmpx_ne_u32\", 0, signal))\n    b.emit(O.op(\"v.permlane16.b32\", shuffled, signal, control, control))\n    stored = V.u32(shuffled + lane, name=\"stored\")\n    b.emit(O.global_store(where, stored, out))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "out",
+     "offset": 0
+    },
+    {
+     "bytes": 4,
+     "hi": 262144,
+     "kind": "u32",
+     "lo": 2,
+     "name": "count",
+     "offset": 8
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_guarded_permute\n\t.globl\tauthored_guarded_permute\n\t.p2align\t8\n\t.type\tauthored_guarded_permute,@function\nauthored_guarded_permute:\n\ts_mov_b32 s2, ttmp9                                          // wgid#1: ttmp9\n\ts_load_b64 s[4:5], s[0:1], 0x0                               // out\n\ts_load_b32 s3, s[0:1], 0x8                                   // count\n\tv_lshl_add_u32 v1, s2, 6, v0                                 // lane = (wgid * 64) + tid\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_xor_b32 v0, 5, v1                                          // signal = lane ^ 5\n\ts_wait_kmcnt 0                                               // kernel arguments\n\tv_cmp_gt_u32 vcc_lo, s3, v1                                  // lane < count\n\ts_mov_b32 exec_lo, vcc_lo\n\tv_lshlrev_b32 v2, 2, v1                                      // where = lane * 4\n\ts_mov_b32 s0, 1615950403                                     // control = 0x60517243\n\tv_cmpx_ne_u32 0, v0\n\tv_mov_b32 v0, v0                                             // hazard\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_permlane16_b32 v3, v0, s0, s0\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_add_nc_u32 v0, v3, v1                                      // stored = shuffled + lane\n\tglobal_store_b32 v2, v0, s[4:5]\n\ts_mov_b32 exec_lo, -1\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_guarded_permute\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 12\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 4\n\t\t.amdhsa_next_free_sgpr 6\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_guarded_permute, .Lfunc_end0-authored_guarded_permute\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           12\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 12\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 64\n    .name:           authored_guarded_permute\n    .private_segment_fixed_size: 0\n    .sgpr_count:     8\n    .sgpr_spill_count: 0\n    .symbol:         authored_guarded_permute.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     4\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}, {\"bytes\": 4, \"hi\": 262144, \"kind\": \"u32\", \"lo\": 2, \"name\": \"count\", \"offset\": 8}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 12, \"lds\": 0, \"max_grid\": [4096], \"mix\": {\"delay\": 3, \"salu\": 4, \"smem\": 2, \"valu\": 8, \"vmem\": 1, \"wait\": 1}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:count#1, s:kargx2, 0x8\", \"base\": 0, \"peak\": 6, \"phase\": \"(derived)\", \"size\": null, \"used\": 6}], \"v\": [{\"at\": \"v_permlane16_b32 v:shuffled#1, v:signal#1, s:control#1, s:control#1\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 4}]}, \"resident\": 32, \"sgpr\": 6, \"symbol\": \"authored_guarded_permute\", \"vgpr\": 4, \"wgsize\": 64, \"wgy\": 0}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}, {\"bytes\": 4, \"hi\": 262144, \"kind\": \"u32\", \"lo\": 2, \"name\": \"count\", \"offset\": 8}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 12, \"lds\": 0, \"max_grid\": [4096], \"mix\": {\"delay\": 3, \"salu\": 4, \"smem\": 2, \"valu\": 8, \"vmem\": 1, \"wait\": 1}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:count#1, s:kargx2, 0x8\", \"base\": 0, \"peak\": 6, \"phase\": \"(derived)\", \"size\": null, \"used\": 6}], \"v\": [{\"at\": \"v_permlane16_b32 v:shuffled#1, v:signal#1, s:control#1, s:control#1\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 4}]}, \"resident\": 32, \"sgpr\": 6, \"symbol\": \"authored_guarded_permute\", \"vgpr\": 4, \"wgsize\": 64, \"wgy\": 0}",
+   "manifest": {
+    "symbol": "authored_guarded_permute",
+    "kernarg_bytes": 12,
+    "lds": 0,
+    "wgsize": 64,
+    "wgy": 0,
+    "vgpr": 4,
+    "agpr": 0,
+    "sgpr": 6,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "out",
+      "offset": 0
+     },
+     {
+      "bytes": 4,
+      "hi": 262144,
+      "kind": "u32",
+      "lo": 2,
+      "name": "count",
+      "offset": 8
+     }
+    ],
+    "build": {},
+    "resident": 32,
+    "mix": {
+     "delay": 3,
+     "salu": 4,
+     "smem": 2,
+     "valu": 8,
+     "vmem": 1,
+     "wait": 1
+    },
+    "notes": [],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_load_b32 s:count#1, s:kargx2, 0x8",
+       "base": 0,
+       "peak": 6,
+       "phase": "(derived)",
+       "size": null,
+       "used": 6
+      }
+     ],
+     "v": [
+      {
+       "at": "v_permlane16_b32 v:shuffled#1, v:signal#1, s:control#1, s:control#1",
+       "base": 0,
+       "peak": 4,
+       "phase": "(derived)",
+       "size": null,
+       "used": 4
+      }
+     ]
+    },
+    "max_grid": [
+     4096
+    ]
+   },
+   "summary": "authored_guarded_permute: 19 instructions, vgpr 4 agpr 0 sgpr 6, 32 WGs per CU\n  v derived: 4 registers for a peak of 4 live at `v_permlane16_b32 v:shuffled#1, v:signal#1, s:control#1, s:control#1` (6 values; #.## s)\n  s derived: 6 registers for a peak of 6 live at `s_load_b32 s:count#1, s:kargx2, 0x8` (5 values; #.## s)\n  ranges: 1 address offsets proven not to wrap, 0 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges"
+   ],
+   "code_object": {
+    "sha256": "36a035958bca494acef1b921c6347b4bd47222264b24172b9899375c7c7f9fa7",
+    "bytes": 2488,
+    "text_hex": "750082be002100f4000000f8c00000f4080000f8010046d6020c0104010087bf8502003a0000c7bf0302987c6a00febe82020430ff0080be4372516080009a7d0003007e010087bf03005bd600010000010087bf0303004a048006ee0000000002000000c100febe0000b0bf",
+    "descriptor_hex": "00000000000000000c00000000000000801000000000000000000000000000000000000000000000000000000000000000000fe0840000000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "770e511d7ff965ee311852421dc1868cd6d20d377c437fb3d363290f95560968",
+     "descriptor": "ce6573276bc44a201445779e3b9d0d89f497a6aba0343077b23e9ca420695a04",
+     "metadata": "428b6633dd114e08022148b5a954ea520926c69c8c9cdae2da87e095e6858c5b"
+    }
+   }
+  },
+  {
+   "name": "matrix_recurrence_b32",
+   "what": "back-to-back WMMA accumulator dependency, nop and neg_lo rendering",
+   "symbol": "authored_matrix_recurrence",
+   "wgsize": 32,
+   "max_grid": [
+    1
+   ],
+   "wg": 1,
+   "src": "k = b.entry(Args(lhs=ptr, rhs=ptr, out=ptr), wg=1, wgsize=32)\nlhs, rhs, out = k.load()\nlane = V.u32(k.tid, name=\"lane\")\naddress = V.u32(lane * 16, name=\"address\")\nx, y = V.u32(n=4, name=\"x\"), V.u32(n=4, name=\"y\")\nb.emit(O.op(\"global_load_b128\", x, address, lhs))\nb.emit(O.op(\"global_load_b128\", y, address, rhs, offset=16))\nb.wait(x, y, \"matrix fragments ready\")\nfirst, second = V.f32(n=8, name=\"first\"), V.f32(n=8, name=\"second\")\nb.emit(O.op(\"v_wmma_f32_16x16x16_f16\", first, x, y, 0))\nb.emit(O.op(\"v_wmma_f32_16x16x16_f16\", second, first[0:4], y, first, neg_lo=(0, 0, 1)))\nout_address = V.u32(lane * 64, name=\"out_address\")\nfor j, part in enumerate((second[4:8], first[4:8], second[0:4], first[0:4])):\n    b.emit(O.op(\"global_store_b128\", out_address, part, out, offset=16 * j or None))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "lhs",
+     "offset": 0
+    },
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "rhs",
+     "offset": 8
+    },
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "out",
+     "offset": 16
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_matrix_recurrence\n\t.globl\tauthored_matrix_recurrence\n\t.p2align\t8\n\t.type\tauthored_matrix_recurrence,@function\nauthored_matrix_recurrence:\n\ts_load_b128 s[4:7], s[0:1], 0x0                              // lhs, rhs\n\ts_load_b64 s[2:3], s[0:1], 0x10                              // out\n\tv_mov_b32 v1, v0                                             // lane = tid\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_lshlrev_b32 v0, 4, v1                                      // address = lane * 16\n\ts_wait_kmcnt 0                                               // kernel arguments\n\tglobal_load_b128 v[4:7], v0, s[4:5]\n\tglobal_load_b128 v[8:11], v0, s[6:7] offset:16\n\ts_wait_loadcnt 0                                             // matrix fragments ready\n\tv_wmma_f32_16x16x16_f16 v[12:19], v[4:7], v[8:11], 0\n\tv_nop                                                        // hazard\n\tv_wmma_f32_16x16x16_f16 v[20:27], v[12:15], v[8:11], v[12:19] neg_lo:[0,0,1]\n\tv_lshlrev_b32 v0, 6, v1                                      // out_address = lane * 64\n\tglobal_store_b128 v0, v[24:27], s[2:3]\n\tglobal_store_b128 v0, v[16:19], s[2:3] offset:16\n\tglobal_store_b128 v0, v[20:23], s[2:3] offset:32\n\tglobal_store_b128 v0, v[12:15], s[2:3] offset:48\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_matrix_recurrence\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 24\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 28\n\t\t.amdhsa_next_free_sgpr 8\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_matrix_recurrence, .Lfunc_end0-authored_matrix_recurrence\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           24\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 24\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 32\n    .name:           authored_matrix_recurrence\n    .private_segment_fixed_size: 0\n    .sgpr_count:     10\n    .sgpr_spill_count: 0\n    .symbol:         authored_matrix_recurrence.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     28\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"lhs\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"rhs\", \"offset\": 8}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 16}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 24, \"lds\": 0, \"max_grid\": [1], \"mix\": {\"delay\": 1, \"salu\": 0, \"smem\": 2, \"valu\": 6, \"vmem\": 6, \"wait\": 2}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b64 s:out#1x2, s:kargx2, 0x10\", \"base\": 0, \"peak\": 8, \"phase\": \"(derived)\", \"size\": null, \"used\": 8}], \"v\": [{\"at\": \"v_wmma_f32_16x16x16_f16 v:second#1x8, v:first#1+0x4, v:y#1x4, v:first#1x8 neg_lo:[0,0,1]\", \"base\": 0, \"peak\": 21, \"phase\": \"(derived)\", \"size\": null, \"used\": 28}]}, \"resident\": 64, \"sgpr\": 8, \"symbol\": \"authored_matrix_recurrence\", \"vgpr\": 28, \"wgsize\": 32, \"wgy\": 0}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"lhs\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"rhs\", \"offset\": 8}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 16}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 24, \"lds\": 0, \"max_grid\": [1], \"mix\": {\"delay\": 1, \"salu\": 0, \"smem\": 2, \"valu\": 6, \"vmem\": 6, \"wait\": 2}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b64 s:out#1x2, s:kargx2, 0x10\", \"base\": 0, \"peak\": 8, \"phase\": \"(derived)\", \"size\": null, \"used\": 8}], \"v\": [{\"at\": \"v_wmma_f32_16x16x16_f16 v:second#1x8, v:first#1+0x4, v:y#1x4, v:first#1x8 neg_lo:[0,0,1]\", \"base\": 0, \"peak\": 21, \"phase\": \"(derived)\", \"size\": null, \"used\": 28}]}, \"resident\": 64, \"sgpr\": 8, \"symbol\": \"authored_matrix_recurrence\", \"vgpr\": 28, \"wgsize\": 32, \"wgy\": 0}",
+   "manifest": {
+    "symbol": "authored_matrix_recurrence",
+    "kernarg_bytes": 24,
+    "lds": 0,
+    "wgsize": 32,
+    "wgy": 0,
+    "vgpr": 28,
+    "agpr": 0,
+    "sgpr": 8,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "lhs",
+      "offset": 0
+     },
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "rhs",
+      "offset": 8
+     },
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "out",
+      "offset": 16
+     }
+    ],
+    "build": {},
+    "resident": 64,
+    "mix": {
+     "delay": 1,
+     "salu": 0,
+     "smem": 2,
+     "valu": 6,
+     "vmem": 6,
+     "wait": 2
+    },
+    "notes": [],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_load_b64 s:out#1x2, s:kargx2, 0x10",
+       "base": 0,
+       "peak": 8,
+       "phase": "(derived)",
+       "size": null,
+       "used": 8
+      }
+     ],
+     "v": [
+      {
+       "at": "v_wmma_f32_16x16x16_f16 v:second#1x8, v:first#1+0x4, v:y#1x4, v:first#1x8 neg_lo:[0,0,1]",
+       "base": 0,
+       "peak": 21,
+       "phase": "(derived)",
+       "size": null,
+       "used": 28
+      }
+     ]
+    },
+    "max_grid": [
+     1
+    ]
+   },
+   "summary": "authored_matrix_recurrence: 17 instructions, vgpr 28 agpr 0 sgpr 8, 64 WGs per CU\n  v derived: 28 registers for a peak of 21 live at `v_wmma_f32_16x16x16_f16 v:second#1x8, v:first#1+0x4, v:y#1x4, v:first#1x8 neg_lo:[0,0,1]` (8 values; #.## s)\n  s derived: 8 registers for a peak of 8 live at `s_load_b64 s:out#1x2, s:kargx2, 0x10` (4 values; #.## s)\n  ranges: 6 address offsets proven not to wrap, 0 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges"
+   ],
+   "code_object": {
+    "sha256": "f2170a5d75f41f991780166516556bdae8e56751bb69eae336cf682eb55854c7",
+    "bytes": 2520,
+    "text_hex": "004100f4000000f8802000f4100000f80003027e010087bf840200300000c7bf04c005ee040000000000000006c005ee08000000001000000000c0bf0c4040cc0411021a0000007e144040cc0c11329c86020030024007ee0000000c00000000024007ee0000000800100000024007ee0000000a00200000024007ee00000006003000000000b0bf",
+    "descriptor_hex": "00000000000000001800000000000000801000000000000000000000000000000000000000000000000000000000000003000fe0840000000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "2082a2787408df8054afcd2f0e571678536c0cc31f1191dee91c7826782bbe9f",
+     "descriptor": "7ca673a09164d6fbdc0404cd560e0d548188d692beb242f7cdc346f00327b92d",
+     "metadata": "2ffde667e1ba8783cfc06b3063a4e69d6dceb228b4aa875f08cf19f4c0b3d678"
+    }
+   }
+  },
+  {
+   "name": "loop_filter_b64",
+   "what": "counted loop, in-body load wait, backward branch and delay notes",
+   "symbol": "authored_loop_filter",
+   "wgsize": 64,
+   "max_grid": [
+    8192
+   ],
+   "wg": 1,
+   "src": "k = b.entry(Args(src=ptr, dst=ptr, rounds=u32.within(2, 48)), wg=1, wgsize=64)\nsrc, dst, rounds = k.load()\nlane = V.u32(k.wgid * 64 + k.tid, name=\"lane\")\naddress = V.u32(lane * 4, name=\"address\")\nstate = V.f32(name=\"state\")\nb.emit(O.op(\"v_mov_b32\", state, 0x3F800000))\nfor _ in b.loop(rounds, name=\"filter\"):\n    sample = V.f32(name=\"sample\")\n    b.emit(O.global_load(sample, address, src))\n    b.wait(sample, \"sample arrived\")\n    state[...] = (state - sample) * 0.5 + sample\nb.emit(O.global_store(address, state, dst))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "src",
+     "offset": 0
+    },
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "dst",
+     "offset": 8
+    },
+    {
+     "bytes": 4,
+     "hi": 48,
+     "kind": "u32",
+     "lo": 2,
+     "name": "rounds",
+     "offset": 16
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_loop_filter\n\t.globl\tauthored_loop_filter\n\t.p2align\t8\n\t.type\tauthored_loop_filter,@function\nauthored_loop_filter:\n\ts_mov_b32 s2, ttmp9                                          // wgid#1: ttmp9\n\ts_load_b128 s[4:7], s[0:1], 0x0                              // src, dst\n\ts_load_b32 s3, s[0:1], 0x10                                  // rounds\n\tv_lshl_add_u32 v1, s2, 6, v0                                 // lane = (wgid * 64) + tid\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_lshlrev_b32 v0, 2, v1                                      // address = lane * 4\n\tv_mov_b32 v1, 1065353216\n\ts_wait_kmcnt 0                                               // the kernel arguments, before loop filter\n\ts_mov_b32 s0, 0\n\ts_cmp_lt_u32 s0, s3\n\ts_cbranch_scc0 .Lfilter_end_2\n.Lfilter_1:\n\tglobal_load_b32 v2, v0, s[4:5]\n\ts_wait_loadcnt 0                                             // sample arrived\n\tv_sub_f32 v3, v1, v2                                         // state = ((state - sample) * 0.5) + sample\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_mul_f32 v4, 0.5, v3\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_add_f32 v1, v4, v2\n\ts_add_co_u32 s0, s0, 1\n\ts_cmp_lt_u32 s0, s3\n\ts_cbranch_scc1 .Lfilter_1\n.Lfilter_end_2:\n\tglobal_store_b32 v0, v1, s[6:7]\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_loop_filter\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 20\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 5\n\t\t.amdhsa_next_free_sgpr 8\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_loop_filter, .Lfunc_end0-authored_loop_filter\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           20\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 20\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 64\n    .name:           authored_loop_filter\n    .private_segment_fixed_size: 0\n    .sgpr_count:     10\n    .sgpr_spill_count: 0\n    .symbol:         authored_loop_filter.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     5\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"src\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"dst\", \"offset\": 8}, {\"bytes\": 4, \"hi\": 48, \"kind\": \"u32\", \"lo\": 2, \"name\": \"rounds\", \"offset\": 16}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 20, \"lds\": 0, \"max_grid\": [8192], \"mix\": {\"branch\": 2, \"delay\": 3, \"salu\": 5, \"smem\": 2, \"valu\": 6, \"vmem\": 2, \"wait\": 2}, \"notes\": [\"loop filter_1: 2 of its 3 VALU ops wait on a recent VALU op's result (2 on the op just before): told by s_delay_alu, the other waves issue meanwhile, but ops independent of the few before them need no wait\"], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:rounds#1, s:kargx2, 0x10\", \"base\": 0, \"peak\": 8, \"phase\": \"(derived)\", \"size\": null, \"used\": 8}], \"v\": [{\"at\": \"v_sub_f32 v:t#2@<string>:11, v:state#1, v:sample#1\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 5}]}, \"resident\": 32, \"sgpr\": 8, \"symbol\": \"authored_loop_filter\", \"vgpr\": 5, \"wgsize\": 64, \"wgy\": 0}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"src\", \"offset\": 0}, {\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"dst\", \"offset\": 8}, {\"bytes\": 4, \"hi\": 48, \"kind\": \"u32\", \"lo\": 2, \"name\": \"rounds\", \"offset\": 16}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 20, \"lds\": 0, \"max_grid\": [8192], \"mix\": {\"branch\": 2, \"delay\": 3, \"salu\": 5, \"smem\": 2, \"valu\": 6, \"vmem\": 2, \"wait\": 2}, \"notes\": [\"loop filter_1: 2 of its 3 VALU ops wait on a recent VALU op's result (2 on the op just before): told by s_delay_alu, the other waves issue meanwhile, but ops independent of the few before them need no wait\"], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:rounds#1, s:kargx2, 0x10\", \"base\": 0, \"peak\": 8, \"phase\": \"(derived)\", \"size\": null, \"used\": 8}], \"v\": [{\"at\": \"v_sub_f32 v:t#2@<string>:11, v:state#1, v:sample#1\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 5}]}, \"resident\": 32, \"sgpr\": 8, \"symbol\": \"authored_loop_filter\", \"vgpr\": 5, \"wgsize\": 64, \"wgy\": 0}",
+   "manifest": {
+    "symbol": "authored_loop_filter",
+    "kernarg_bytes": 20,
+    "lds": 0,
+    "wgsize": 64,
+    "wgy": 0,
+    "vgpr": 5,
+    "agpr": 0,
+    "sgpr": 8,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "src",
+      "offset": 0
+     },
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "dst",
+      "offset": 8
+     },
+     {
+      "bytes": 4,
+      "hi": 48,
+      "kind": "u32",
+      "lo": 2,
+      "name": "rounds",
+      "offset": 16
+     }
+    ],
+    "build": {},
+    "resident": 32,
+    "mix": {
+     "branch": 2,
+     "delay": 3,
+     "salu": 5,
+     "smem": 2,
+     "valu": 6,
+     "vmem": 2,
+     "wait": 2
+    },
+    "notes": [
+     "loop filter_1: 2 of its 3 VALU ops wait on a recent VALU op's result (2 on the op just before): told by s_delay_alu, the other waves issue meanwhile, but ops independent of the few before them need no wait"
+    ],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_load_b32 s:rounds#1, s:kargx2, 0x10",
+       "base": 0,
+       "peak": 8,
+       "phase": "(derived)",
+       "size": null,
+       "used": 8
+      }
+     ],
+     "v": [
+      {
+       "at": "v_sub_f32 v:t#2@<string>:11, v:state#1, v:sample#1",
+       "base": 0,
+       "peak": 4,
+       "phase": "(derived)",
+       "size": null,
+       "used": 5
+      }
+     ]
+    },
+    "max_grid": [
+     8192
+    ]
+   },
+   "summary": "authored_loop_filter: 22 instructions, vgpr 5 agpr 0 sgpr 8, 32 WGs per CU\n  note: loop filter_1: 2 of its 3 VALU ops wait on a recent VALU op's result (2 on the op just before): told by s_delay_alu, the other waves issue meanwhile, but ops independent of the few before them need no wait\n  v derived: 5 registers for a peak of 4 live at `v_sub_f32 v:t#2@<string>:11, v:state#1, v:sample#1` (7 values; #.## s)\n  s derived: 8 registers for a peak of 8 live at `s_load_b32 s:rounds#1, s:kargx2, 0x10` (5 values; #.## s)\n  ranges: 2 address offsets proven not to wrap, 0 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges"
+   ],
+   "code_object": {
+    "sha256": "80b418cd0132aa8b58b3c3e18e0ece217bf32a62bb84a88d82792b77b276aaaf",
+    "bytes": 2488,
+    "text_hex": "750082be004100f4000000f8c00000f4100000f8010046d6020c0104010087bf82020030f202027e0000c7bf800080be00030abf0c00a1bf040005ee02000000000000000000c0bf01050608010087bff0060810010087bf040502060081008000030abff4ffa2bf068006ee00008000000000000000b0bf",
+    "descriptor_hex": "00000000000000001400000000000000801000000000000000000000000000000000000000000000000000000000000000000fe0840000000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "906f0f3b418a88d9205c3789ba65d94b451ead83485e1ed1fb432c8be6d3aec3",
+     "descriptor": "65698028dec6ebe880cfa17880ad1a914a682a2502e29ad079c35a37d4e26f79",
+     "metadata": "9f427b7b0df54e307d5b206a23a0f3c539a356cc1e6ca756a0dda6f012f71332"
+    }
+   }
+  },
+  {
+   "name": "lds_exchange_b96",
+   "what": "LDS table, barrier, per-wave address proof and race checking",
+   "symbol": "authored_lds_exchange",
+   "wgsize": 96,
+   "max_grid": [
+    4096
+   ],
+   "wg": 1,
+   "src": "k = b.entry(Args(out=ptr), wg=1, wgsize=96)\n(out,) = k.load()\nlayout = b.lds()\nslots = layout.region(\"slots\", (96,), \"u32\")\nvalue = V.u32((k.tid ^ 0x55) + 17, name=\"value\")\nb.emit(O.ds_write(slots.at(k.tid), value))\nb.wait(slots)\nb.barrier(\"all slots published\")\nreceived = V.u32(name=\"received\")\nb.emit(O.ds_read(received, slots.at((k.tid + 48) % 96)))\nb.wait(received)\nwhere = V.u32((k.wgid * 96 + k.tid) * 4, name=\"where\")\nresult = V.u32(received + k.tid, name=\"result\")\nb.emit(O.global_store(where, result, out))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "out",
+     "offset": 0
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_lds_exchange\n\t.globl\tauthored_lds_exchange\n\t.p2align\t8\n\t.type\tauthored_lds_exchange,@function\nauthored_lds_exchange:\n; lds: 384 B\n;   offset     end   size  region           shape                strides\n;        0     384    384  slots            [96] u32             4\n\ts_mov_b32 s2, ttmp9                                          // wgid#1: ttmp9\n\ts_load_b64 s[4:5], s[0:1], 0x0                               // out\n\tv_xor_b32 v1, 85, v0                                         // value = (tid ^ 85) + 17\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_add_nc_u32 v2, 17, v1\n\tv_lshlrev_b32 v1, 2, v0                                      // adr = tid * 4\n\tds_store_b32 v1, v2                                          // slots + tid * 4\n\ts_wait_dscnt 0\n\ts_barrier_signal -1\n\ts_barrier_wait 65535                                         // all slots published\n\tv_add_nc_u32 v1, 48, v0                                      // adr = ((tid + 48) % 96) * 4\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_mul_hi_u32 v2, v1, 2863311531\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_lshrrev_b32 v2, 6, v2\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_mul_lo_u32 v1, v2, 96\n\tv_add_nc_u32 v2, 48, v0\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_sub_nc_u32 v3, v2, v1\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_lshlrev_b32 v1, 2, v3\n\tds_load_b32 v2, v1                                           // slots + ((tid + 48) % 96) * 4\n\ts_wait_dscnt 0\n\ts_mul_i32 s0, s2, 96                                         // where = ((wgid * 96) + tid) * 4\n\tv_add_nc_u32 v1, s0, v0\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_lshlrev_b32 v3, 2, v1\n\tv_add_nc_u32 v1, v2, v0                                      // result = received + tid\n\ts_wait_kmcnt 0                                               // kernel arguments\n\tglobal_store_b32 v3, v1, s[4:5]\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_lds_exchange\n\t\t.amdhsa_group_segment_fixed_size 384\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 8\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 0\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 4\n\t\t.amdhsa_next_free_sgpr 6\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_lds_exchange, .Lfunc_end0-authored_lds_exchange\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           8\n        .value_kind:     by_value\n    .group_segment_fixed_size: 384\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 8\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 96\n    .name:           authored_lds_exchange\n    .private_segment_fixed_size: 0\n    .sgpr_count:     8\n    .sgpr_spill_count: 0\n    .symbol:         authored_lds_exchange.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     4\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 8, \"lds\": 384, \"max_grid\": [4096], \"mix\": {\"barrier\": 1, \"delay\": 7, \"ds\": 2, \"salu\": 3, \"smem\": 1, \"valu\": 13, \"vmem\": 1, \"wait\": 3}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b64 s:out#1x2, s:kargx2, 0x0\", \"base\": 0, \"peak\": 5, \"phase\": \"(derived)\", \"size\": null, \"used\": 6}], \"v\": [{\"at\": \"v_sub_nc_u32 v:t#2@<string>:10, v:t#6@<string>:10, v:t#5@<string>:10\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 4}]}, \"resident\": 21, \"sgpr\": 6, \"symbol\": \"authored_lds_exchange\", \"vgpr\": 4, \"wgsize\": 96, \"wgy\": 0}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 8, \"lds\": 384, \"max_grid\": [4096], \"mix\": {\"barrier\": 1, \"delay\": 7, \"ds\": 2, \"salu\": 3, \"smem\": 1, \"valu\": 13, \"vmem\": 1, \"wait\": 3}, \"notes\": [], \"phases\": {\"s\": [{\"at\": \"s_load_b64 s:out#1x2, s:kargx2, 0x0\", \"base\": 0, \"peak\": 5, \"phase\": \"(derived)\", \"size\": null, \"used\": 6}], \"v\": [{\"at\": \"v_sub_nc_u32 v:t#2@<string>:10, v:t#6@<string>:10, v:t#5@<string>:10\", \"base\": 0, \"peak\": 4, \"phase\": \"(derived)\", \"size\": null, \"used\": 4}]}, \"resident\": 21, \"sgpr\": 6, \"symbol\": \"authored_lds_exchange\", \"vgpr\": 4, \"wgsize\": 96, \"wgy\": 0}",
+   "manifest": {
+    "symbol": "authored_lds_exchange",
+    "kernarg_bytes": 8,
+    "lds": 384,
+    "wgsize": 96,
+    "wgy": 0,
+    "vgpr": 4,
+    "agpr": 0,
+    "sgpr": 6,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "out",
+      "offset": 0
+     }
+    ],
+    "build": {},
+    "resident": 21,
+    "mix": {
+     "barrier": 1,
+     "delay": 7,
+     "ds": 2,
+     "salu": 3,
+     "smem": 1,
+     "valu": 13,
+     "vmem": 1,
+     "wait": 3
+    },
+    "notes": [],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_load_b64 s:out#1x2, s:kargx2, 0x0",
+       "base": 0,
+       "peak": 5,
+       "phase": "(derived)",
+       "size": null,
+       "used": 6
+      }
+     ],
+     "v": [
+      {
+       "at": "v_sub_nc_u32 v:t#2@<string>:10, v:t#6@<string>:10, v:t#5@<string>:10",
+       "base": 0,
+       "peak": 4,
+       "phase": "(derived)",
+       "size": null,
+       "used": 4
+      }
+     ]
+    },
+    "max_grid": [
+     4096
+    ]
+   },
+   "summary": "authored_lds_exchange: 31 instructions, vgpr 4 agpr 0 sgpr 6, lds 384, 21 WGs per CU\n  v derived: 4 registers for a peak of 4 live at `v_sub_nc_u32 v:t#2@<string>:10, v:t#6@<string>:10, v:t#5@<string>:10` (14 values; #.## s)\n  s derived: 6 registers for a peak of 5 live at `s_load_b64 s:out#1x2, s:kargx2, 0x0` (4 values; #.## s)\n  ranges: 2 address offsets proven not to wrap, 1 unproven; 1 LDS accesses proven inside their regions, 1 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "drop_m0",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges",
+    "ranges, each wave",
+    "LDS races"
+   ],
+   "code_object": {
+    "sha256": "da0321f68f2172540f348b7380b338355e199acea18a21d72b23d2f82904f447",
+    "bytes": 2544,
+    "text_hex": "750082be002100f4000000f8ff00023a55000000010087bf9102044a82000230000034d8010200000000c6bfc14e80beffff94bfb000024a010087bf02002dd701ff0100abaaaaaa010087bf86040432010087bf01002cd702ff010060000000b000044a010087bf0203064c010087bf820602300000d8d8010000020000c6bf02ff0096600000000000024a010087bf820206300201024a0000c7bf048006ee00008000030000000000b0bf",
+    "descriptor_hex": "80010000000000000800000000000000801000000000000000000000000000000000000000000000000000000000000000000fe0840000000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "71cd66eeba9251d69fefcc67f7c0666b7be14f45898ab46a18a8c6d049f5ddf6",
+     "descriptor": "6a0e3dc08706c68b9b996ef691f9122a9fe23cc9084f57d7e9d9afc9d85f252e",
+     "metadata": "bc4ab4c6accf6bc2f6e92b2822b5d3778149bc3ee2937a2a19a0e6145097876e"
+    }
+   }
+  },
+  {
+   "name": "plane_store_b32",
+   "what": "two workgroup dimensions, uniform/assume claims and comment output",
+   "symbol": "authored_plane_store",
+   "wgsize": 32,
+   "max_grid": [
+    32,
+    16
+   ],
+   "wg": 2,
+   "src": "k = b.entry(Args(out=ptr, width=u32.within(1, 32)), wg=2, wgsize=32)\nout, width = k.load()\nb.uniform(width, why=\"one launch width for every wave\")\ncolumn = S.u32(k.wgid * width + 1, name=\"column\")\nrow = S.u32(k.wgid_y * 32, name=\"row\")\nb.comment(\"form a plane index from both workgroup coordinates\")\nbase = S.u32(row + column, name=\"base\")\nindex = V.u32(base * 32 + k.tid, name=\"index\")\nb.assume(index, lo=1, hi=(1 << 16) - 1, why=\"bounded authored grid\")\nwhere = V.u32(index * 4, name=\"where\")\npayload = V.u32(index ^ width, name=\"payload\")\nb.emit(O.global_store(where, payload, out))\n",
+   "args": [
+    {
+     "bytes": 8,
+     "kind": "ptr",
+     "name": "out",
+     "offset": 0
+    },
+    {
+     "bytes": 4,
+     "hi": 32,
+     "kind": "u32",
+     "lo": 1,
+     "name": "width",
+     "offset": 8
+    }
+   ],
+   "s": "\t.amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n\t.amdhsa_code_object_version 6\n\t.text\n\t.protected\tauthored_plane_store\n\t.globl\tauthored_plane_store\n\t.p2align\t8\n\t.type\tauthored_plane_store,@function\nauthored_plane_store:\n\ts_mov_b32 s2, ttmp9                                          // wgid#1: ttmp9\n\ts_mov_b32 s3, ttmp7                                          // wgid_y#1: ttmp7\n\ts_load_b64 s[4:5], s[0:1], 0x0                               // out\n\ts_load_b32 s6, s[0:1], 0x8                                   // width\n; uniform: s6 (one launch width for every wave)\n\ts_wait_kmcnt 0                                               // kernel arguments\n\ts_mul_i32 s0, s2, s6                                         // column = (wgid * width) + 1\n\ts_add_co_u32 s1, s0, 1\n\ts_lshl_b32 s0, s3, 5                                         // row = wgid_y * 32\n; form a plane index from both workgroup coordinates\n\ts_add_co_u32 s2, s0, s1                                      // base = row + column\n\tv_lshl_add_u32 v1, s2, 5, v0                                 // index = (base * 32) + tid\n; assume: v1 in [1, 65535] (bounded authored grid)\n\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)\n\tv_lshlrev_b32 v0, 2, v1                                      // where = index * 4\n\ts_delay_alu 2                                                // hazard: instid0(VALU_DEP_2)\n\tv_xor_b32 v2, s6, v1                                         // payload = index ^ width\n\tglobal_store_b32 v0, v2, s[4:5]\n\ts_endpgm\n\t.section\t.rodata,\"a\",@progbits\n\t.p2align\t6, 0x0\n\t.amdhsa_kernel authored_plane_store\n\t\t.amdhsa_group_segment_fixed_size 0\n\t\t.amdhsa_private_segment_fixed_size 0\n\t\t.amdhsa_kernarg_size 12\n\t\t.amdhsa_user_sgpr_count 2\n\t\t.amdhsa_user_sgpr_dispatch_ptr 0\n\t\t.amdhsa_user_sgpr_queue_ptr 0\n\t\t.amdhsa_user_sgpr_kernarg_segment_ptr 1\n\t\t.amdhsa_user_sgpr_dispatch_id 0\n\t\t.amdhsa_user_sgpr_private_segment_size 0\n\t\t.amdhsa_wavefront_size32 1\n\t\t.amdhsa_uses_dynamic_stack 0\n\t\t.amdhsa_enable_private_segment 0\n\t\t.amdhsa_system_sgpr_workgroup_id_x 1\n\t\t.amdhsa_system_sgpr_workgroup_id_y 1\n\t\t.amdhsa_system_sgpr_workgroup_id_z 0\n\t\t.amdhsa_system_sgpr_workgroup_info 0\n\t\t.amdhsa_system_vgpr_workitem_id 0\n\t\t.amdhsa_next_free_vgpr 3\n\t\t.amdhsa_next_free_sgpr 7\n\t\t.amdhsa_reserve_vcc 1\n\t\t.amdhsa_float_round_mode_32 0\n\t\t.amdhsa_float_round_mode_16_64 0\n\t\t.amdhsa_float_denorm_mode_32 3\n\t\t.amdhsa_float_denorm_mode_16_64 3\n\t\t.amdhsa_fp16_overflow 0\n\t\t.amdhsa_workgroup_processor_mode 1\n\t\t.amdhsa_memory_ordered 1\n\t\t.amdhsa_forward_progress 1\n\t\t.amdhsa_round_robin_scheduling 0\n\t.end_amdhsa_kernel\n\t.text\n.Lfunc_end0:\n\t.size\tauthored_plane_store, .Lfunc_end0-authored_plane_store\n\t.amdgpu_metadata\n---\namdhsa.kernels:\n  - .args:\n      - .offset:         0\n        .size:           12\n        .value_kind:     by_value\n    .group_segment_fixed_size: 0\n    .kernarg_segment_align: 8\n    .kernarg_segment_size: 12\n    .language:       OpenCL C\n    .language_version:\n      - 2\n      - 0\n    .max_flat_workgroup_size: 32\n    .name:           authored_plane_store\n    .private_segment_fixed_size: 0\n    .sgpr_count:     9\n    .sgpr_spill_count: 0\n    .symbol:         authored_plane_store.kd\n    .uniform_work_group_size: 1\n    .uses_dynamic_stack: false\n    .vgpr_count:     3\n    .vgpr_spill_count: 0\n    .wavefront_size: 32\n    .workgroup_processor_mode: 1\namdhsa.target:   amdgcn-amd-amdhsa--gfx1201\namdhsa.version:\n  - 1\n  - 2\n...\n\t.end_amdgpu_metadata\n; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}, {\"bytes\": 4, \"hi\": 32, \"kind\": \"u32\", \"lo\": 1, \"name\": \"width\", \"offset\": 8}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 12, \"lds\": 0, \"max_grid\": [32, 16], \"mix\": {\"delay\": 2, \"salu\": 6, \"smem\": 2, \"valu\": 3, \"vmem\": 1, \"wait\": 1}, \"notes\": [\"SALU 6 > VALU + MFMA 3 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)\"], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:width#1, s:kargx2, 0x8\", \"base\": 0, \"peak\": 7, \"phase\": \"(derived)\", \"size\": null, \"used\": 7}], \"v\": [{\"at\": \"v_xor_b32 v:payload#1, s:width#1, v:index#1\", \"base\": 0, \"peak\": 3, \"phase\": \"(derived)\", \"size\": null, \"used\": 3}]}, \"resident\": 64, \"sgpr\": 7, \"symbol\": \"authored_plane_store\", \"vgpr\": 3, \"wgsize\": 32, \"wgy\": 1}\n",
+   "manifest_line": "; thin.manifest {\"agpr\": 0, \"args\": [{\"bytes\": 8, \"kind\": \"ptr\", \"name\": \"out\", \"offset\": 0}, {\"bytes\": 4, \"hi\": 32, \"kind\": \"u32\", \"lo\": 1, \"name\": \"width\", \"offset\": 8}], \"build\": {}, \"grid\": [], \"kernarg_bytes\": 12, \"lds\": 0, \"max_grid\": [32, 16], \"mix\": {\"delay\": 2, \"salu\": 6, \"smem\": 2, \"valu\": 3, \"vmem\": 1, \"wait\": 1}, \"notes\": [\"SALU 6 > VALU + MFMA 3 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)\"], \"phases\": {\"s\": [{\"at\": \"s_load_b32 s:width#1, s:kargx2, 0x8\", \"base\": 0, \"peak\": 7, \"phase\": \"(derived)\", \"size\": null, \"used\": 7}], \"v\": [{\"at\": \"v_xor_b32 v:payload#1, s:width#1, v:index#1\", \"base\": 0, \"peak\": 3, \"phase\": \"(derived)\", \"size\": null, \"used\": 3}]}, \"resident\": 64, \"sgpr\": 7, \"symbol\": \"authored_plane_store\", \"vgpr\": 3, \"wgsize\": 32, \"wgy\": 1}",
+   "manifest": {
+    "symbol": "authored_plane_store",
+    "kernarg_bytes": 12,
+    "lds": 0,
+    "wgsize": 32,
+    "wgy": 1,
+    "vgpr": 3,
+    "agpr": 0,
+    "sgpr": 7,
+    "args": [
+     {
+      "bytes": 8,
+      "kind": "ptr",
+      "name": "out",
+      "offset": 0
+     },
+     {
+      "bytes": 4,
+      "hi": 32,
+      "kind": "u32",
+      "lo": 1,
+      "name": "width",
+      "offset": 8
+     }
+    ],
+    "build": {},
+    "resident": 64,
+    "mix": {
+     "delay": 2,
+     "salu": 6,
+     "smem": 2,
+     "valu": 3,
+     "vmem": 1,
+     "wait": 1
+    },
+    "notes": [
+     "SALU 6 > VALU + MFMA 3 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)"
+    ],
+    "grid": [],
+    "phases": {
+     "s": [
+      {
+       "at": "s_load_b32 s:width#1, s:kargx2, 0x8",
+       "base": 0,
+       "peak": 7,
+       "phase": "(derived)",
+       "size": null,
+       "used": 7
+      }
+     ],
+     "v": [
+      {
+       "at": "v_xor_b32 v:payload#1, s:width#1, v:index#1",
+       "base": 0,
+       "peak": 3,
+       "phase": "(derived)",
+       "size": null,
+       "used": 3
+      }
+     ]
+    },
+    "max_grid": [
+     32,
+     16
+    ]
+   },
+   "summary": "authored_plane_store: 15 instructions, vgpr 3 agpr 0 sgpr 7, 64 WGs per CU\n  note: SALU 6 > VALU + MFMA 3 over the whole kernel: where the hot loop has this mix, the CU's one scalar issue per cycle is the bound once ~4 waves share it (an in-kernel clock says whether it is the loop)\n  v derived: 3 registers for a peak of 3 live at `v_xor_b32 v:payload#1, s:width#1, v:index#1` (4 values; #.## s)\n  s derived: 7 registers for a peak of 7 live at `s_load_b32 s:width#1, s:kargx2, 0x8` (9 values; #.## s)\n  ranges: 1 address offsets proven not to wrap, 0 unproven",
+   "pass_times_keys": [
+    "drop_entry",
+    "waits",
+    "regalloc",
+    "hazards",
+    "LDS proof",
+    "save-less regions",
+    "SCC readers",
+    "dead writes",
+    "aliases",
+    "hazards clear",
+    "verify",
+    "ranges"
+   ],
+   "code_object": {
+    "sha256": "0a9ae2a4e1a7828c40a258541011fdf5e45a9c77c734e59d5578ba0e3a3f78aa",
+    "bytes": 2456,
+    "text_hex": "750082be730083be002100f4000000f8800100f4080000f80000c7bf02060096008101800385008400010280010046d6020a0104010087bf82020030020087bf0602043a048006ee00000001000000000000b0bf",
+    "descriptor_hex": "00000000000000000c00000000000000801000000000000000000000000000000000000000000000000000000000000000000fe0840100000804000000000000",
+    "e_flags": 78,
+    "digests": {
+     "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+     "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+     "text": "cd9bd5f513f7f80ec833a1b6c03ff8858e4f16099cdb94a9c9a7674706dd764e",
+     "descriptor": "f021424af999a77b87354a2031cae69d016b0c6b50e5a96ef351e2c4fd81140a",
+     "metadata": "e7159803bbd56c0ceca76d1209d57521089ed6ffe8c62e104fc5c9ddd497c595"
+    }
+   }
+  }
+ ]
+}

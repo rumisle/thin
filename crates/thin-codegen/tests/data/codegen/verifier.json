@@ -1,0 +1,257 @@
+{
+ "notation": "Hand-authored split-counter assembly. counter_waits and its native records are computed by the independent checker and sorted as it returns them.",
+ "cases": [
+  {
+   "name": "unwaited_vector_result",
+   "text": "authored:\n\tglobal_load_b32 v7, v0, s[8:9]\n\tv_add_nc_u32 v8, v7, 1\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 3: v_add_nc_u32 touches v7 while the load at line 2 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     3,
+     "v_add_nc_u32",
+     "v7",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "retired_vector_result",
+   "text": "authored:\n\tglobal_load_b32 v7, v0, s[8:9]\n\ts_wait_loadcnt 0\n\tv_xor_b32 v8, v7, v0\n\ts_endpgm\n",
+   "counter_waits": [],
+   "counter_records": []
+  },
+  {
+   "name": "older_of_two_loads",
+   "text": "authored:\n\tglobal_load_b32 v10, v0, s[8:9]\n\tglobal_load_b32 v11, v0, s[8:9] offset:12\n\ts_wait_loadcnt 1\n\tv_or_b32 v12, v10, v0\n\tv_sub_u32 v13, v11, v12\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 6: v_sub_u32 touches v11 while the load at line 3 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     6,
+     "v_sub_u32",
+     "v11",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "overwrite_pending_load",
+   "text": "authored:\n\tglobal_load_b32 v12, v1, s[8:9]\n\tglobal_load_b32 v12, v1, s[8:9] offset:20\n\ts_wait_loadcnt 0\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 3: global_load_b32 touches v12 while the load at line 2 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     3,
+     "global_load_b32",
+     "v12",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "lds_counter_independent",
+   "text": "authored:\n\tds_load_b32 v4, v0\n\tglobal_load_b32 v9, v0, s[8:9]\n\ts_wait_loadcnt 0\n\tv_xor_b32 v10, v4, v9\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 5: v_xor_b32 touches v4 while the load at line 2 may be in flight (dscnt)"
+   ],
+   "counter_records": [
+    [
+     5,
+     "v_xor_b32",
+     "v4",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "lds_store_orders_wait",
+   "text": "authored:\n\tds_load_b32 v6, v0\n\tds_store_b32 v0, v11\n\ts_wait_dscnt 1\n\tv_or_b32 v7, v6, v0\n\ts_endpgm\n",
+   "counter_waits": [],
+   "counter_records": []
+  },
+  {
+   "name": "kmcnt_is_not_ordered_count",
+   "text": "authored:\n\ts_load_b32 s20, s[0:1], 0x8\n\ts_load_b32 s21, s[0:1], 0xc\n\ts_wait_kmcnt 1\n\ts_or_b32 s22, s20, 1\n\ts_wait_kmcnt 0\n\ts_add_co_u32 s23, s21, s22\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 5: s_or_b32 touches s20 while the load at line 2 may be in flight (kmcnt)"
+   ],
+   "counter_records": [
+    [
+     5,
+     "s_or_b32",
+     "s20",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "atomic_return_load_counter",
+   "text": "authored:\n\tglobal_atomic_add_u32 v13, v0, v2, s[8:9] th:TH_ATOMIC_RETURN\n\tglobal_atomic_add_u32 v0, v4, s[8:9]\n\tv_xor_b32 v14, v13, v2\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 4: v_xor_b32 touches v13 while the load at line 2 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     4,
+     "v_xor_b32",
+     "v13",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "join_with_new_pending_load",
+   "text": "authored:\n\tglobal_load_b32 v8, v0, s[8:9]\n\ts_wait_loadcnt 0\n\ts_cbranch_scc1 .Lmerge\n\tglobal_load_b32 v9, v0, s[8:9] offset:8\n\ts_wait_loadcnt 0\n.Lmerge:\n\tglobal_load_b32 v9, v0, s[8:9] offset:16\n\tv_sub_u32 v10, v9, v8\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 9: v_sub_u32 touches v9 while the load at line 8 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     9,
+     "v_sub_u32",
+     "v9",
+     8
+    ]
+   ]
+  },
+  {
+   "name": "pending_store_data",
+   "text": "authored:\n\tglobal_load_b64 v[16:17], v0, s[8:9]\n\tglobal_store_b64 v0, v[16:17], s[10:11]\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 3: global_store_b64 touches v16 while the load at line 2 may be in flight (loadcnt)",
+    "line 3: global_store_b64 touches v17 while the load at line 2 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     3,
+     "global_store_b64",
+     "v16",
+     2
+    ],
+    [
+     3,
+     "global_store_b64",
+     "v17",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "one_branch_has_wait",
+   "text": "authored:\n\tglobal_load_b32 v18, v0, s[8:9]\n\ts_cbranch_scc1 .Lafter\n\ts_wait_loadcnt 0x0\n.Lafter:\n\tv_or_b32 v19, v18, v0\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 6: v_or_b32 touches v18 while the load at line 2 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     6,
+     "v_or_b32",
+     "v18",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "backedge_pending_load",
+   "text": ".Lrepeat:\n\tv_xor_b32 v20, v21, v0\n\tglobal_load_b32 v21, v0, s[8:9] offset:24\n\ts_cbranch_scc1 .Lrepeat\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 2: v_xor_b32 touches v21 while the load at line 3 may be in flight (loadcnt)",
+    "line 3: global_load_b32 touches v21 while the load at line 3 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     2,
+     "v_xor_b32",
+     "v21",
+     3
+    ],
+    [
+     3,
+     "global_load_b32",
+     "v21",
+     3
+    ]
+   ]
+  },
+  {
+   "name": "dead_unwaited_read",
+   "text": "authored:\n\tglobal_load_b32 v22, v0, s[8:9]\n\ts_branch .Ldone\n\tv_add_nc_u32 v23, v22, 1\n.Ldone:\n\ts_endpgm\n",
+   "counter_waits": [],
+   "counter_records": []
+  },
+  {
+   "name": "wide_destination_member",
+   "text": "authored:\n\tglobal_load_b128 v[12:15], v0, s[8:9]\n\tv_or_b32 v16, v14, v0\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 3: v_or_b32 touches v14 while the load at line 2 may be in flight (loadcnt)"
+   ],
+   "counter_records": [
+    [
+     3,
+     "v_or_b32",
+     "v14",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "per_wave_control_classes",
+   "text": "authored:\n\tglobal_load_b32 v3, v0, s[8:9]\n\tglobal_load_b32 v4, v0, s[8:9] offset:4\n\ts_cbranch_execz .Lfinished                 // by_wave skip 0,2,4 of 6\n\ts_wait_loadcnt 0x0\n\tv_add_nc_u32 v5, v3, v4\n.Lfinished:\n\ts_endpgm\n",
+   "counter_waits": [],
+   "counter_records": []
+  },
+  {
+   "name": "scalar_load_overwrite",
+   "text": "authored:\n\ts_load_b64 s[10:11], s[0:1], 0x10\n\ts_load_b64 s[10:11], s[0:1], 0x18\n\ts_wait_kmcnt 0x0\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 3: s_load_b64 touches s10 while the load at line 2 may be in flight (kmcnt)",
+    "line 3: s_load_b64 touches s11 while the load at line 2 may be in flight (kmcnt)"
+   ],
+   "counter_records": [
+    [
+     3,
+     "s_load_b64",
+     "s10",
+     2
+    ],
+    [
+     3,
+     "s_load_b64",
+     "s11",
+     2
+    ]
+   ]
+  },
+  {
+   "name": "footer_text_ignored",
+   "text": "authored:\n\ts_endpgm\n\t.section\t.rodata\n\ts_load_b32 s9, s[0:1], 0x0\n\ts_xor_b32 s10, s9, s9\n",
+   "counter_waits": [],
+   "counter_records": []
+  },
+  {
+   "name": "comments_do_not_touch_registers",
+   "text": "authored:\n\tglobal_load_b32 v24, v0, s[8:9] // v24 and s99 are prose\n\ts_endpgm\n",
+   "counter_waits": [],
+   "counter_records": []
+  },
+  {
+   "name": "returned_message_pending",
+   "text": "authored:\n\ts_sendmsg_rtn_b64 s[14:15], 137\n\ts_xor_b32 s16, s15, 1\n\ts_wait_kmcnt 0x0\n\ts_add_co_u32 s17, s14, s16\n\ts_endpgm\n",
+   "counter_waits": [
+    "line 3: s_xor_b32 touches s15 while the load at line 2 may be in flight (kmcnt)"
+   ],
+   "counter_records": [
+    [
+     3,
+     "s_xor_b32",
+     "s15",
+     2
+    ]
+   ]
+  }
+ ]
+}

@@ -1,0 +1,413 @@
+{
+ "notation": "Each case is a DSL snippet (`src`) run on a fresh Builder for gfx1201, with `b` the Builder, `V`, `S` its files and every name of the language imported. `built` is the stream the Builder made, before any pass: one line per instruction, `<form name> <operands> {fields}; <attributes>`. A register operand is written as VReg repr (`<file>:<value name>[<index in group>]x<dwords>` and `+<lo>` when lo != 0); a named register by its name; an immediate as its value, with the writer's spelling in quotes when it has one (`16'0x10'`); a block as `@label`. Source modifiers are written `-x`, `|x|`. Fields are in stored order. Attributes in a fixed order: comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset: none or var, ordered), m0_set, waves_taken, fence. `values` lists the program's values in id order: `id file name n= align= [index=] [pin=] [same_as=]`. `records` holds the Program's lane regions and loops, the deferred records' kinds, each file's entered / pinned groups and lanes-covered names, and the wave index. `error` is the refusal (exception class and message) raised while the snippet ran. `render` (the whole pipeline's output) is the final.s; `render_error` a refusal of the pipeline's passes.",
+ "cases": [
+  {
+   "name": "widths_alignment_mix",
+   "src": "g = S.ptr(name=\"g\"); e = V.i32(name=\"e\"); lm = S.mask(name=\"lm\")\nquad = V.u32(n=4, name=\"quad\"); tri = V.f32(n=3, name=\"tri\")\nwide = S.u64(name=\"wide\"); two = V.f32x2(name=\"two\"); one = V.f32(name=\"one\")\noct = S.i32(n=8, name=\"oct\"); V.f32(n=2); hexa = S.u32(n=6, name=\"hexa\")\nshape = [(x.type.name, x.width, len(x)) for x in (g, e, lm, quad, tri, wide, two, one, oct, hexa)]",
+   "built": [],
+   "values": [
+    "0 s g#1 n=2 align=2",
+    "1 v e#1 n=1 align=1",
+    "2 s lm#1 n=1 align=1",
+    "3 v quad#1 n=4 align=4",
+    "4 v tri#1 n=3 align=2",
+    "5 s wide#1 n=2 align=2",
+    "6 v two#1 n=2 align=2",
+    "7 v one#1 n=1 align=1",
+    "8 s oct#1 n=8 align=4",
+    "9 v t#1 n=2 align=2",
+    "10 s hexa#1 n=6 align=4"
+   ],
+   "render": []
+  },
+  {
+   "name": "name_counters_by_file",
+   "src": "S.u32(name=\"idx\"); V.u32(name=\"idx\"); V.f32()\nV.u32(name=\"idx\"); S.u32(); S.u32(name=\"idx\"); V.u32(name=\"idx.hi\")",
+   "built": [],
+   "values": [
+    "0 s idx#1 n=1 align=1",
+    "1 v idx#2 n=1 align=1",
+    "2 v t#1 n=1 align=1",
+    "3 v idx#3 n=1 align=1",
+    "4 s t#2 n=1 align=1",
+    "5 s idx#4 n=1 align=1",
+    "6 v idx.hi#1 n=1 align=1"
+   ],
+   "render": []
+  },
+  {
+   "name": "initial_values_each_element",
+   "src": "ones = V.f32(1.0, n=4, name=\"ones\")\nlim = S.u32(40, name=\"lim\")\ninside = S.mask(lim <= V.u32(name=\"lane\", at=6), name=\"inside\")",
+   "built": [
+    "v_mov_b32 v:ones#1[0]x1, 1.0 ; comment=\"ones[0] = 1.0\"",
+    "v_mov_b32 v:ones#1[0]x1+1, 1.0 ; comment=\"ones[1] = 1.0\"",
+    "v_mov_b32 v:ones#1[0]x1+2, 1.0 ; comment=\"ones[2] = 1.0\"",
+    "v_mov_b32 v:ones#1[0]x1+3, 1.0 ; comment=\"ones[3] = 1.0\"",
+    "s_mov_b32 s:lim#1[0]x1, 40 ; comment=\"lim = 40\"",
+    "v_cmp_le_u32_e64 s:inside#1[0]x1, s:lim#1[0]x1, v:lane#1[0]x1 ; comment=\"inside = lim <= lane\""
+   ],
+   "values": [
+    "0 v ones#1 n=4 align=4",
+    "1 s lim#1 n=1 align=1",
+    "2 v lane#1 n=1 align=1 pin=6",
+    "3 s inside#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "lane#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 1.0                                            // ones[0] = 1.0",
+    "\tv_mov_b32 v1, 1.0                                            // ones[1] = 1.0",
+    "\tv_mov_b32 v2, 1.0                                            // ones[2] = 1.0",
+    "\tv_mov_b32 v3, 1.0                                            // ones[3] = 1.0",
+    "\ts_mov_b32 s0, 40                                             // lim = 40",
+    "\tv_cmp_le_u32_e64 s1, s0, v6                                  // inside = lim <= lane"
+   ]
+  },
+  {
+   "name": "negative_index_slice_halves",
+   "src": "buf = V.f32(n=6, name=\"buf\", at=8)\naddr = S.ptr(name=\"addr\", at=6)\ndst = V.f32(n=3, name=\"dst\")\ndst[2] = buf[-2]\ndst[0] = buf[2:5][2]\ndst[1] = buf[1:][0]\ntop = S.u32(addr.hi, name=\"top\")\nbot = S.u32(addr.lo, name=\"bot\")",
+   "built": [
+    "v_mov_b32 v:dst#1[0]x1+2, v:buf#1[0]x1+4 ; comment=\"dst[2] = buf[4]\"",
+    "v_mov_b32 v:dst#1[0]x1, v:buf#1[0]x1+4 ; comment=\"dst[0] = buf[2:5][2]\"",
+    "v_mov_b32 v:dst#1[0]x1+1, v:buf#1[0]x1+1 ; comment=\"dst[1] = buf[1:6][0]\"",
+    "s_mov_b32 s:top#1[0]x1, s:addr#1[0]x1+1 ; comment=\"top = addr.hi\"",
+    "s_mov_b32 s:bot#1[0]x1, s:addr#1[0]x1 ; comment=\"bot = addr.lo\""
+   ],
+   "values": [
+    "0 v buf#1 n=6 align=4 pin=8",
+    "1 s addr#1 n=2 align=2 pin=6",
+    "2 v dst#1 n=3 align=2",
+    "3 s top#1 n=1 align=1",
+    "4 s bot#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "buf#1"
+    ],
+    "s.pinned": [
+     "addr#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v2, v12                                            // dst[2] = buf[4]",
+    "\tv_mov_b32 v0, v12                                            // dst[0] = buf[2:5][2]",
+    "\tv_mov_b32 v1, v9                                             // dst[1] = buf[1:6][0]",
+    "\ts_mov_b32 s0, s7                                             // top = addr.hi",
+    "\ts_mov_b32 s1, s6                                             // bot = addr.lo"
+   ]
+  },
+  {
+   "name": "same_as_register_share",
+   "src": "base = V.u32(name=\"base\", at=5)\nalias = V.u32(name=\"alias\", same_as=base)\nalias[...] = base ^ 9",
+   "built": [
+    "v_xor_b32 v:alias#1[0]x1, 9, v:base#1[0]x1 ; comment=\"alias = base ^ 9\""
+   ],
+   "values": [
+    "0 v base#1 n=1 align=1 pin=5",
+    "1 v alias#1 n=1 align=1 same_as=0"
+   ],
+   "records": {
+    "v.pinned": [
+     "base#1"
+    ]
+   },
+   "render": [
+    "\tv_xor_b32 v5, 9, v5                                          // alias = base ^ 9"
+   ]
+  },
+  {
+   "name": "reinterpret_and_convert_chain",
+   "src": "bits = V.u32(name=\"bits\", at=1)\nh = V.f32(f32(bits) - 4.0, name=\"h\")\ncnt = V.i32(cvt_i32(h), name=\"cnt\")\nlogical = V.u32(u32(cnt) >> 3, name=\"logical\")\narith = V.i32(i32(logical) >> 2, name=\"arith\")\nraw = V.u32(u32(arith), name=\"raw\")",
+   "built": [
+    "v_subrev_f32 v:h#1[0]x1, 4.0, v:bits#1[0]x1 ; comment=\"h = f32(bits) - 4.0\"",
+    "v_cvt_i32_f32 v:cnt#1[0]x1, v:h#1[0]x1 ; comment=\"cnt = cvt_i32(h)\"",
+    "v_lshrrev_b32 v:logical#1[0]x1, 3, v:cnt#1[0]x1 ; comment=\"logical = u32(cnt) >> 3\"",
+    "v_ashrrev_i32 v:arith#1[0]x1, 2, v:logical#1[0]x1 ; comment=\"arith = i32(logical) >> 2\"",
+    "v_mov_b32 v:raw#1[0]x1, v:arith#1[0]x1 ; comment=\"raw = u32(arith)\""
+   ],
+   "values": [
+    "0 v bits#1 n=1 align=1 pin=1",
+    "1 v h#1 n=1 align=1",
+    "2 v cnt#1 n=1 align=1",
+    "3 v logical#1 n=1 align=1",
+    "4 v arith#1 n=1 align=1",
+    "5 v raw#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "bits#1"
+    ]
+   },
+   "render": [
+    "\tv_subrev_f32 v0, 4.0, v1                                     // h = f32(bits) - 4.0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_cvt_i32_f32 v1, v0                                         // cnt = cvt_i32(h)",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_lshrrev_b32 v0, 3, v1                                      // logical = u32(cnt) >> 3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_ashrrev_i32 v1, 2, v0                                      // arith = i32(logical) >> 2",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mov_b32 v0, v1                                             // raw = u32(arith)"
+   ]
+  },
+  {
+   "name": "reinterpret_tree_into_f32",
+   "src": "word = V.u32(name=\"word\", at=2)\ndstf = V.f32(name=\"dstf\")\ndstf[...] = f32(word ^ 0x80)",
+   "built": [
+    "v_xor_b32 v:dstf#1[0]x1, 128, v:word#1[0]x1 ; comment=\"dstf = f32(word ^ 128)\""
+   ],
+   "values": [
+    "0 v word#1 n=1 align=1 pin=2",
+    "1 v dstf#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "word#1"
+    ]
+   },
+   "render": [
+    "\tv_xor_b32 v0, 128, v2                                        // dstf = f32(word ^ 128)"
+   ]
+  },
+  {
+   "name": "pair_view_of_elements",
+   "src": "buf = V.f32(n=6, name=\"buf\", at=4)\npr = V.f32x2(f32x2(buf[4:6]), name=\"pr\")\nf32x2(buf[0:2])[...] = pr\nprod = V.f32(pr.hi * pr.lo, name=\"prod\")",
+   "built": [
+    "v_mov_b32 v:pr#1[0]x1, v:buf#1[0]x1+4 ; comment=\"pr = buf[4:6]\"",
+    "v_mov_b32 v:pr#1[0]x1+1, v:buf#1[0]x1+5",
+    "v_mov_b32 v:buf#1[0]x1, v:pr#1[0]x1 ; comment=\"buf[0:2] = pr\"",
+    "v_mov_b32 v:buf#1[0]x1+1, v:pr#1[0]x1+1",
+    "v_mul_f32 v:prod#1[0]x1, v:pr#1[0]x1+1, v:pr#1[0]x1 ; comment=\"prod = pr.hi * pr.lo\""
+   ],
+   "values": [
+    "0 v buf#1 n=6 align=4 pin=4",
+    "1 v pr#1 n=2 align=2",
+    "2 v prod#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "buf#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, v8                                             // pr = buf[4:6]",
+    "\tv_mov_b32 v1, v9",
+    "\ts_delay_alu 2                                                // hazard: instid0(VALU_DEP_2)",
+    "\tv_mov_b32 v4, v0                                             // buf[0:2] = pr",
+    "\ts_delay_alu 2                                                // hazard: instid0(VALU_DEP_2)",
+    "\tv_mov_b32 v5, v1",
+    "\ts_delay_alu 3                                                // hazard: instid0(VALU_DEP_3)",
+    "\tv_mul_f32 v2, v1, v0                                         // prod = pr.hi * pr.lo"
+   ]
+  },
+  {
+   "name": "lanes_covered_declared",
+   "src": "src0 = V.u32(name=\"src0\", at=7)\nacc = V.u32(name=\"acc\")\nV.lanes_covered(\"acc\")\nacc[...] = src0 - 2",
+   "built": [
+    "v_subrev_nc_u32 v:acc#1[0]x1, 2, v:src0#1[0]x1 ; comment=\"acc = src0 - 2\""
+   ],
+   "values": [
+    "0 v src0#1 n=1 align=1 pin=7",
+    "1 v acc#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "src0#1"
+    ],
+    "v.lanes_covered": [
+     "acc"
+    ]
+   },
+   "render": [
+    "\tv_subrev_nc_u32 v0, 2, v7                                    // acc = src0 - 2"
+   ]
+  },
+  {
+   "name": "index_at_count",
+   "src": "S.u32(n=2, name=\"pair2\")[2]",
+   "error": {
+    "class": "IndexError",
+    "message": "s:pair2#1[2]: 2 element(s)"
+   }
+  },
+  {
+   "name": "index_before_start",
+   "src": "V.u32(n=3, name=\"row\")[-4]",
+   "error": {
+    "class": "IndexError",
+    "message": "v:row#1[-4]: 3 element(s)"
+   }
+  },
+  {
+   "name": "slice_with_stride",
+   "src": "V.u32(n=6)[1:5:2]",
+   "error": {
+    "class": "IndexError",
+    "message": "v:t#1[1:5:2]: elements are contiguous, no step"
+   }
+  },
+  {
+   "name": "slice_of_nothing",
+   "src": "S.u32(n=4)[2:2]",
+   "error": {
+    "class": "IndexError",
+    "message": "s:t#1[2:2]: no element"
+   }
+  },
+  {
+   "name": "float_index",
+   "src": "V.f32(n=2)[1.0]",
+   "error": {
+    "class": "TypeError",
+    "message": "v:t#1[1.0]: an element index or a slice"
+   }
+  },
+  {
+   "name": "halves_of_scalar_u32",
+   "src": "S.u32(name=\"cnt\").lo",
+   "error": {
+    "class": "TypeError",
+    "message": "s:cnt#1: .lo / .hi are a u64's, a mask's or an f32x2's halves"
+   }
+  },
+  {
+   "name": "halves_of_f32",
+   "src": "V.f32().hi",
+   "error": {
+    "class": "TypeError",
+    "message": "v:t#1: .lo / .hi are a u64's, a mask's or an f32x2's halves"
+   }
+  },
+  {
+   "name": "halves_of_wave32_mask",
+   "src": "S.mask(name=\"lanes\").hi",
+   "error": {
+    "class": "TypeError",
+    "message": "s:lanes#1: .lo / .hi are a u64's, a mask's or an f32x2's halves"
+   }
+  },
+  {
+   "name": "vector_mask",
+   "src": "V.mask(name=\"lanes\")",
+   "error": {
+    "class": "ValueError",
+    "message": "a mask in the v file: a lane mask is SGPRs (S.mask())"
+   }
+  },
+  {
+   "name": "scalar_pair",
+   "src": "S.f32x2(name=\"duo\")",
+   "error": {
+    "class": "ValueError",
+    "message": "an f32x2 in the s file: a VGPR pair (V.f32x2())"
+   }
+  },
+  {
+   "name": "zero_elements",
+   "src": "S.f32(n=0)",
+   "error": {
+    "class": "ValueError",
+    "message": "s.f32(n=0): one element or more"
+   }
+  },
+  {
+   "name": "bool_element_count",
+   "src": "V.f32(n=True)",
+   "error": {
+    "class": "ValueError",
+    "message": "v.f32(n=True): one element or more"
+   }
+  },
+  {
+   "name": "name_with_dash",
+   "src": "S.u32(name=\"k-1\")",
+   "error": {
+    "class": "ValueError",
+    "message": "name 'k-1': letters, digits, _ and . only"
+   }
+  },
+  {
+   "name": "same_as_a_slice",
+   "src": "base = V.f32(n=3, name=\"base\")\nV.f32(name=\"alias\", same_as=base[1:3])",
+   "error": {
+    "class": "ValueError",
+    "message": "same_as=v:base#1[1:3]: a whole value of the v file"
+   }
+  },
+  {
+   "name": "same_as_vector_from_scalar",
+   "src": "vv = V.u32(name=\"vv\")\nS.u32(name=\"ss\", same_as=vv)",
+   "error": {
+    "class": "ValueError",
+    "message": "same_as=v:vv#1: a whole value of the s file"
+   }
+  },
+  {
+   "name": "pair_view_odd_start",
+   "src": "buf = V.f32(n=6, name=\"buf\", at=4)\nf32x2(buf[3:5])",
+   "error": {
+    "class": "ExprError",
+    "message": "f32x2(v:buf#1[3:5]): at an odd register (a pair is an even-aligned VGPR pair)"
+   }
+  },
+  {
+   "name": "pair_view_of_sgprs",
+   "src": "sc = S.f32(n=2, name=\"sc\")\nf32x2(sc)",
+   "error": {
+    "class": "ExprError",
+    "message": "f32x2(s:sc#1): two dword elements of a VGPR value (f32x2(acc[2:4]))"
+   }
+  },
+  {
+   "name": "pair_view_one_element",
+   "src": "buf = V.f32(n=6, name=\"buf\")\nf32x2(buf[2:3])",
+   "error": {
+    "class": "ExprError",
+    "message": "f32x2(v:buf#1[2:3]): two dword elements of a VGPR value (f32x2(acc[2:4]))"
+   }
+  },
+  {
+   "name": "reinterpret_u64_as_i32",
+   "src": "q = V.u64(name=\"q\")\ni32(q)",
+   "error": {
+    "class": "ExprError",
+    "message": "i32(q): a u64 is not an i32's width"
+   }
+  },
+  {
+   "name": "reinterpret_mask_as_f32",
+   "src": "lm = S.mask(name=\"lm\")\nf32(lm)",
+   "error": {
+    "class": "ExprError",
+    "message": "f32(lm): a mask32 is not an f32's width"
+   }
+  },
+  {
+   "name": "reinterpret_pair_as_u32",
+   "src": "duo = V.f32x2(name=\"duo\")\nu32(duo)",
+   "error": {
+    "class": "ExprError",
+    "message": "u32(duo): an f32x2's halves are .lo and .hi"
+   }
+  },
+  {
+   "name": "operands_of_two_builders",
+   "src": "other = Builder()\nV.f32(name=\"mine\", at=2) - other.v.f32(name=\"theirs\", at=2)",
+   "error": {
+    "class": "ExprError",
+    "message": "values of two Builders' files in one expression"
+   }
+  },
+  {
+   "name": "scalar_number_before_placement",
+   "src": "k = S.u32(name=\"k\")\nS.phys(as_reg(k))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "s:k#1[0]x1: a register's number read before the placement makes it final (derive, compile_kernel)"
+   }
+  }
+ ]
+}

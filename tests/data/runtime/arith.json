@@ -1,0 +1,188 @@
+{
+ "notation": "The launch arithmetic. A case holds `value` or `error` (the LaunchError's whole message). `magic` gives (mul, shift) for divisors d; `magic_refused` the refusals; `cdiv` a/b rounded up (toward +inf) with its refusal.",
+ "magic": [
+  {
+   "d": 1,
+   "mul": 0,
+   "shift": 0
+  },
+  {
+   "d": 2,
+   "mul": 0,
+   "shift": 1
+  },
+  {
+   "d": 3,
+   "mul": 1431655766,
+   "shift": 2
+  },
+  {
+   "d": 5,
+   "mul": 2576980378,
+   "shift": 3
+  },
+  {
+   "d": 7,
+   "mul": 613566757,
+   "shift": 3
+  },
+  {
+   "d": 10,
+   "mul": 2576980378,
+   "shift": 4
+  },
+  {
+   "d": 12,
+   "mul": 1431655766,
+   "shift": 4
+  },
+  {
+   "d": 100,
+   "mul": 1202590843,
+   "shift": 7
+  },
+  {
+   "d": 255,
+   "mul": 16843010,
+   "shift": 8
+  },
+  {
+   "d": 256,
+   "mul": 0,
+   "shift": 8
+  },
+  {
+   "d": 257,
+   "mul": 4261543426,
+   "shift": 9
+  },
+  {
+   "d": 641,
+   "mul": 2566259711,
+   "shift": 10
+  },
+  {
+   "d": 1000,
+   "mul": 103079216,
+   "shift": 10
+  },
+  {
+   "d": 4096,
+   "mul": 0,
+   "shift": 12
+  },
+  {
+   "d": 65535,
+   "mul": 65538,
+   "shift": 16
+  },
+  {
+   "d": 65536,
+   "mul": 0,
+   "shift": 16
+  },
+  {
+   "d": 65537,
+   "mul": 4294836226,
+   "shift": 17
+  },
+  {
+   "d": 1048577,
+   "mul": 4294959105,
+   "shift": 21
+  },
+  {
+   "d": 1000000007,
+   "mul": 316718691,
+   "shift": 30
+  },
+  {
+   "d": 2147483647,
+   "mul": 3,
+   "shift": 31
+  },
+  {
+   "d": 2147483648,
+   "mul": 0,
+   "shift": 31
+  }
+ ],
+ "magic_refused": [
+  {
+   "d": 0,
+   "error": "magic(0): a divisor in 1 .. 2^31"
+  },
+  {
+   "d": -1,
+   "error": "magic(-1): a divisor in 1 .. 2^31"
+  },
+  {
+   "d": 2147483649,
+   "error": "magic(2147483649): a divisor in 1 .. 2^31"
+  },
+  {
+   "d": {
+    "float": 2.0
+   },
+   "error": "magic(2.0): a divisor in 1 .. 2^31"
+  },
+  {
+   "d": {
+    "bool": true
+   },
+   "error": "magic(True): a divisor in 1 .. 2^31"
+  }
+ ],
+ "cdiv": [
+  {
+   "a": 0,
+   "b": 4,
+   "value": 0
+  },
+  {
+   "a": 1,
+   "b": 4,
+   "value": 1
+  },
+  {
+   "a": 4,
+   "b": 4,
+   "value": 1
+  },
+  {
+   "a": 5,
+   "b": 4,
+   "value": 2
+  },
+  {
+   "a": 8,
+   "b": 4,
+   "value": 2
+  },
+  {
+   "a": -1,
+   "b": 4,
+   "value": 0
+  },
+  {
+   "a": -5,
+   "b": 4,
+   "value": -1
+  },
+  {
+   "a": 7,
+   "b": -2,
+   "value": -3
+  },
+  {
+   "a": 1000,
+   "b": 256,
+   "value": 4
+  },
+  {
+   "a": 1,
+   "b": 0,
+   "error": "division by 0"
+  }
+ ]
+}

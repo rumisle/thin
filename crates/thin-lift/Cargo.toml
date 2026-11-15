@@ -1,0 +1,25 @@
+[package]
+name = "thin-lift"
+description = "thin's lift: gfx1201 code objects from other compilers or libraries back into thin's terms (interface, schedule, physical program)"
+keywords = ["gpu", "amdgpu", "disassembler"]
+categories = ["compilers", "development-tools"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-targets.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+thin-codegen.workspace = true
+thin-emu.workspace = true
+serde_json.workspace = true

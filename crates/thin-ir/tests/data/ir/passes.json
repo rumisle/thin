@@ -1,0 +1,54 @@
+{
+ "notation": "An executable Pass pipeline. calls records transforms as [name, null] and checks as [name, snapshot index]. programs_made counts distinct snapshots observed by checks; returned is 'a program' or null; pass_times_keys are measured timing keys.",
+ "pipeline": [
+  "stage (transform)",
+  "entry (check)",
+  "entry_again (check)",
+  "suppressed (check, when false)",
+  "fold (transform)",
+  "before_spill (check)",
+  "after_spill (check)",
+  "stage (transform)"
+ ],
+ "calls": [
+  [
+   "stage",
+   null
+  ],
+  [
+   "entry",
+   0
+  ],
+  [
+   "entry_again",
+   0
+  ],
+  [
+   "fold",
+   null
+  ],
+  [
+   "before_spill",
+   1
+  ],
+  [
+   "after_spill",
+   1
+  ],
+  [
+   "stage",
+   null
+  ]
+ ],
+ "programs_made": 2,
+ "returned": null,
+ "pass_times_keys": [
+  "after_spill",
+  "before_spill",
+  "entry",
+  "entry_again",
+  "fold",
+  "stage",
+  "verify"
+ ]
+}

@@ -1,0 +1,389 @@
+//! The memory families and buffer-offset staging.
+
+use thin_ir::{Datum, Instr, Reg, Tag};
+
+use super::{op, Arg, Ctx, FArg, Made, Notes, Stage};
+use crate::error::{value, Result};
+use crate::expr::node::Tree;
+use crate::lds::{Address, Split, SplitKind};
+
+/// The staging placeholder's value number.
+pub const LIT: i32 = -1;
+
+/// The staging placeholder register.
+pub fn lit() -> Reg {
+    Reg::new(LIT, 's', 0, 1)
+}
+
+/// A family's operand: a register, an int, a formula, an LDS address,
+/// none, or a string.
+#[derive(Clone, Debug)]
+pub enum Val {
+    /// None.
+    None,
+    /// A register.
+    Reg(Reg),
+    /// An int.
+    Int(i128),
+    /// A formula.
+    Tree(Tree),
+    /// An LDS address.
+    Addr(Address),
+    /// A string (`"off"`).
+    Str(String),
+}
+
+impl Val {
+    fn arg(&self) -> Arg {
+        match self {
+            Val::None => Arg::None,
+            Val::Reg(r) => Arg::Reg(*r, 0),
+            Val::Int(v) => Arg::Int(*v),
+            Val::Str(s) => Arg::Str(s.clone()),
+            Val::Addr(a) => Arg::Addr(a.clone()),
+            Val::Tree(_) => Arg::None,
+        }
+    }
+}
+
+/// What a family made.
+#[derive(Clone, Debug)]
+pub enum Family {
+    /// An instruction, or an LDS access.
+    Made(Made),
+    /// A split object.
+    Split(Box<Split>),
+}
+
+/// A memory op's cache fields: its temporal hint (`th`) and scope, each
+/// one of the target's choices, or empty for the default.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Cache {
+    /// The temporal hint, `TH_*`.
+    pub th: String,
+    /// The scope, `SCOPE_*`.
+    pub scope: String,
+}
+
+impl Cache {
+    /// The fields it sets.
+    pub fn fields(&self) -> Vec<(String, FArg)> {
+        [("th", &self.th), ("scope", &self.scope)]
+            .into_iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, v)| (k.to_owned(), FArg::Str(v.clone())))
+            .collect()
+    }
+}
+
+/// A family's options.
+#[derive(Clone, Debug, Default)]
+pub struct Opts {
+    /// The immediate offset.
+    pub offset: Val,
+    /// The cache fields.
+    pub cache: Cache,
+    /// The comment.
+    pub comment: String,
+    /// The tag.
+    pub tag: Option<Tag>,
+    /// `bytes=`: 1, 2, none, or another value by its repr.
+    pub bytes: Option<std::result::Result<i128, String>>,
+    /// `signed=`.
+    pub signed: bool,
+    /// The ordered reason (LDS).
+    pub ordered: String,
+}
+
+impl Default for Val {
+    fn default() -> Val {
+        Val::Int(0)
+    }
+}
+
+fn reg_of(v: &Val) -> Option<Reg> {
+    if let Val::Reg(r) = v {
+        Some(*r)
+    } else {
+        None
+    }
+}
+
+/// The width word of a family's data.
+fn width(c: &Ctx<'_>, fam: &str, data: &Reg, o: &Opts, load: bool) -> Result<String> {
+    let repr = crate::values::reg_repr(c.values, data);
+    match &o.bytes {
+        Some(Ok(b @ (1 | 2))) => {
+            if data.n != 1 {
+                return value(format!(
+                    "{fam}: bytes={b}: one dword's low bytes, not {repr} ({} dwords)",
+                    data.n
+                ));
+            }
+            let bits = b * 8;
+            Ok(match (load, o.signed) {
+                (true, true) => format!("i{bits}"),
+                (true, false) => format!("u{bits}"),
+                (false, _) => format!("b{bits}"),
+            })
+        }
+        Some(Ok(b)) => value(format!(
+            "{fam}: bytes={b}: 1 or 2 (a whole dword or more: no bytes=)"
+        )),
+        Some(Err(r)) => value(format!(
+            "{fam}: bytes={r}: 1 or 2 (a whole dword or more: no bytes=)"
+        )),
+        None if o.signed => value(format!(
+            "{fam}: signed= is a 1- or 2-byte load's (bytes=1 or 2)"
+        )),
+        None => match data.n {
+            1 => Ok("b32".into()),
+            2 => Ok("b64".into()),
+            3 => Ok("b96".into()),
+            4 => Ok("b128".into()),
+            n => value(format!(
+                "{fam}: {repr} is {n} dword(s); the forms take 1, 2, 3, 4"
+            )),
+        },
+    }
+}
+
+fn notes(o: &Opts) -> Notes {
+    Notes {
+        comment: o.comment.clone(),
+        tag: o.tag.clone(),
+        ..Notes::default()
+    }
+}
+
+fn offset_field(o: &Opts) -> Vec<(String, FArg)> {
+    match &o.offset {
+        Val::Int(0) | Val::None => Vec::new(),
+        Val::Int(v) => vec![("offset".to_owned(), FArg::Int(*v))],
+        _ => Vec::new(),
+    }
+}
+
+/// `s_load(dst, base, offset)` and `s_store(data, base, offset)`.
+pub fn scalar(c: &Ctx<'_>, store: bool, data: &Reg, base: Val, o: Opts) -> Result<Family> {
+    let fam = if store { "s_store" } else { "s_load" };
+    let widths: &[(u32, &str)] = match store {
+        false => &[
+            (1, "b32"),
+            (2, "b64"),
+            (4, "b128"),
+            (8, "b256"),
+            (16, "b512"),
+        ],
+        true => &[(1, "b32"), (2, "b64"), (4, "b128")],
+    };
+    let Some((_, w)) = widths.iter().find(|(n, _)| *n == data.n) else {
+        let takes: Vec<String> = widths.iter().map(|(n, _)| n.to_string()).collect();
+        let repr = crate::values::reg_repr(c.values, data);
+        return value(format!(
+            "{fam}: {repr} is {} dword(s); the forms take {}",
+            data.n,
+            takes.join(", ")
+        ));
+    };
+    let name = format!("s.{}.{w}", if store { "store" } else { "load" });
+    if matches!(base, Val::Tree(_)) || matches!(o.offset, Val::Tree(_)) {
+        return Ok(Family::Split(Box::new(Split::new(
+            SplitKind::Scalar,
+            name,
+            *data,
+            base,
+            o.offset.clone(),
+            o,
+        ))));
+    }
+    let off = match &o.offset {
+        Val::Int(v) => Arg::Str(format!("0x{v:x}")),
+        v => v.arg(),
+    };
+    let fields = o.cache.fields();
+    op(
+        c,
+        &name,
+        vec![Arg::Reg(*data, 0), base.arg(), off],
+        fields,
+        notes(&o),
+    )
+    .map(Family::Made)
+}
+
+/// `global_load(dst, addr, base)` and `global_store(addr, data, base)`.
+pub fn global(
+    c: &Ctx<'_>,
+    store: bool,
+    data: &Reg,
+    addr: Val,
+    base: Val,
+    o: Opts,
+) -> Result<Family> {
+    let fam = if store { "global_store" } else { "global_load" };
+    let w = width(c, fam, data, &o, !store)?;
+    let name = format!("global.{}.{w}", if store { "store" } else { "load" });
+    // A bare scalar pointer is the base with a zero offset, split as a sum.
+    let pointer = matches!(&addr, Val::Reg(r) if r.file == 's' && r.n == 2);
+    let split = matches!(addr, Val::Tree(_))
+        || pointer && matches!(base, Val::None)
+        || !matches!(base, Val::None) && matches!(addr, Val::Int(_));
+    if split {
+        let s = Split::new(
+            SplitKind::Global {
+                store,
+                base: reg_of(&base),
+            },
+            name,
+            *data,
+            addr,
+            o.offset.clone(),
+            o,
+        );
+        return Ok(Family::Split(Box::new(s)));
+    }
+    let base = match base {
+        Val::None => Arg::Str("off".into()),
+        b => b.arg(),
+    };
+    let args = match store {
+        true => vec![addr.arg(), Arg::Reg(*data, 0), base],
+        false => vec![Arg::Reg(*data, 0), addr.arg(), base],
+    };
+    let mut fields = offset_field(&o);
+    fields.extend(o.cache.fields());
+    op(c, &name, args, fields, notes(&o)).map(Family::Made)
+}
+
+/// `buffer_load(dst, voffset, desc, soffset)` and `buffer_store(…)`.
+pub fn buffer(
+    c: &Ctx<'_>,
+    store: bool,
+    data: &Reg,
+    voffset: Val,
+    desc: Val,
+    soffset: Val,
+    o: Opts,
+) -> Result<Family> {
+    let fam = if store { "buffer_store" } else { "buffer_load" };
+    let w = width(c, fam, data, &o, !store)?;
+    let name = format!("buffer.{}.{w}", if store { "store" } else { "load" });
+    if matches!(voffset, Val::Tree(_) | Val::Int(_)) {
+        let kind = SplitKind::Buffer {
+            store,
+            desc: reg_of(&desc).expect("a resource"),
+            soffset: soffset.clone(),
+        };
+        return Ok(Family::Split(Box::new(Split::new(
+            kind,
+            name,
+            *data,
+            voffset,
+            o.offset.clone(),
+            o,
+        ))));
+    }
+    buffer_op(c, &name, store, data, voffset, desc, soffset, o).map(Family::Made)
+}
+
+/// A memory family by name: `s_load`, `s_store`, `global_load`,
+/// `global_store`, `buffer_load`, `buffer_store`, `ds_read`, `ds_write`;
+/// `xs` its operands after the data in the table's order (a scalar's and
+/// an LDS access's offset last).
+pub fn family(c: &Ctx<'_>, name: &str, data: &Reg, xs: Vec<Val>, o: Opts) -> Result<Family> {
+    let store = name.ends_with("store") || name == "ds_write";
+    let at = |k: usize| xs.get(k).cloned().unwrap_or(Val::None);
+    match name {
+        "s_load" | "s_store" => scalar(c, store, data, at(0), Opts { offset: at(1), ..o }),
+        "global_load" | "global_store" => global(c, store, data, at(0), at(1), o),
+        "buffer_load" | "buffer_store" => buffer(c, store, data, at(0), at(1), at(2), o),
+        _ => ds(c, store, data, at(0), Opts { offset: at(1), ..o }),
+    }
+}
+
+/// The buffer instruction with its offset staging.
+#[allow(clippy::too_many_arguments)]
+pub fn buffer_op(
+    c: &Ctx<'_>,
+    name: &str,
+    store: bool,
+    data: &Reg,
+    voffset: Val,
+    desc: Val,
+    soffset: Val,
+    o: Opts,
+) -> Result<Made> {
+    let offen = !matches!(voffset, Val::None);
+    let off = match &o.offset {
+        Val::Int(v) => *v,
+        _ => 0,
+    };
+    let mut n = notes(&o);
+    let mut soff = soffset.arg();
+    let mut fields: Vec<(String, FArg)> = Vec::new();
+    if offen {
+        fields.push(("offen".into(), FArg::Bool(true)));
+    }
+    // An offset past the field's range moves into soffset: added to a
+    // register soffset, or folded with a constant one.
+    let range = c.t.offset_range(thin_target::Mem::Buffer).unwrap_or(0..=0);
+    if range.contains(&off) {
+        if off != 0 {
+            fields.push(("offset".into(), FArg::Int(off)));
+        }
+    } else {
+        n.stage = Some(match &soffset {
+            Val::Reg(r) => Stage::Add(*r, off),
+            Val::Int(s) => Stage::Mov(off + s),
+            _ => {
+                return value(format!(
+                    "{name}: offset {off} past {}: soffset must be a register or a constant",
+                    range.end()
+                ))
+            }
+        });
+        soff = Arg::Reg(lit(), 0);
+    }
+    fields.extend(o.cache.fields());
+    let vo = match voffset {
+        Val::None => Arg::Str("off".into()),
+        v => v.arg(),
+    };
+    let args = match store {
+        true => vec![Arg::Reg(*data, 0), vo, desc.arg(), soff],
+        false => vec![Arg::Reg(*data, 0), vo, desc.arg(), soff],
+    };
+    op(c, name, args, fields, n)
+}
+
+/// `ds_read(dst, addr, offset)` and `ds_write(addr, data, offset)`.
+pub fn ds(c: &Ctx<'_>, store: bool, data: &Reg, addr: Val, o: Opts) -> Result<Family> {
+    let fam = if store { "ds_write" } else { "ds_read" };
+    let w = width(c, fam, data, &o, !store)?;
+    let name = format!("ds.{}.{w}", if store { "store" } else { "load" });
+    let args = match store {
+        true => vec![addr.arg(), Arg::Reg(*data, 0)],
+        false => vec![Arg::Reg(*data, 0), addr.arg()],
+    };
+    let mut fields = offset_field(&o);
+    if matches!(addr, Val::Addr(_)) && !o.ordered.is_empty() {
+        fields.push(("ordered".into(), FArg::Str(o.ordered.clone())));
+    }
+    op(c, &name, args, fields, notes(&o)).map(Family::Made)
+}
+
+/// The native stage an instruction carries.
+pub fn staged_of(i: &Instr) -> Option<Stage> {
+    let o = i.attrs().staged.as_ref()?;
+    match o.datum()? {
+        Datum::Tuple(t) => match t.as_slice() {
+            [Datum::Str(k), Datum::Reg(r), Datum::Int(off)] if &**k == "add" => {
+                Some(Stage::Add(*r, *off))
+            }
+            [Datum::Str(k), Datum::Int(off)] if &**k == "mov" => Some(Stage::Mov(*off)),
+            _ => None,
+        },
+        _ => None,
+    }
+}

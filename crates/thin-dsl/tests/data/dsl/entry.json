@@ -1,0 +1,1467 @@
+{
+ "notation": "Generated DSL programs for gfx1201. Each case's `src` runs on a fresh Builder `b`, with `V` and `S` its vector and scalar files and the whole language in scope. `built` lists the Builder's own stream before any pass, one instruction per line as `<form> <operands> {fields} ; <attributes>`: a register is its VReg repr (`<file>:<value>[<group index>]x<dwords>`, `+<lo>` for a nonzero lo), a physical register its name, an immediate its value with any written spelling quoted after it (`32'0x20'`), a block `@label`, a negated or absolute source `-x` or `|x|`; fields in stored order; attributes in the fixed order comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset none|var, ordered), m0_set, waves_taken, fence. `values` gives each value in id order as `id file name n= align=` then any `index=`, `pin=`, `same_as=`. `records` holds the lane regions, loops, deferred kinds, each file's entered/pinned/lanes-covered groups, needs, the LDS table and the wave index, when present. `error` is the class and message of a refusal while the program runs; otherwise `render` is the pipeline's final assembly lines, or `render_error` its refusal (class and the first line of its text, the program's file written kernel.py).",
+ "args_notation": "`args` cases evaluate one declaration expression with the language in scope: an argument block's `size`, `own()` (arguments without a library) and each argument's record without the fields left at their defaults, or the expression's refusal.",
+ "cases": [
+  {
+   "name": "entry_empty_block",
+   "src": "kern = b.entry(Args())",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": []
+  },
+  {
+   "name": "entry_tid_copy_one_dim",
+   "src": "kern = b.entry(wgsize=128)\nassert kern.wgid_y is None and kern.wg == 1\nlid = V.u32(kern.tid, name=\"lid\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "v_mov_b32 v:lid#1[0]x1, v:tid[0]x1 ; comment=\"lid = tid\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 v lid#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v1, v0                                             // lid = tid"
+   ]
+  },
+  {
+   "name": "entry_two_dims_tile_index",
+   "src": "kern = b.entry(wg=2)\ntile = S.u32(kern.wgid_y * 16 + kern.wgid, name=\"tile\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_mov_b32 s:wgid_y#1[0]x1, ttmp7 ; comment=\"wgid_y#1: ttmp7\"",
+    "s_lshl4_add_u32 s:tile#1[0]x1, s:wgid_y#1[0]x1, s:wgid#1[0]x1 ; comment=\"tile = (wgid_y * 16) + wgid\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 s wgid_y#1 n=1 align=1",
+    "3 v tid n=1 align=1 pin=0",
+    "4 s tile#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, ttmp9                                          // wgid#1: ttmp9",
+    "\ts_mov_b32 s1, ttmp7                                          // wgid_y#1: ttmp7",
+    "\ts_lshl4_add_u32 s2, s1, s0                                   // tile = (wgid_y * 16) + wgid"
+   ]
+  },
+  {
+   "name": "entry_one_dim_row_scale",
+   "src": "kern = b.entry(Args(), wg=1)\nrow = S.u32(kern.wgid * 5, name=\"row\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_mul_i32 s:row#1[0]x1, s:wgid#1[0]x1, 5 ; comment=\"row = wgid * 5\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s row#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s0, ttmp9                                          // wgid#1: ttmp9",
+    "\ts_mul_i32 s1, s0, 5                                          // row = wgid * 5"
+   ]
+  },
+  {
+   "name": "merge_words_then_pointer",
+   "src": "kern = b.entry(Args(**{f\"w{i}\": u32 for i in range(12)}, base=ptr))\nws = kern.load()\nacc = S.u32(ws[11], name=\"acc\")\nfor w in ws[:11]:\n    acc ^= w",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b256 s:args#1[0]x8, s:karg[0]x2, 0'0x0' ; comment=\"w0, w1, w2, w3, w4, w5, w6, w7\"",
+    "s_load_b128 s:args#2[0]x4, s:karg[0]x2, 32'0x20' ; comment=\"w8, w9, w10, w11\"",
+    "s_load_b64 s:base#1[0]x2, s:karg[0]x2, 48'0x30' ; comment=\"base\"",
+    "ir.wait_regs s:args#2[0]x1+3 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#2[0]x1+3 {counter=km, said=kernel arguments, regions=()}",
+    "s_mov_b32 s:acc#1[0]x1, s:args#2[0]x1+3 ; comment=\"acc = w11\"",
+    "ir.wait_regs s:args#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1 ; comment=\"acc = acc ^ w0\"",
+    "ir.wait_regs s:args#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+1 ; comment=\"acc = acc ^ w1\"",
+    "ir.wait_regs s:args#1[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+2 ; comment=\"acc = acc ^ w2\"",
+    "ir.wait_regs s:args#1[0]x1+3 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+3 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+3 ; comment=\"acc = acc ^ w3\"",
+    "ir.wait_regs s:args#1[0]x1+4 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+4 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+4 ; comment=\"acc = acc ^ w4\"",
+    "ir.wait_regs s:args#1[0]x1+5 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+5 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+5 ; comment=\"acc = acc ^ w5\"",
+    "ir.wait_regs s:args#1[0]x1+6 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+6 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+6 ; comment=\"acc = acc ^ w6\"",
+    "ir.wait_regs s:args#1[0]x1+7 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+7 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#1[0]x1+7 ; comment=\"acc = acc ^ w7\"",
+    "ir.wait_regs s:args#2[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#2[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#2[0]x1 ; comment=\"acc = acc ^ w8\"",
+    "ir.wait_regs s:args#2[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#2[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#2[0]x1+1 ; comment=\"acc = acc ^ w9\"",
+    "ir.wait_regs s:args#2[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#2[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:acc#1[0]x1, s:acc#1[0]x1, s:args#2[0]x1+2 ; comment=\"acc = acc ^ w10\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s args#1 n=8 align=4",
+    "4 s args#2 n=4 align=4",
+    "5 s base#1 n=2 align=2",
+    "6 s acc#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b256 s[4:11], s[0:1], 0x0                             // w0, w1, w2, w3, w4, w5, w6, w7",
+    "\ts_load_b128 s[12:15], s[0:1], 0x20                           // w8, w9, w10, w11",
+    "\ts_load_b64 s[2:3], s[0:1], 0x30                              // base",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_mov_b32 s0, s15                                            // acc = w11",
+    "\ts_xor_b32 s0, s0, s4                                         // acc = acc ^ w0",
+    "\ts_xor_b32 s0, s0, s5                                         // acc = acc ^ w1",
+    "\ts_xor_b32 s0, s0, s6                                         // acc = acc ^ w2",
+    "\ts_xor_b32 s0, s0, s7                                         // acc = acc ^ w3",
+    "\ts_xor_b32 s0, s0, s8                                         // acc = acc ^ w4",
+    "\ts_xor_b32 s0, s0, s9                                         // acc = acc ^ w5",
+    "\ts_xor_b32 s0, s0, s10                                        // acc = acc ^ w6",
+    "\ts_xor_b32 s0, s0, s11                                        // acc = acc ^ w7",
+    "\ts_xor_b32 s0, s0, s12                                        // acc = acc ^ w8",
+    "\ts_xor_b32 s0, s0, s13                                        // acc = acc ^ w9",
+    "\ts_xor_b32 s0, s0, s14                                        // acc = acc ^ w10"
+   ]
+  },
+  {
+   "name": "merge_pointer_then_signed_words",
+   "src": "kern = b.entry(Args(base=ptr, **{f\"k{i}\": i32 for i in range(9)}, scale=f32))\ngot = kern.load()\nmix = S.i32(got[1] - got[9], name=\"mix\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b256 s:args#1[0]x8, s:karg[0]x2, 0'0x0' ; comment=\"base, k0, k1, k2, k3, k4, k5\"",
+    "s_load_b128 s:args#2[0]x4, s:karg[0]x2, 32'0x20' ; comment=\"k6, k7, k8, scale\"",
+    "ir.wait_regs s:args#1[0]x1+2, s:args#2[0]x1+2 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:args#1[0]x1+2, s:args#2[0]x1+2 {counter=km, said=kernel arguments, regions=()}",
+    "s_sub_co_u32 s:mix#1[0]x1, s:args#1[0]x1+2, s:args#2[0]x1+2 ; comment=\"mix = k0 - k8\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s args#1 n=8 align=4",
+    "4 s args#2 n=4 align=4",
+    "5 s mix#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b256 s[4:11], s[0:1], 0x0                             // base, k0, k1, k2, k3, k4, k5",
+    "\ts_load_b128 s[12:15], s[0:1], 0x20                           // k6, k7, k8, scale",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_sub_co_u32 s0, s6, s14                                     // mix = k0 - k8"
+   ]
+  },
+  {
+   "name": "load_subset_then_reversed_pair",
+   "src": "kern = b.entry(Args(cols=u32, src=ptr, ld=u32, rows=u32))\n(ld,) = kern.load(\"ld\")\nspan = S.u32(ld * 3, name=\"span\")\n(rows, src) = kern.load(\"rows\", \"src\")\nspan -= rows",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b32 s:ld#1[0]x1, s:karg[0]x2, 16'0x10' ; comment=\"ld\"",
+    "ir.wait_regs s:ld#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:ld#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_mul_i32 s:span#1[0]x1, s:ld#1[0]x1, 3 ; comment=\"span = ld * 3\"",
+    "s_load_b64 s:src#1[0]x2, s:karg[0]x2, 8'0x8' ; comment=\"src\"",
+    "s_load_b32 s:rows#1[0]x1, s:karg[0]x2, 20'0x14' ; comment=\"rows\"",
+    "ir.wait_regs s:rows#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:rows#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_sub_co_u32 s:span#1[0]x1, s:span#1[0]x1, s:rows#1[0]x1 ; comment=\"span = span - rows\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s ld#1 n=1 align=1",
+    "4 s span#1 n=1 align=1",
+    "5 s src#1 n=2 align=2",
+    "6 s rows#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x10                                  // ld",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_mul_i32 s3, s2, 3                                          // span = ld * 3",
+    "\ts_load_b64 s[4:5], s[0:1], 0x8                               // src",
+    "\ts_load_b32 s2, s[0:1], 0x14                                  // rows",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_sub_co_u32 s3, s3, s2                                      // span = span - rows"
+   ]
+  },
+  {
+   "name": "reload_after_guarded_load",
+   "src": "kern = b.entry(Args(lim=u32, alt=u32, gain=u32))\n(lim,) = kern.load(\"lim\")\npick = S.u32(lim, name=\"pick\")\nwith b.when(lim != 7):\n    (alt,) = kern.load(\"alt\")\n    pick ^= alt\n(alt,) = kern.load(\"alt\")\npick[...] = pick | alt",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b32 s:lim#1[0]x1, s:karg[0]x2, 0'0x0' ; comment=\"lim\"",
+    "ir.wait_regs s:lim#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:lim#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_mov_b32 s:pick#1[0]x1, s:lim#1[0]x1 ; comment=\"pick = lim\"",
+    "ir.wait_regs s:lim#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:lim#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_cmp_lg_u32 s:lim#1[0]x1, 7 ; comment=\"lim != 7\"",
+    "s_cbranch_scc0 @.Lif_1",
+    "s_load_b32 s:alt#1[0]x1, s:karg[0]x2, 4'0x4' ; comment=\"alt\"",
+    "ir.wait_regs s:alt#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:alt#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_xor_b32 s:pick#1[0]x1, s:pick#1[0]x1, s:alt#1[0]x1 ; comment=\"pick = pick ^ alt\"",
+    "ir.label {name=.Lif_1}",
+    "s_load_b32 s:alt#2[0]x1, s:karg[0]x2, 4'0x4' ; comment=\"alt\"",
+    "ir.wait_regs s:alt#2[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:alt#2[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_or_b32 s:pick#1[0]x1, s:pick#1[0]x1, s:alt#2[0]x1 ; comment=\"pick = pick | alt\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s lim#1 n=1 align=1",
+    "4 s pick#1 n=1 align=1",
+    "5 s alt#1 n=1 align=1",
+    "6 s alt#2 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x0                                   // lim",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_mov_b32 s3, s2                                             // pick = lim",
+    "\ts_cmp_lg_u32 s2, 7                                           // lim != 7",
+    "\ts_cbranch_scc0 .Lif_1",
+    "\ts_load_b32 s2, s[0:1], 0x4                                   // alt",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_xor_b32 s3, s3, s2                                         // pick = pick ^ alt",
+    ".Lif_1:",
+    "\ts_load_b32 s2, s[0:1], 0x4                                   // alt",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_or_b32 s3, s3, s2                                          // pick = pick | alt"
+   ]
+  },
+  {
+   "name": "library_argument_leads_block",
+   "src": "kern = b.entry(Args(tally=lib_arg(gens, \"tally\"), out=ptr, cnt=u32))\nout, cnt = kern.load()\n(tl,) = kern.load(\"tally\")\nmore = S.u32(cnt << 2, name=\"more\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b128 s:args#1[0]x4, s:karg[0]x2, 0'0x0' ; comment=\"tally, out\"",
+    "s_load_b32 s:cnt#1[0]x1, s:karg[0]x2, 16'0x10' ; comment=\"cnt\"",
+    "ir.wait_regs s:cnt#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:cnt#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_lshl_b32 s:more#1[0]x1, s:cnt#1[0]x1, 2 ; comment=\"more = cnt << 2\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s args#1 n=4 align=4",
+    "4 s cnt#1 n=1 align=1",
+    "5 s more#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b128 s[4:7], s[0:1], 0x0                              // tally, out",
+    "\ts_load_b32 s2, s[0:1], 0x10                                  // cnt",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_lshl_b32 s0, s2, 2                                         // more = cnt << 2"
+   ]
+  },
+  {
+   "name": "peers_rank_by_loaded_index",
+   "src": "kern = b.entry(Args(rk=u32, ring=peers(3)))\nrk, ring = kern.load()\nfar = kern.load_rank(\"ring\", rk)",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b32 s:rk#1[0]x1, s:karg[0]x2, 0'0x0' ; comment=\"rk\"",
+    "s_load_b256 s:ring#1[0]x8, s:karg[0]x2, 8'0x8' ; comment=\"ring\"",
+    "ir.wait_regs s:rk#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:rk#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_lshl3_add_u32 s:koff#1[0]x1, s:rk#1[0]x1, 8 ; comment=\"koff = 8 + (rk * 8)\"",
+    "s_load_b64 s:ring_d#1[0]x2, s:karg[0]x2, s:koff#1[0]x1 ; comment=\"karg + koff: ring\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s rk#1 n=1 align=1",
+    "4 s ring#1 n=8 align=4",
+    "5 s ring_d#1 n=2 align=2",
+    "6 s koff#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x0                                   // rk",
+    "\ts_load_b256 s[4:11], s[0:1], 0x8                             // ring",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_lshl3_add_u32 s3, s2, 8                                    // koff = 8 + (rk * 8)",
+    "\ts_load_b64 s[12:13], s[0:1], s3                              // karg + koff: ring"
+   ]
+  },
+  {
+   "name": "mapped_rank_by_masked_index",
+   "src": "kern = b.entry(Args(win=mapped(4), sel=u32))\n(sel,) = kern.load(\"sel\")\npick = S.u32(sel & 3, name=\"pick\")\npeer = kern.load_rank(\"win\", pick)",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b32 s:sel#1[0]x1, s:karg[0]x2, 40'0x28' ; comment=\"sel\"",
+    "ir.wait_regs s:sel#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:sel#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_and_b32 s:pick#1[0]x1, s:sel#1[0]x1, 3 ; comment=\"pick = sel & 3\"",
+    "s_lshl_b32 s:koff#1[0]x1, s:pick#1[0]x1, 3 ; comment=\"koff = pick * 8\"",
+    "s_load_b64 s:win_d#1[0]x2, s:karg[0]x2, s:koff#1[0]x1 ; comment=\"karg + koff: win\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s sel#1 n=1 align=1",
+    "4 s pick#1 n=1 align=1",
+    "5 s win_d#1 n=2 align=2",
+    "6 s koff#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x28                                  // sel",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_and_b32 s3, s2, 3                                          // pick = sel & 3",
+    "\ts_lshl_b32 s2, s3, 3                                         // koff = pick * 8",
+    "\ts_load_b64 s[4:5], s[0:1], s2                                // karg + koff: win"
+   ]
+  },
+  {
+   "name": "mapped_rank_by_pinned_index_after_full_load",
+   "src": "kern = b.entry(Args(cnt=u32, win=mapped(3)))\ncnt, win = kern.load()\nwho = S.u32(name=\"who\", at=12)\nother = kern.load_rank(\"win\", who)\nleft = S.u32(cnt - 2, name=\"left\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_load_b32 s:cnt#1[0]x1, s:karg[0]x2, 0'0x0' ; comment=\"cnt\"",
+    "s_load_b256 s:win#1[0]x8, s:karg[0]x2, 8'0x8' ; comment=\"win\"",
+    "s_lshl3_add_u32 s:koff#1[0]x1, s:who#1[0]x1, 8 ; comment=\"koff = 8 + (who * 8)\"",
+    "s_load_b64 s:win_d#1[0]x2, s:karg[0]x2, s:koff#1[0]x1 ; comment=\"karg + koff: win\"",
+    "ir.wait_regs s:cnt#1[0]x1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:cnt#1[0]x1 {counter=km, said=kernel arguments, regions=()}",
+    "s_sub_co_u32 s:left#1[0]x1, s:cnt#1[0]x1, 2 ; comment=\"left = cnt - 2\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 v tid n=1 align=1 pin=0",
+    "3 s cnt#1 n=1 align=1",
+    "4 s win#1 n=8 align=4",
+    "5 s who#1 n=1 align=1 pin=12",
+    "6 s win_d#1 n=2 align=2",
+    "7 s koff#1 n=1 align=1",
+    "8 s left#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg",
+     "who#1"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x0                                   // cnt",
+    "\ts_load_b256 s[4:11], s[0:1], 0x8                             // win",
+    "\ts_lshl3_add_u32 s3, s12, 8                                   // koff = 8 + (who * 8)",
+    "\ts_load_b64 s[12:13], s[0:1], s3                              // karg + koff: win",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_sub_co_u32 s0, s2, 2                                       // left = cnt - 2"
+   ]
+  },
+  {
+   "name": "preload_hint_ignored_two_dims",
+   "src": "kern = b.entry(Args(gain=f32, lo=u32, hi=u32, dst=ptr), preload=2, wg=2)\ngain, lo, hi, dst = kern.load()\nwidth = S.u32(kern.wgid_y - (hi - lo), name=\"width\")",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_mov_b32 s:wgid_y#1[0]x1, ttmp7 ; comment=\"wgid_y#1: ttmp7\"",
+    "s_load_b64 s:args#1[0]x2, s:karg[0]x2, 0'0x0' ; comment=\"gain, lo\"",
+    "s_load_b32 s:hi#1[0]x1, s:karg[0]x2, 8'0x8' ; comment=\"hi\"",
+    "s_load_b64 s:dst#1[0]x2, s:karg[0]x2, 16'0x10' ; comment=\"dst\"",
+    "ir.wait_regs s:hi#1[0]x1, s:args#1[0]x1+1 {counter=ds, said=kernel arguments, regions=()}",
+    "ir.wait_regs s:hi#1[0]x1, s:args#1[0]x1+1 {counter=km, said=kernel arguments, regions=()}",
+    "s_sub_co_u32 s:t#1[0]x1, s:hi#1[0]x1, s:args#1[0]x1+1 ; comment=\"width = wgid_y - (hi - lo)\"",
+    "s_sub_co_u32 s:width#1[0]x1, s:wgid_y#1[0]x1, s:t#1[0]x1"
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 s wgid_y#1 n=1 align=1",
+    "3 v tid n=1 align=1 pin=0",
+    "4 s args#1 n=2 align=2",
+    "5 s hi#1 n=1 align=1",
+    "6 s dst#1 n=2 align=2",
+    "7 s width#1 n=1 align=1",
+    "8 s t#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_mov_b32 s2, ttmp7                                          // wgid_y#1: ttmp7",
+    "\ts_load_b64 s[4:5], s[0:1], 0x0                               // gain, lo",
+    "\ts_load_b32 s3, s[0:1], 0x8                                   // hi",
+    "\ts_load_b64 s[6:7], s[0:1], 0x10                              // dst",
+    "\ts_wait_kmcnt 0                                               // kernel arguments",
+    "\ts_sub_co_u32 s0, s3, s5                                      // width = wgid_y - (hi - lo)",
+    "\ts_sub_co_u32 s1, s2, s0"
+   ]
+  },
+  {
+   "name": "preload_hint_unused_argument",
+   "src": "kern = b.entry(Args(n=u32), wg=2, preload=8)\n(n,) = kern.load()",
+   "built": [
+    "s_mov_b32 s:wgid#1[0]x1, ttmp9 ; comment=\"wgid#1: ttmp9\"",
+    "s_mov_b32 s:wgid_y#1[0]x1, ttmp7 ; comment=\"wgid_y#1: ttmp7\"",
+    "s_load_b32 s:n#1[0]x1, s:karg[0]x2, 0'0x0' ; comment=\"n\""
+   ],
+   "values": [
+    "0 s karg n=2 align=1 pin=0",
+    "1 s wgid#1 n=1 align=1",
+    "2 s wgid_y#1 n=1 align=1",
+    "3 v tid n=1 align=1 pin=0",
+    "4 s n#1 n=1 align=1"
+   ],
+   "records": {
+    "v.entered": [
+     "tid"
+    ],
+    "v.pinned": [
+     "tid"
+    ],
+    "s.entered": [
+     "karg"
+    ],
+    "s.pinned": [
+     "karg"
+    ]
+   },
+   "render": [
+    "\ts_load_b32 s2, s[0:1], 0x0                                   // n"
+   ]
+  },
+  {
+   "name": "refuse_wg_0",
+   "src": "b.entry(wg=0)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "entry: wg=0 - workgroup ids x (1) or x and y (2)"
+   }
+  },
+  {
+   "name": "refuse_wg_4",
+   "src": "b.entry(wg=4)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "entry: wg=4 - workgroup ids x (1) or x and y (2)"
+   }
+  },
+  {
+   "name": "refuse_load_unknown_after_known",
+   "src": "kern = b.entry(Args(src=ptr, n=u32))\nkern.load(\"n\", \"cnt\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "load('cnt'): no such argument (the block: src, n)"
+   }
+  },
+  {
+   "name": "refuse_load_from_empty_block",
+   "src": "kern = b.entry(Args())\nkern.load(\"x\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "load('x'): no such argument (the block is empty)"
+   }
+  },
+  {
+   "name": "refuse_load_rank_of_scalar",
+   "src": "kern = b.entry(Args(n=u32, ring=peers(2)))\nkern.load_rank(\"n\", kern.wgid)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "load_rank('n'): a peers or mapped argument's"
+   }
+  },
+  {
+   "name": "refuse_load_rank_of_owned_pointer",
+   "src": "kern = b.entry(Args(buf=kept, ring=peers(2)))\nkern.load_rank(\"buf\", kern.wgid)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "load_rank('buf'): a peers or mapped argument's"
+   }
+  },
+  {
+   "name": "refuse_second_entry",
+   "src": "b.entry(wg=2)\nb.entry()",
+   "error": {
+    "class": "ScheduleError",
+    "message": "entry: made once a kernel"
+   }
+  }
+ ],
+ "args": [
+  {
+   "name": "four_pointers_then_ranged_count",
+   "src": "Args(src=ptr, dst=ptr, aux=ptr, bias=ptr, cnt=u32.within(2, 1 << 20))",
+   "size": 36,
+   "own": [
+    "src",
+    "dst",
+    "aux",
+    "bias",
+    "cnt"
+   ],
+   "args": [
+    {
+     "name": "src",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "dst",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "aux",
+     "offset": 16,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "bias",
+     "offset": 24,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "cnt",
+     "offset": 32,
+     "bytes": 4,
+     "kind": "u32",
+     "lo": 2,
+     "hi": 1048576
+    }
+   ]
+  },
+  {
+   "name": "signed_range_then_wide",
+   "src": "Args(off=i32.within(-64, 64), w=u64)",
+   "size": 16,
+   "own": [
+    "off",
+    "w"
+   ],
+   "args": [
+    {
+     "name": "off",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "i32",
+     "lo": -64,
+     "hi": 64
+    },
+    {
+     "name": "w",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "u64"
+    }
+   ]
+  },
+  {
+   "name": "i32_pads_before_pointer",
+   "src": "Args(k=i32, base=ptr)",
+   "size": 16,
+   "own": [
+    "k",
+    "base"
+   ],
+   "args": [
+    {
+     "name": "k",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "i32"
+    },
+    {
+     "name": "base",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr"
+    }
+   ]
+  },
+  {
+   "name": "wide_values_around_scalars",
+   "src": "Args(h=u64, a=f32, c=i32, e=u32, g=u64)",
+   "size": 32,
+   "own": [
+    "h",
+    "a",
+    "c",
+    "e",
+    "g"
+   ],
+   "args": [
+    {
+     "name": "h",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "u64"
+    },
+    {
+     "name": "a",
+     "offset": 8,
+     "bytes": 4,
+     "kind": "f32"
+    },
+    {
+     "name": "c",
+     "offset": 12,
+     "bytes": 4,
+     "kind": "i32"
+    },
+    {
+     "name": "e",
+     "offset": 16,
+     "bytes": 4,
+     "kind": "u32"
+    },
+    {
+     "name": "g",
+     "offset": 24,
+     "bytes": 8,
+     "kind": "u64"
+    }
+   ]
+  },
+  {
+   "name": "placed_middle_then_follower",
+   "src": "Args(at={\"gamma\": 32}, out=ptr, gamma=f32, delta=u32)",
+   "size": 40,
+   "own": [
+    "out",
+    "gamma",
+    "delta"
+   ],
+   "args": [
+    {
+     "name": "out",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "gamma",
+     "offset": 32,
+     "bytes": 4,
+     "kind": "f32"
+    },
+    {
+     "name": "delta",
+     "offset": 36,
+     "bytes": 4,
+     "kind": "u32"
+    }
+   ]
+  },
+  {
+   "name": "placed_first_then_pointer",
+   "src": "Args(at={\"lr\": 16}, lr=f32, w=ptr)",
+   "size": 32,
+   "own": [
+    "lr",
+    "w"
+   ],
+   "args": [
+    {
+     "name": "lr",
+     "offset": 16,
+     "bytes": 4,
+     "kind": "f32"
+    },
+    {
+     "name": "w",
+     "offset": 24,
+     "bytes": 8,
+     "kind": "ptr"
+    }
+   ]
+  },
+  {
+   "name": "placed_out_of_order",
+   "src": "Args(at={\"a\": 8, \"b\": 0}, a=u32, b=u32)",
+   "size": 12,
+   "own": [
+    "a",
+    "b"
+   ],
+   "args": [
+    {
+     "name": "a",
+     "offset": 8,
+     "bytes": 4,
+     "kind": "u32"
+    },
+    {
+     "name": "b",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "u32"
+    }
+   ]
+  },
+  {
+   "name": "divisor_first_then_scalars",
+   "src": "Args(stride=u32.within(3, 1000).divisor(), idx=u32, out=ptr)",
+   "size": 32,
+   "own": [
+    "stride",
+    "idx",
+    "out"
+   ],
+   "args": [
+    {
+     "name": "stride",
+     "offset": 0,
+     "bytes": 16,
+     "kind": "u32",
+     "lo": 3,
+     "hi": 1000,
+     "divisor": true
+    },
+    {
+     "name": "idx",
+     "offset": 16,
+     "bytes": 4,
+     "kind": "u32"
+    },
+    {
+     "name": "out",
+     "offset": 24,
+     "bytes": 8,
+     "kind": "ptr"
+    }
+   ]
+  },
+  {
+   "name": "divisor_at_upper_bound",
+   "src": "Args(lead=u32.within(1, 1 << 31).divisor())",
+   "size": 16,
+   "own": [
+    "lead"
+   ],
+   "args": [
+    {
+     "name": "lead",
+     "offset": 0,
+     "bytes": 16,
+     "kind": "u32",
+     "lo": 1,
+     "hi": 2147483648,
+     "divisor": true
+    }
+   ]
+  },
+  {
+   "name": "multiple_then_pointer",
+   "src": "Args(len_=u32.within(8, 512).multiple_of(8), out=ptr)",
+   "size": 16,
+   "own": [
+    "len_",
+    "out"
+   ],
+   "args": [
+    {
+     "name": "len_",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "u32",
+     "lo": 8,
+     "hi": 512,
+     "multiple": 8
+    },
+    {
+     "name": "out",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr"
+    }
+   ]
+  },
+  {
+   "name": "signed_multiple",
+   "src": "Args(q=i32.within(-30, 30).multiple_of(6))",
+   "size": 4,
+   "own": [
+    "q"
+   ],
+   "args": [
+    {
+     "name": "q",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "i32",
+     "lo": -30,
+     "hi": 30,
+     "multiple": 6
+    }
+   ]
+  },
+  {
+   "name": "multiple_and_divisor_either_order",
+   "src": "Args(p=u32.within(8, 512).multiple_of(8).divisor(), r=u32.within(6, 96).divisor().multiple_of(3))",
+   "size": 32,
+   "own": [
+    "p",
+    "r"
+   ],
+   "args": [
+    {
+     "name": "p",
+     "offset": 0,
+     "bytes": 16,
+     "kind": "u32",
+     "lo": 8,
+     "hi": 512,
+     "divisor": true,
+     "multiple": 8
+    },
+    {
+     "name": "r",
+     "offset": 16,
+     "bytes": 16,
+     "kind": "u32",
+     "lo": 6,
+     "hi": 96,
+     "divisor": true,
+     "multiple": 3
+    }
+   ]
+  },
+  {
+   "name": "owned_kinds_with_uncached",
+   "src": "Args(g=gens.uncached, k=kept.uncached, s=scratch, c=carried, kk=kept)",
+   "size": 40,
+   "own": [
+    "g",
+    "k",
+    "s",
+    "c",
+    "kk"
+   ],
+   "args": [
+    {
+     "name": "g",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "gens",
+     "mem": "uncached"
+    },
+    {
+     "name": "k",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "kept",
+     "mem": "uncached"
+    },
+    {
+     "name": "s",
+     "offset": 16,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "scratch"
+    },
+    {
+     "name": "c",
+     "offset": 24,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "carried"
+    },
+    {
+     "name": "kk",
+     "offset": 32,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "kept"
+    }
+   ]
+  },
+  {
+   "name": "rank_groups_at_bounds",
+   "src": "Args(r=peers(8), m=mapped(2), z=u32)",
+   "size": 100,
+   "own": [
+    "r",
+    "m",
+    "z"
+   ],
+   "args": [
+    {
+     "name": "r",
+     "offset": 0,
+     "bytes": 72,
+     "kind": "ptr",
+     "ranks": 8
+    },
+    {
+     "name": "m",
+     "offset": 72,
+     "bytes": 24,
+     "kind": "ptr",
+     "owned": "mapped",
+     "ranks": 2
+    },
+    {
+     "name": "z",
+     "offset": 96,
+     "bytes": 4,
+     "kind": "u32"
+    }
+   ]
+  },
+  {
+   "name": "library_pointer_first",
+   "src": "Args(cl=lib_arg(kept, \"clock\"), out=ptr)",
+   "size": 16,
+   "own": [
+    "out"
+   ],
+   "args": [
+    {
+     "name": "cl",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "kept",
+     "library": "clock"
+    },
+    {
+     "name": "out",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr"
+    }
+   ]
+  },
+  {
+   "name": "library_scalar_and_uncached",
+   "src": "Args(v=u32, sc=lib_arg(u32, \"sum\"), kc=lib_arg(kept.uncached, \"ring\"))",
+   "size": 16,
+   "own": [
+    "v"
+   ],
+   "args": [
+    {
+     "name": "v",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "u32"
+    },
+    {
+     "name": "sc",
+     "offset": 4,
+     "bytes": 4,
+     "kind": "u32",
+     "library": "sum"
+    },
+    {
+     "name": "kc",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr",
+     "owned": "kept",
+     "library": "ring",
+     "mem": "uncached"
+    }
+   ]
+  },
+  {
+   "name": "empty_argument_block",
+   "src": "Args(at={})",
+   "size": 0,
+   "own": [],
+   "args": []
+  },
+  {
+   "name": "seeded_plain_block_3",
+   "src": "Args(c=u64, v=f32, k=i32)",
+   "size": 16,
+   "own": [
+    "c",
+    "v",
+    "k"
+   ],
+   "args": [
+    {
+     "name": "c",
+     "offset": 0,
+     "bytes": 8,
+     "kind": "u64"
+    },
+    {
+     "name": "v",
+     "offset": 8,
+     "bytes": 4,
+     "kind": "f32"
+    },
+    {
+     "name": "k",
+     "offset": 12,
+     "bytes": 4,
+     "kind": "i32"
+    }
+   ]
+  },
+  {
+   "name": "seeded_plain_block_6",
+   "src": "Args(e=u32, n=ptr, c=u64, m=ptr, d=f32, v=ptr)",
+   "size": 48,
+   "own": [
+    "e",
+    "n",
+    "c",
+    "m",
+    "d",
+    "v"
+   ],
+   "args": [
+    {
+     "name": "e",
+     "offset": 0,
+     "bytes": 4,
+     "kind": "u32"
+    },
+    {
+     "name": "n",
+     "offset": 8,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "c",
+     "offset": 16,
+     "bytes": 8,
+     "kind": "u64"
+    },
+    {
+     "name": "m",
+     "offset": 24,
+     "bytes": 8,
+     "kind": "ptr"
+    },
+    {
+     "name": "d",
+     "offset": 32,
+     "bytes": 4,
+     "kind": "f32"
+    },
+    {
+     "name": "v",
+     "offset": 40,
+     "bytes": 8,
+     "kind": "ptr"
+    }
+   ]
+  },
+  {
+   "name": "refuse_kind_bool",
+   "src": "Args(flag=bool)",
+   "error": {
+    "class": "ValueError",
+    "message": "argument flag: <class 'bool'> is not one of ptr, u32, i32, f32, u64"
+   }
+  },
+  {
+   "name": "refuse_kind_string",
+   "src": "Args(h=\"f16\")",
+   "error": {
+    "class": "ValueError",
+    "message": "argument h: 'f16' is not one of ptr, u32, i32, f32, u64"
+   }
+  },
+  {
+   "name": "refuse_range_on_u64",
+   "src": "Args(v=(u64).within(0, 9))",
+   "error": {
+    "class": "ValueError",
+    "message": "argument v: a range on an integer (u32, i32), not u64"
+   }
+  },
+  {
+   "name": "refuse_range_on_ptr",
+   "src": "Args(v=(ptr).within(0, 9))",
+   "error": {
+    "class": "ValueError",
+    "message": "argument v: a range on an integer (u32, i32), not ptr"
+   }
+  },
+  {
+   "name": "refuse_range_on_f32",
+   "src": "Args(v=(f32).within(0, 9))",
+   "error": {
+    "class": "ValueError",
+    "message": "argument v: a range on an integer (u32, i32), not f32"
+   }
+  },
+  {
+   "name": "refuse_at_unknown_names",
+   "src": "Args(at={\"nope\": 8, \"zz\": 0}, a=u32)",
+   "error": {
+    "class": "ValueError",
+    "message": "at= names no argument: nope, zz"
+   }
+  },
+  {
+   "name": "refuse_at_misaligned_ptr",
+   "src": "Args(at={\"q\": 12}, p=u32, q=ptr)",
+   "error": {
+    "class": "ValueError",
+    "message": "argument q: at byte 12, a ptr is 8-aligned"
+   }
+  },
+  {
+   "name": "refuse_at_misaligned_u64",
+   "src": "Args(at={\"w\": 4}, v=u32, w=u64)",
+   "error": {
+    "class": "ValueError",
+    "message": "argument w: at byte 4, a u64 is 8-aligned"
+   }
+  },
+  {
+   "name": "refuse_at_misaligned_u32",
+   "src": "Args(at={\"v\": 3}, v=u32)",
+   "error": {
+    "class": "ValueError",
+    "message": "argument v: at byte 3, a u32 is 4-aligned"
+   }
+  },
+  {
+   "name": "refuse_overlap_placed_into_wide",
+   "src": "Args(at={\"tail\": 12}, head=u64, mid=u64, tail=u32)",
+   "error": {
+    "class": "ValueError",
+    "message": "arguments mid and tail overlap (bytes 8..15, 12..)"
+   }
+  },
+  {
+   "name": "refuse_overlap_same_start",
+   "src": "Args(at={\"b\": 0}, a=u32, b=u32)",
+   "error": {
+    "class": "ValueError",
+    "message": "arguments a and b overlap (bytes 0..3, 0..)"
+   }
+  },
+  {
+   "name": "refuse_divisor_lo_zero",
+   "src": "u32.within(0, 10).divisor()",
+   "error": {
+    "class": "ValueError",
+    "message": "u32.within(0, 10).divisor(): a u32 within 1 .. 2^31"
+   }
+  },
+  {
+   "name": "refuse_divisor_hi_past",
+   "src": "u32.within(1, (1 << 31) + 1).divisor()",
+   "error": {
+    "class": "ValueError",
+    "message": "u32.within(1, 2147483649).divisor(): a u32 within 1 .. 2^31"
+   }
+  },
+  {
+   "name": "refuse_divisor_signed",
+   "src": "i32.within(2, 100).divisor()",
+   "error": {
+    "class": "ValueError",
+    "message": "i32.within(2, 100).divisor(): a u32 within 1 .. 2^31"
+   }
+  },
+  {
+   "name": "refuse_multiple_none_in_range",
+   "src": "u32.within(9, 15).multiple_of(16)",
+   "error": {
+    "class": "ValueError",
+    "message": "u32.within(9, 15).multiple_of(16): no multiple of 16 in it"
+   }
+  },
+  {
+   "name": "refuse_multiple_zero",
+   "src": "u32.within(0, 64).multiple_of(0)",
+   "error": {
+    "class": "ValueError",
+    "message": "multiple_of(0): an int, 2 or more"
+   }
+  },
+  {
+   "name": "refuse_multiple_negative",
+   "src": "u32.within(0, 64).multiple_of(-4)",
+   "error": {
+    "class": "ValueError",
+    "message": "multiple_of(-4): an int, 2 or more"
+   }
+  },
+  {
+   "name": "refuse_multiple_bool",
+   "src": "u32.within(0, 64).multiple_of(True)",
+   "error": {
+    "class": "ValueError",
+    "message": "multiple_of(True): an int, 2 or more"
+   }
+  },
+  {
+   "name": "refuse_multiple_restated",
+   "src": "u32.within(0, 64).multiple_of(8).multiple_of(2)",
+   "error": {
+    "class": "ValueError",
+    "message": "multiple_of(2): already a multiple of 8 (state one: the lcm)"
+   }
+  },
+  {
+   "name": "refuse_range_reversed",
+   "src": "i32.within(0, -1)",
+   "error": {
+    "class": "ValueError",
+    "message": "i32.within(0, -1): an empty range"
+   }
+  },
+  {
+   "name": "refuse_mapped_0",
+   "src": "mapped(0)",
+   "error": {
+    "class": "ValueError",
+    "message": "mapped(0): a group of 2 .. 8 ranks"
+   }
+  },
+  {
+   "name": "refuse_mapped_9",
+   "src": "mapped(9)",
+   "error": {
+    "class": "ValueError",
+    "message": "mapped(9): a group of 2 .. 8 ranks"
+   }
+  },
+  {
+   "name": "refuse_peers_1",
+   "src": "peers(1)",
+   "error": {
+    "class": "ValueError",
+    "message": "peers(1): a group of 2 .. 8 ranks"
+   }
+  },
+  {
+   "name": "refuse_peers_16",
+   "src": "peers(16)",
+   "error": {
+    "class": "ValueError",
+    "message": "peers(16): a group of 2 .. 8 ranks"
+   }
+  },
+  {
+   "name": "refuse_uncached_scratch_in_block",
+   "src": "Args(tmp=scratch.uncached)",
+   "error": {
+    "class": "ValueError",
+    "message": "scratch.uncached: kept, carried or gens memory"
+   }
+  },
+  {
+   "name": "refuse_uncached_mapped",
+   "src": "mapped(3).uncached",
+   "error": {
+    "class": "ValueError",
+    "message": "mapped(3).uncached: kept, carried or gens memory"
+   }
+  },
+  {
+   "name": "refuse_uncached_twice",
+   "src": "carried.uncached.uncached",
+   "error": {
+    "class": "ValueError",
+    "message": "carried.uncached.uncached: kept, carried or gens memory"
+   }
+  }
+ ]
+}

@@ -1,0 +1,39 @@
+[package]
+name = "thin-codegen"
+description = "The pipeline of thin: phases, deferred transforms, placement, compile_kernel, the .s file, the manifest, the ABI and the code-object driver"
+keywords = ["gpu", "compiler", "amdgpu", "codegen"]
+categories = ["compilers"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-dsl.workspace = true
+thin-targets.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+thin-test-support = { path = "../../tests/rust" }
+serde_json.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-targets.workspace = true
+thin-dsl.workspace = true
+thin-emu.workspace = true
+
+
+[[test]]
+name = "codegen"
+harness = false

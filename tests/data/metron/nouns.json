@@ -1,0 +1,425 @@
+{
+ "notation": "Synthetic constructor products and contract perturbations, evaluated through metron.",
+ "kinds": [
+  "scratch",
+  "kept",
+  "carried",
+  "gens",
+  "kept.uncached",
+  "carried.uncached",
+  "gens.uncached",
+  "mapped"
+ ],
+ "uncached_kinds": [
+  "kept.uncached",
+  "carried.uncached",
+  "gens.uncached",
+  "mapped"
+ ],
+ "reserved": [
+  "owned",
+  "stream",
+  "rank",
+  "peers"
+ ],
+ "cases": [
+  {
+   "what": "Point",
+   "case": "a name both in and out",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out ['x'], reserved [], not tensors [], outputs ['x']: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "a reserved name",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out [], reserved ['stream'], not tensors [], outputs ['y']: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "an output reserved",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out [], reserved ['owned'], not tensors [], outputs ['owned']: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "not a tensor",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out [], reserved [], not tensors ['y'], outputs ['y']: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "no output",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out [], reserved [], not tensors [], outputs []: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "no input is fine",
+   "result": "ok"
+  },
+  {
+   "what": "Point",
+   "case": "names rank and peers are reserved",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out [], reserved ['peers', 'rank'], not tensors [], outputs ['y']: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "several faults at once",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out ['x'], reserved ['stream'], not tensors ['q'], outputs ['q', 'x']: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "group: ranks differ",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: 2 ranks' inputs, 1 ranks' outputs"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "group: no ranks",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: 0 ranks' inputs, 0 ranks' outputs"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "group: one rank's fault",
+   "result": {
+    "error": "ValueError",
+    "message": "point p: names in and out [], reserved [], not tensors [], outputs []: none of the first three, one output at least"
+   }
+  },
+  {
+   "what": "Point",
+   "case": "group of two ok",
+   "result": "ok"
+  },
+  {
+   "what": "Arm",
+   "case": "size 0",
+   "owned": {
+    "w": [
+     0,
+     "scratch"
+    ]
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': (0, 'scratch')} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "bytes for scratch",
+   "owned": {
+    "w": [
+     "01",
+     "scratch"
+    ]
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': (b'\\x01', 'scratch')} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "bytes for kept",
+   "owned": {
+    "w": [
+     "01",
+     "kept"
+    ]
+   },
+   "read": [],
+   "result": "ok"
+  },
+  {
+   "what": "Arm",
+   "case": "bytes for kept.uncached",
+   "owned": {
+    "w": [
+     "0102",
+     "kept.uncached"
+    ]
+   },
+   "read": [],
+   "result": "ok"
+  },
+  {
+   "what": "Arm",
+   "case": "empty bytes for kept",
+   "owned": {
+    "w": [
+     "",
+     "kept"
+    ]
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': (b'', 'kept')} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "unknown kind",
+   "owned": {
+    "w": [
+     8,
+     "pinned"
+    ]
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': (8, 'pinned')} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "a bool size",
+   "owned": {
+    "w": [
+     true,
+     "scratch"
+    ]
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': (True, 'scratch')} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "a negative size",
+   "owned": {
+    "w": [
+     -4,
+     "carried"
+    ]
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': (-4, 'carried')} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "not a pair",
+   "owned": {
+    "w": "8"
+   },
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {'w': 8} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "every kind",
+   "owned": {
+    "scratch": [
+     8,
+     "scratch"
+    ],
+    "kept": [
+     8,
+     "kept"
+    ],
+    "carried": [
+     8,
+     "carried"
+    ],
+    "gens": [
+     8,
+     "gens"
+    ],
+    "kept.uncached": [
+     8,
+     "kept.uncached"
+    ],
+    "carried.uncached": [
+     8,
+     "carried.uncached"
+    ],
+    "gens.uncached": [
+     8,
+     "gens.uncached"
+    ],
+    "mapped": [
+     8,
+     "mapped"
+    ]
+   },
+   "read": [],
+   "result": "ok"
+  },
+  {
+   "what": "Arm",
+   "case": "read of a name not owned",
+   "owned": {
+    "w": [
+     8,
+     "kept"
+    ]
+   },
+   "read": [
+    "t"
+   ],
+   "result": {
+    "error": "ValueError",
+    "message": "arm 'a': owned {} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read ['t']: of owned"
+   }
+  },
+  {
+   "what": "Arm",
+   "case": "read of an owned name",
+   "owned": {
+    "w": [
+     8,
+     "kept"
+    ]
+   },
+   "read": [
+    "w"
+   ],
+   "result": "ok"
+  },
+  {
+   "what": "Arm",
+   "case": "empty name",
+   "owned": {},
+   "read": [],
+   "result": {
+    "error": "ValueError",
+    "message": "arm '': owned {} - (bytes > 0, one of ('scratch', 'kept', 'carried', 'gens', 'kept.uncached', 'carried.uncached', 'gens.uncached', 'mapped')) each, kept's bytes or its first contents; read []: of owned"
+   }
+  },
+  {
+   "what": "State",
+   "case": "code warm",
+   "result": "ok"
+  },
+  {
+   "what": "State",
+   "case": "code cold",
+   "result": "ok"
+  },
+  {
+   "what": "State",
+   "case": "code hot",
+   "result": {
+    "error": "ValueError",
+    "message": "state code 'hot': 'warm' or 'cold'"
+   }
+  },
+  {
+   "what": "State.said",
+   "case": "warm {y, x}, cold",
+   "result": {
+    "warm": [
+     "x",
+     "y"
+    ],
+    "code": "cold"
+   }
+  },
+  {
+   "what": "race refusal",
+   "case": "an arm twice",
+   "arms": [
+    "a",
+    "a",
+    "b",
+    "b"
+   ],
+   "warm": [],
+   "result": {
+    "error": "ValueError",
+    "message": "race at p: arms named once, one at least (['a', 'b']); warm []: of the inputs"
+   }
+  },
+  {
+   "what": "race refusal",
+   "case": "no arm",
+   "arms": [],
+   "warm": [],
+   "result": {
+    "error": "ValueError",
+    "message": "race at p: arms named once, one at least (none); warm []: of the inputs"
+   }
+  },
+  {
+   "what": "race refusal",
+   "case": "warm not an input",
+   "arms": [
+    "a"
+   ],
+   "warm": [
+    "w",
+    "y"
+   ],
+   "result": {
+    "error": "ValueError",
+    "message": "race at p: arms named once, one at least (none); warm ['w', 'y']: of the inputs"
+   }
+  },
+  {
+   "what": "race refusal",
+   "case": "warm an input",
+   "arms": [
+    "a",
+    "b"
+   ],
+   "warm": [
+    "x"
+   ],
+   "result": "ok"
+  },
+  {
+   "what": "race refusal",
+   "case": "all at once",
+   "arms": [
+    "a",
+    "a"
+   ],
+   "warm": [
+    "w"
+   ],
+   "result": {
+    "error": "ValueError",
+    "message": "race at p: arms named once, one at least (['a']); warm ['w']: of the inputs"
+   }
+  },
+  {
+   "what": "Arm.unchecked",
+   "case": "checked becomes false",
+   "result": false
+  }
+ ]
+}

@@ -1,0 +1,300 @@
+{
+ "notation": "YAML subsets and assembly inputs authored here; metadata documents and AsmError diagnostics are computed by thin-codegen's metadata reader.",
+ "cases": [
+  {
+   "name": "complete_nested_document",
+   "yaml": [
+    "amdhsa.kernels:",
+    "  - .args:",
+    "      - .offset: 8",
+    "        .size: 40",
+    "        .value_kind: by_value",
+    "    .language: HIP",
+    "    .language_version:",
+    "      - 3",
+    "      - 1",
+    "    .max_flat_workgroup_size: 128",
+    "    .name: authored_kernel",
+    "    .uses_dynamic_stack: true",
+    "    .wavefront_size: 64",
+    "amdhsa.target: custom-target",
+    "amdhsa.version:",
+    "  - 2",
+    "  - 1"
+   ],
+   "ok": {
+    "amdhsa.kernels": [
+     {
+      ".args": [
+       {
+        ".offset": 8,
+        ".size": 40,
+        ".value_kind": "by_value"
+       }
+      ],
+      ".language": "HIP",
+      ".language_version": [
+       3,
+       1
+      ],
+      ".max_flat_workgroup_size": 128,
+      ".name": "authored_kernel",
+      ".uses_dynamic_stack": true,
+      ".wavefront_size": 64
+     }
+    ],
+    "amdhsa.target": "custom-target",
+    "amdhsa.version": [
+     2,
+     1
+    ]
+   }
+  },
+  {
+   "name": "negative_decimal",
+   "yaml": [
+    "delta: -73"
+   ],
+   "ok": {
+    "delta": -73
+   }
+  },
+  {
+   "name": "zero_in_nested_map",
+   "yaml": [
+    "limits:",
+    "  count: 0"
+   ],
+   "ok": {
+    "limits": {
+     "count": 0
+    }
+   }
+  },
+  {
+   "name": "padded_decimal_refused",
+   "yaml": [
+    "count: 00091"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: '00091' is not a value this reader takes"
+  },
+  {
+   "name": "boolean_pair",
+   "yaml": [
+    "enabled: true",
+    "  ",
+    "visible: false"
+   ],
+   "ok": {
+    "enabled": true,
+    "visible": false
+   }
+  },
+  {
+   "name": "capital_false_refused",
+   "yaml": [
+    "flag: False"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: 'False' is not a value this reader takes"
+  },
+  {
+   "name": "capital_yes_refused",
+   "yaml": [
+    "enabled: YES"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: 'YES' is not a value this reader takes"
+  },
+  {
+   "name": "flow_sequence_refused",
+   "yaml": [
+    "values: [4, 8]"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: '[4, 8]' is not a value this reader takes"
+  },
+  {
+   "name": "single_quoted_refused",
+   "yaml": [
+    "mode: 'fast'"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: \"'fast'\" is not a value this reader takes"
+  },
+  {
+   "name": "plain_string_punctuation",
+   "yaml": [
+    "target: rdna-4 wave 1.2"
+   ],
+   "ok": {
+    "target": "rdna-4 wave 1.2"
+   }
+  },
+  {
+   "name": "duplicate_nested_key",
+   "yaml": [
+    "outer:",
+    "  value: 7",
+    "  value: 9"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: 'value: 9'"
+  },
+  {
+   "name": "nested_key_without_value",
+   "yaml": [
+    "root:",
+    "  child:"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: child has no value"
+  },
+  {
+   "name": "unkeyed_line_refused",
+   "yaml": [
+    "not-a-key"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: 'not-a-key'"
+  },
+  {
+   "name": "blank_and_whitespace_lines",
+   "yaml": [
+    "alpha: 4",
+    "",
+    "   ",
+    "beta: 8"
+   ],
+   "ok": {
+    "alpha": 4,
+    "beta": 8
+   }
+  },
+  {
+   "name": "nested_scalar_map",
+   "yaml": [
+    "config:",
+    "  width: 64",
+    "  height: 16",
+    "  label: tile-A"
+   ],
+   "ok": {
+    "config": {
+     "width": 64,
+     "height": 16,
+     "label": "tile-A"
+    }
+   }
+  },
+  {
+   "name": "same_indent_scalar_list",
+   "yaml": [
+    "samples:",
+    "- 7",
+    "- -2",
+    "- 0"
+   ],
+   "ok": {
+    "samples": [
+     7,
+     -2,
+     0
+    ]
+   }
+  },
+  {
+   "name": "dedent_left_over",
+   "yaml": [
+    "root:",
+    "    nested: 1",
+    "  orphan: 2"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: 'orphan: 2' left over"
+  },
+  {
+   "name": "three_list_maps",
+   "yaml": [
+    "items:",
+    "  - index: 1",
+    "    label: first",
+    "  - index: 2",
+    "    label: second",
+    "  - index: 3"
+   ],
+   "ok": {
+    "items": [
+     {
+      "index": 1,
+      "label": "first"
+     },
+     {
+      "index": 2,
+      "label": "second"
+     },
+     {
+      "index": 3
+     }
+    ]
+   }
+  },
+  {
+   "name": "wavefront_type_refused",
+   "yaml": [
+    "amdhsa.kernels:",
+    "  - .wavefront_size: wide64"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: .wavefront_size: 'wide64' is not a value LLVM takes there"
+  },
+  {
+   "name": "language_value_refused",
+   "yaml": [
+    "amdhsa.kernels:",
+    "  - .language: Rust"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: .language: 'Rust' is not a value LLVM takes there"
+  },
+  {
+   "name": "dynamic_stack_type_refused",
+   "yaml": [
+    "amdhsa.kernels:",
+    "  - .uses_dynamic_stack: 1"
+   ],
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata: .uses_dynamic_stack: 1 is not a value LLVM takes there"
+  },
+  {
+   "name": "kernel_keys_ignored_elsewhere",
+   "yaml": [
+    ".uses_dynamic_stack: 0",
+    ".language: Rust"
+   ],
+   "ok": {
+    ".uses_dynamic_stack": 0,
+    ".language": "Rust"
+   }
+  },
+  {
+   "name": "assembly_without_metadata",
+   "s": "\t.text\nauthored_empty:\n\ts_mov_b32 s0, 0\n\ts_endpgm\n",
+   "refused": "AsmError",
+   "message": "no .amdgpu_metadata block"
+  },
+  {
+   "name": "assembly_without_document_start",
+   "s": "\t.text\nauthored:\n\ts_endpgm\n\t.amdgpu_metadata\nvalue: 9\n...\n\t.end_amdgpu_metadata\n",
+   "refused": "AsmError",
+   "message": "line 7: .amdgpu_metadata: a YAML document, --- to ..."
+  },
+  {
+   "name": "assembly_without_metadata_end",
+   "s": "\t.text\nauthored:\n\t.amdgpu_metadata\n---\nvalue: 9\n...\n",
+   "refused": "AsmError",
+   "message": ".amdgpu_metadata without its end"
+  }
+ ]
+}

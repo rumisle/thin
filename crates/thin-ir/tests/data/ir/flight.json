@@ -1,0 +1,369 @@
+{
+ "target": "gfx1201",
+ "notation": "Authored gfx1201 notation: vN/sN and v[a:b]/s[a:b] name values placed at physical registers; named physical registers, integer immediates and @label operands are supported. {name=value|...} gives fields. '; m0_set=C' and '; waves=0bMASK' attach IR attributes. Abstract stream op/br/brw/jmp/end/label tokens denote concrete native instructions. Native results are entry states unless their key says otherwise.",
+ "result": "Tracked load rows still in flight on entry to each row",
+ "cases": [
+  {
+   "name": "three_loads_retire_in_order",
+   "lines": [
+    "global_load_b32 v11, v[20:21], off",
+    "global_load_b32 v14, v[20:21], off",
+    "global_load_b32 v15, v[22:23], off",
+    "s_wait_loadcnt {loadcnt=2}",
+    "v_mov_b32 v30, 70",
+    "s_wait_loadcnt {loadcnt=1}",
+    "v_mov_b32 v31, 71",
+    "s_wait_loadcnt {loadcnt=0}",
+    "s_endpgm"
+   ],
+   "loads": [
+    0,
+    1,
+    2
+   ],
+   "in_flight": [
+    [],
+    [
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2
+    ],
+    [
+     2
+    ],
+    []
+   ]
+  },
+  {
+   "name": "separate_wait_domains",
+   "lines": [
+    "global_load_b32 v12, v[24:25], off",
+    "ds_load_b32 v16, v26",
+    "global_store_b32 v[24:25], v12, off",
+    "ds_load_b32 v17, v27",
+    "s_wait_dscnt {dscnt=1}",
+    "v_mov_b32 v32, 72",
+    "s_wait_loadcnt {loadcnt=0}",
+    "v_mov_b32 v33, 73",
+    "s_wait_storecnt {storecnt=0}",
+    "s_endpgm"
+   ],
+   "loads": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "in_flight": [
+    [],
+    [
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1,
+     2
+    ],
+    [
+     0,
+     1,
+     2,
+     3
+    ],
+    [
+     0,
+     2,
+     3
+    ],
+    [
+     0,
+     2,
+     3
+    ],
+    [
+     2,
+     3
+    ],
+    [
+     2,
+     3
+    ],
+    [
+     3
+    ]
+   ]
+  },
+  {
+   "name": "scalar_memory_count",
+   "lines": [
+    "s_load_b32 s14, s[10:11], 8",
+    "s_load_b32 s15, s[10:11], 12",
+    "s_wait_kmcnt {kmcnt=1}",
+    "v_mov_b32 v34, 74",
+    "s_wait_kmcnt {kmcnt=0}",
+    "s_endpgm"
+   ],
+   "loads": [
+    0,
+    1
+   ],
+   "in_flight": [
+    [],
+    [
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    []
+   ]
+  },
+  {
+   "name": "operand_wait_retires_all",
+   "lines": [
+    "global_load_b32 v13, v[28:29], off",
+    "s_wait_loadcnt 0",
+    "v_mov_b32 v35, 75",
+    "s_endpgm"
+   ],
+   "loads": [
+    0
+   ],
+   "in_flight": [
+    [],
+    [
+     0
+    ],
+    [],
+    []
+   ]
+  },
+  {
+   "name": "operand_wait_retires_prefix",
+   "lines": [
+    "global_load_b32 v13, v[28:29], off",
+    "global_load_b32 v18, v[30:31], off",
+    "s_wait_loadcnt 1",
+    "v_mov_b32 v36, 76",
+    "s_endpgm"
+   ],
+   "loads": [
+    0,
+    1
+   ],
+   "in_flight": [
+    [],
+    [
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     1
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  {
+   "name": "track_only_second_load",
+   "lines": [
+    "global_load_b32 v13, v[28:29], off",
+    "global_load_b32 v18, v[30:31], off",
+    "s_wait_loadcnt {loadcnt=1}",
+    "v_mov_b32 v37, 77",
+    "s_endpgm"
+   ],
+   "loads": [
+    1
+   ],
+   "in_flight": [
+    [],
+    [],
+    [
+     0
+    ],
+    [
+     0
+    ],
+    [
+     0
+    ]
+   ]
+  },
+  {
+   "name": "join_keeps_earlier_load",
+   "lines": [
+    "global_load_b32 v13, v[28:29], off",
+    "s_cbranch_scc1 @around",
+    "global_load_b32 v18, v[30:31], off",
+    "around:",
+    "s_wait_loadcnt {loadcnt=1}",
+    "v_mov_b32 v38, 78",
+    "s_endpgm"
+   ],
+   "loads": [
+    0,
+    2
+   ],
+   "in_flight": [
+    [],
+    [
+     0
+    ],
+    [
+     0
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1
+    ],
+    [
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "name": "load_reissued_by_loop",
+   "lines": [
+    "iterate:",
+    "global_load_b32 v13, v[28:29], off",
+    "v_mov_b32 v39, 79",
+    "global_load_b32 v18, v[30:31], off",
+    "s_wait_loadcnt {loadcnt=1}",
+    "s_cbranch_scc1 @iterate",
+    "s_wait_loadcnt {loadcnt=0}",
+    "s_endpgm"
+   ],
+   "loads": [
+    1,
+    3
+   ],
+   "in_flight": [
+    [
+     1
+    ],
+    [
+     1
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     1
+    ],
+    [
+     1
+    ],
+    []
+   ]
+  },
+  {
+   "name": "explicit_non_program_load_order",
+   "lines": [
+    "s_cbranch_scc1 @right_loads",
+    "global_load_b32 v18, v[30:31], off",
+    "global_load_b32 v13, v[28:29], off",
+    "s_branch @load_join",
+    "right_loads:",
+    "global_load_b32 v13, v[28:29], off",
+    "global_load_b32 v18, v[30:31], off",
+    "load_join:",
+    "v_mov_b32 v40, 80",
+    "s_endpgm"
+   ],
+   "loads": [
+    5,
+    2,
+    1,
+    6
+   ],
+   "in_flight": [
+    [],
+    [],
+    [
+     2
+    ],
+    [
+     2,
+     1
+    ],
+    [],
+    [],
+    [
+     0
+    ],
+    [
+     2,
+     1,
+     0,
+     3
+    ],
+    [
+     2,
+     1,
+     0,
+     3
+    ],
+    [
+     2,
+     1,
+     0,
+     3
+    ]
+   ]
+  }
+ ]
+}

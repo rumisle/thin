@@ -1,0 +1,761 @@
+{
+ "target": "gfx1201",
+ "notation": "Authored gfx1201 notation: vN/sN and v[a:b]/s[a:b] name values placed at physical registers; named physical registers, integer immediates and @label operands are supported. {name=value|...} gives fields. '; m0_set=C' and '; waves=0bMASK' attach IR attributes. Abstract stream op/br/brw/jmp/end/label tokens denote concrete native instructions. Native results are entry states unless their key says otherwise. defs/uses are [value id, lo, n] over one shared value table.",
+ "instrs": [
+  {
+   "line": "v_add_nc_u32 v51, v52, v53",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     0,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     1,
+     0,
+     1
+    ],
+    [
+     2,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_add_nc_u32 v51, v51, v51",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     0,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     0,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_fmac_f32 v57, v58, v59",
+   "roles": [
+    3,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     3,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     3,
+     0,
+     1
+    ],
+    [
+     4,
+     0,
+     1
+    ],
+    [
+     5,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_writelane_b32 v57, s19, 1",
+   "roles": [
+    3,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     3,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     3,
+     0,
+     1
+    ],
+    [
+     6,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_cmp_gt_u32 vcc_lo, v55, v56",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [],
+   "uses": [
+    [
+     7,
+     0,
+     1
+    ],
+    [
+     8,
+     0,
+     1
+    ]
+   ],
+   "writes": [
+    "vcc"
+   ],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": true,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_cmp_gt_u32 s[28:29], v55, v56",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     9,
+     0,
+     2
+    ]
+   ],
+   "uses": [
+    [
+     7,
+     0,
+     1
+    ],
+    [
+     8,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": true,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_cmpx_gt_u32 v57, v58",
+   "roles": [
+    1,
+    1
+   ],
+   "defs": [],
+   "uses": [
+    [
+     3,
+     0,
+     1
+    ],
+    [
+     4,
+     0,
+     1
+    ]
+   ],
+   "writes": [
+    "exec"
+   ],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": true,
+   "writes_exec": true,
+   "m0_write": false
+  },
+  {
+   "line": "v_cndmask_b32 v59, v60, v61, vcc_lo",
+   "roles": [
+    2,
+    1,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     5,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     10,
+     0,
+     1
+    ],
+    [
+     11,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec",
+    "vcc"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "s_mov_b32 exec_lo, 0x5a",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [],
+   "uses": [],
+   "writes": [
+    "exec"
+   ],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": true,
+   "m0_write": false
+  },
+  {
+   "line": "s_mov_b32 exec_hi, 17",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [],
+   "uses": [],
+   "writes": [
+    "exec"
+   ],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": true,
+   "m0_write": false
+  },
+  {
+   "line": "s_mov_b32 s32, exec_lo",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [
+    [
+     12,
+     0,
+     1
+    ]
+   ],
+   "uses": [],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "s_and_saveexec_b32 s34, s36",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [
+    [
+     13,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     14,
+     0,
+     1
+    ]
+   ],
+   "writes": [
+    "exec",
+    "scc"
+   ],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": true,
+   "m0_write": false
+  },
+  {
+   "line": "s_mov_b32 m0, 18",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [],
+   "uses": [],
+   "writes": [
+    "m0"
+   ],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": true
+  },
+  {
+   "line": "s_add_co_u32 s37, s38, s39",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     15,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     16,
+     0,
+     1
+    ],
+    [
+     17,
+     0,
+     1
+    ]
+   ],
+   "writes": [
+    "scc"
+   ],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "s_or_b32 vcc_lo, exec_lo, vcc_lo",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [],
+   "uses": [],
+   "writes": [
+    "vcc",
+    "scc"
+   ],
+   "reads": [
+    "exec",
+    "vcc"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "global_load_b32 v61, v[62:63], off",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     11,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     18,
+     0,
+     2
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec",
+    "off"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "global_store_b32 v[64:65], v61, off",
+   "roles": [
+    1,
+    1,
+    1
+   ],
+   "defs": [],
+   "uses": [
+    [
+     19,
+     0,
+     2
+    ],
+    [
+     11,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec",
+    "off"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "s_load_b32 s36, s[40:41], 8",
+   "roles": [
+    2,
+    1,
+    1
+   ],
+   "defs": [
+    [
+     14,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     20,
+     0,
+     2
+    ]
+   ],
+   "writes": [],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "s_cbranch_scc1 @detour",
+   "roles": [
+    1
+   ],
+   "defs": [],
+   "uses": [],
+   "writes": [],
+   "reads": [
+    "scc"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "s_endpgm",
+   "roles": [],
+   "defs": [],
+   "uses": [],
+   "writes": [],
+   "reads": [],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_mov_b32_dpp v67, v68 {dpp=quad_perm:[2,3,0,1]|row_mask=15|bank_mask=15}",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [
+    [
+     21,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     22,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_mov_b32_dpp v67, v68 {dpp=row_shr:2|row_mask=15|bank_mask=15}",
+   "roles": [
+    3,
+    1
+   ],
+   "defs": [
+    [
+     21,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     21,
+     0,
+     1
+    ],
+    [
+     22,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_mov_b32_dpp v67, v68 {dpp=row_shr:2|row_mask=15|bank_mask=15|bound_ctrl=true}",
+   "roles": [
+    2,
+    1
+   ],
+   "defs": [
+    [
+     21,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     22,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  },
+  {
+   "line": "v_mov_b32_dpp v67, v68 {dpp=quad_perm:[2,3,0,1]|row_mask=13|bank_mask=15}",
+   "roles": [
+    3,
+    1
+   ],
+   "defs": [
+    [
+     21,
+     0,
+     1
+    ]
+   ],
+   "uses": [
+    [
+     21,
+     0,
+     1
+    ],
+    [
+     22,
+     0,
+     1
+    ]
+   ],
+   "writes": [],
+   "reads": [
+    "exec"
+   ],
+   "sgpr_valu_def": false,
+   "writes_exec": false,
+   "m0_write": false
+  }
+ ],
+ "dpp_reads_old": [
+  {
+   "fields": {},
+   "reads_old": true
+  },
+  {
+   "fields": {
+    "row_mask": 14,
+    "bank_mask": 15
+   },
+   "reads_old": true
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "bound_ctrl": true
+   },
+   "reads_old": false
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "bound_ctrl": 0
+   },
+   "reads_old": true
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_mirror"
+   },
+   "reads_old": false
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_half_mirror"
+   },
+   "reads_old": false
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_ror:5"
+   },
+   "reads_old": false
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_share:6"
+   },
+   "reads_old": false
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_xmask:9"
+   },
+   "reads_old": false
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_shl:2"
+   },
+   "reads_old": true
+  },
+  {
+   "fields": {
+    "row_mask": 15,
+    "bank_mask": 15,
+    "dpp": "row_newbcast:17"
+   },
+   "reads_old": true
+  },
+  {
+   "fields": {
+    "row_mask": 13,
+    "bank_mask": 11,
+    "dpp": "row_mirror",
+    "bound_ctrl": true
+   },
+   "reads_old": true
+  },
+  {
+   "fields": {
+    "row_mask": true,
+    "bank_mask": 15,
+    "dpp": "row_mirror"
+   },
+   "reads_old": true
+  }
+ ]
+}

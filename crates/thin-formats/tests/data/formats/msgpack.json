@@ -1,0 +1,184 @@
+[
+ {
+  "value": null,
+  "hex": "c0"
+ },
+ {
+  "value": true,
+  "hex": "c3"
+ },
+ {
+  "value": false,
+  "hex": "c2"
+ },
+ {
+  "value": 0,
+  "hex": "00"
+ },
+ {
+  "value": 127,
+  "hex": "7f"
+ },
+ {
+  "value": 128,
+  "hex": "cc80"
+ },
+ {
+  "value": 255,
+  "hex": "ccff"
+ },
+ {
+  "value": 256,
+  "hex": "cd0100"
+ },
+ {
+  "value": 65535,
+  "hex": "cdffff"
+ },
+ {
+  "value": 65536,
+  "hex": "ce00010000"
+ },
+ {
+  "value": 4294967296,
+  "hex": "cf0000000100000000"
+ },
+ {
+  "value": 9223372036854775808,
+  "hex": "cf8000000000000000"
+ },
+ {
+  "value": -1,
+  "hex": "ff"
+ },
+ {
+  "value": -32,
+  "hex": "e0"
+ },
+ {
+  "value": -33,
+  "hex": "d0df"
+ },
+ {
+  "value": -128,
+  "hex": "d080"
+ },
+ {
+  "value": -129,
+  "hex": "d1ff7f"
+ },
+ {
+  "value": -2147483648,
+  "hex": "d280000000"
+ },
+ {
+  "value": -9223372036854775808,
+  "hex": "d38000000000000000"
+ },
+ {
+  "value": "",
+  "hex": "a0"
+ },
+ {
+  "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hex": "bf61616161616161616161616161616161616161616161616161616161616161"
+ },
+ {
+  "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hex": "d9206161616161616161616161616161616161616161616161616161616161616161"
+ },
+ {
+  "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "hex": "da010061616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161"
+ },
+ {
+  "value": [],
+  "hex": "90"
+ },
+ {
+  "value": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15
+  ],
+  "hex": "dc0010000102030405060708090a0b0c0d0e0f"
+ },
+ {
+  "value": {
+   "b": 1,
+   "a": [
+    1,
+    "x"
+   ]
+  },
+  "hex": "82a1619201a178a16201"
+ },
+ {
+  "value": {
+   "k00": 0,
+   "k01": 1,
+   "k02": 2,
+   "k03": 3,
+   "k04": 4,
+   "k05": 5,
+   "k06": 6,
+   "k07": 7,
+   "k08": 8,
+   "k09": 9,
+   "k10": 10,
+   "k11": 11,
+   "k12": 12,
+   "k13": 13,
+   "k14": 14,
+   "k15": 15
+  },
+  "hex": "de0010a36b303000a36b303101a36b303202a36b303303a36b303404a36b303505a36b303606a36b303707a36b303808a36b303909a36b31300aa36b31310ba36b31320ca36b31330da36b31340ea36b31350f"
+ },
+ {
+  "value": 18446744073709551616,
+  "refused": "CodeObjectError"
+ },
+ {
+  "value": -9223372036854775809,
+  "refused": "CodeObjectError"
+ },
+ {
+  "value": {
+   "é": 1
+  },
+  "refused": "CodeObjectError"
+ },
+ {
+  "value": 1.5,
+  "refused": "CodeObjectError"
+ },
+ {
+  "value": {
+   "a": {
+    "b": [
+     1180591620717411303424
+    ]
+   }
+  },
+  "refused": "CodeObjectError"
+ },
+ {
+  "value": {
+   "a": 1.0
+  },
+  "refused": "CodeObjectError"
+ }
+]

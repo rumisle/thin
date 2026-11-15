@@ -1,0 +1,35 @@
+[package]
+name = "thin-formats"
+description = "Element formats, bit-exact encode/decode, MX quantization, byte layouts and the AMDHSA code-object container"
+keywords = ["gpu", "amdgpu", "fp8", "microscaling", "elf"]
+categories = ["encoding", "parser-implementations"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+rayon.workspace = true
+sha2.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+thin-test-support = { path = "../../tests/rust" }
+serde_json.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-targets.workspace = true
+thin-dsl.workspace = true
+thin-codegen.workspace = true
+thin-emu.workspace = true
+
+
+[[test]]
+name = "formats"
+harness = false

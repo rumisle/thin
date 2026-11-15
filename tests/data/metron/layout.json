@@ -1,0 +1,547 @@
+{
+ "notation": "Native copy geometry and owned-pool allocation/initialization for explicit host inputs.",
+ "copies": [
+  {
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     1
+    ],
+    "device": "cpu"
+   },
+   "io": "in",
+   "nbytes": 4,
+   "stride": 4112,
+   "gap_byte": 255,
+   "first_byte": 0
+  },
+  {
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     4
+    ],
+    "device": "cpu"
+   },
+   "io": "out",
+   "nbytes": 16,
+   "stride": 4112,
+   "gap_byte": 91,
+   "first_byte": 255
+  },
+  {
+   "tensor": {
+    "dtype": "uint8",
+    "shape": [
+     0
+    ],
+    "device": "cpu"
+   },
+   "io": "in",
+   "nbytes": 0,
+   "stride": 4096,
+   "gap_byte": 255,
+   "first_byte": null
+  },
+  {
+   "tensor": {
+    "dtype": "uint8",
+    "shape": [
+     17
+    ],
+    "device": "cpu"
+   },
+   "io": "out",
+   "nbytes": 17,
+   "stride": 4128,
+   "gap_byte": 91,
+   "first_byte": 255
+  },
+  {
+   "tensor": {
+    "dtype": "bfloat16",
+    "shape": [
+     1024,
+     3
+    ],
+    "device": "cpu"
+   },
+   "io": "in",
+   "nbytes": 6144,
+   "stride": 10240,
+   "gap_byte": 255,
+   "first_byte": 0
+  },
+  {
+   "tensor": {
+    "dtype": "float32",
+    "shape": [
+     1048576
+    ],
+    "device": "cpu"
+   },
+   "io": "in",
+   "nbytes": 4194304,
+   "stride": 4198400,
+   "gap_byte": 255,
+   "first_byte": 0
+  }
+ ],
+ "owned": [
+  {
+   "arms": [
+    {
+     "name": "a",
+     "owned": {
+      "w": [
+       300,
+       "scratch"
+      ],
+      "k": [
+       16,
+       "kept"
+      ]
+     }
+    },
+    {
+     "name": "b",
+     "owned": {
+      "v": [
+       8,
+       "scratch"
+      ],
+      "u": [
+       600,
+       "scratch"
+      ],
+      "c": [
+       4,
+       "carried"
+      ]
+     }
+    }
+   ],
+   "at": [
+    {
+     "arm": "a",
+     "name": "w",
+     "kind": "scratch",
+     "offset": 0,
+     "nbytes": 300
+    },
+    {
+     "arm": "a",
+     "name": "k",
+     "kind": "kept",
+     "offset": 0,
+     "nbytes": 16
+    },
+    {
+     "arm": "b",
+     "name": "v",
+     "kind": "scratch",
+     "offset": 0,
+     "nbytes": 8
+    },
+    {
+     "arm": "b",
+     "name": "u",
+     "kind": "scratch",
+     "offset": 256,
+     "nbytes": 600
+    },
+    {
+     "arm": "b",
+     "name": "c",
+     "kind": "carried",
+     "offset": 0,
+     "nbytes": 4
+    }
+   ],
+   "pools": {
+    "scratch": 1024,
+    "kept": 256,
+    "carried": 256,
+    "gens": 0
+   },
+   "contents": {
+    "scratch": [
+     [
+      255,
+      1024
+     ]
+    ],
+    "kept": [
+     [
+      0,
+      256
+     ]
+    ],
+    "carried": [
+     [
+      0,
+      256
+     ]
+    ],
+    "gens": []
+   },
+   "gap": {
+    "scratch": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "kept": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "carried": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "gens": [
+     [
+      91,
+      4096
+     ]
+    ]
+   }
+  },
+  {
+   "arms": [
+    {
+     "name": "a",
+     "owned": {
+      "k": [
+       "0708",
+       "kept"
+      ],
+      "z": [
+       10,
+       "kept"
+      ]
+     }
+    },
+    {
+     "name": "b",
+     "owned": {
+      "k": [
+       "090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909090909",
+       "kept"
+      ]
+     }
+    }
+   ],
+   "at": [
+    {
+     "arm": "a",
+     "name": "z",
+     "kind": "kept",
+     "offset": 0,
+     "nbytes": 10
+    },
+    {
+     "arm": "a",
+     "name": "k",
+     "kind": "kept",
+     "offset": 256,
+     "nbytes": 2
+    },
+    {
+     "arm": "b",
+     "name": "k",
+     "kind": "kept",
+     "offset": 512,
+     "nbytes": 300
+    }
+   ],
+   "pools": {
+    "scratch": 0,
+    "kept": 1024,
+    "carried": 0,
+    "gens": 0
+   },
+   "contents": {
+    "scratch": [],
+    "kept": [
+     [
+      0,
+      256
+     ],
+     [
+      7,
+      1
+     ],
+     [
+      8,
+      1
+     ],
+     [
+      0,
+      254
+     ],
+     [
+      9,
+      300
+     ],
+     [
+      0,
+      212
+     ]
+    ],
+    "carried": [],
+    "gens": []
+   },
+   "gap": {
+    "scratch": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "kept": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "carried": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "gens": [
+     [
+      91,
+      4096
+     ]
+    ]
+   }
+  },
+  {
+   "arms": [
+    {
+     "name": "a",
+     "owned": {
+      "g": [
+       8,
+       "gens"
+      ],
+      "c": [
+       300,
+       "carried.uncached"
+      ],
+      "h": [
+       8,
+       "gens.uncached"
+      ],
+      "m": [
+       12,
+       "mapped"
+      ],
+      "k": [
+       "01",
+       "kept.uncached"
+      ]
+     }
+    }
+   ],
+   "at": [
+    {
+     "arm": "a",
+     "name": "g",
+     "kind": "gens",
+     "offset": 0,
+     "nbytes": 8
+    },
+    {
+     "arm": "a",
+     "name": "c",
+     "kind": "carried.uncached",
+     "offset": 0,
+     "nbytes": 300
+    },
+    {
+     "arm": "a",
+     "name": "h",
+     "kind": "gens.uncached",
+     "offset": 0,
+     "nbytes": 8
+    },
+    {
+     "arm": "a",
+     "name": "m",
+     "kind": "mapped",
+     "offset": 0,
+     "nbytes": 12
+    },
+    {
+     "arm": "a",
+     "name": "k",
+     "kind": "kept.uncached",
+     "offset": 0,
+     "nbytes": 1
+    }
+   ],
+   "pools": {
+    "scratch": 0,
+    "kept": 0,
+    "carried": 0,
+    "gens": 256,
+    "kept.uncached": 256,
+    "carried.uncached": 512,
+    "gens.uncached": 256,
+    "mapped": 256
+   },
+   "contents": {
+    "scratch": [],
+    "kept": [],
+    "carried": [],
+    "gens": [
+     [
+      "fffffffd",
+      64
+     ]
+    ],
+    "kept.uncached": [
+     [
+      1,
+      1
+     ],
+     [
+      0,
+      255
+     ]
+    ],
+    "carried.uncached": [
+     [
+      0,
+      512
+     ]
+    ],
+    "gens.uncached": [
+     [
+      "fffffffd",
+      64
+     ]
+    ],
+    "mapped": [
+     [
+      0,
+      256
+     ]
+    ]
+   },
+   "gap": {
+    "scratch": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "kept": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "carried": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "gens": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "kept.uncached": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "carried.uncached": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "gens.uncached": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "mapped": [
+     [
+      91,
+      4096
+     ]
+    ]
+   }
+  },
+  {
+   "arms": [
+    {
+     "name": "a",
+     "owned": {}
+    }
+   ],
+   "at": [],
+   "pools": {
+    "scratch": 0,
+    "kept": 0,
+    "carried": 0,
+    "gens": 0
+   },
+   "contents": {
+    "scratch": [],
+    "kept": [],
+    "carried": [],
+    "gens": []
+   },
+   "gap": {
+    "scratch": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "kept": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "carried": [
+     [
+      91,
+      4096
+     ]
+    ],
+    "gens": [
+     [
+      91,
+      4096
+     ]
+    ]
+   }
+  }
+ ],
+ "copies_refusal": {
+  "case": "an input of stride_max - GAP + 1 bytes",
+  "result": {
+   "error": "ValueError",
+   "message": "huge: 4294897665 bytes: a copy of at most 4294897664"
+  }
+ }
+}

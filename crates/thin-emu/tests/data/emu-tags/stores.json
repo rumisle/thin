@@ -1,0 +1,897 @@
+{
+ "notation": "Each case calls the store (or atomic) check once with the stored bytes ([offset in D, tag]) of one buffer named D, the problem's only layout. d_rows / d_cols / d_kblocks / scatter are tables, written as formulas of m and n over the case's rows and columns. errors: every recorded error (non-fail-fast), in order; raised: an error raised regardless of the mode. stores: the store counts [m, n, (A row,) count] in order of first store. Message prefix 'wave 0:' is the wave id.",
+ "cases": [
+  {
+   "case": "a good bf16 cell",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "two cells, one row (n from the offset)",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     2,
+     {
+      "rec": {
+       "m": 0,
+       "n": 1,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     3,
+     {
+      "rec": {
+       "m": 0,
+       "n": 1,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ],
+    [
+     0,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "untagged bytes",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] stored from bytes with no provenance"
+   ],
+   "stores": []
+  },
+  {
+   "case": "a plain memory byte",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "mem": [
+       5,
+       0
+      ]
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] stored from a plain memory byte, not an accumulator"
+   ],
+   "stores": []
+  },
+  {
+   "case": "wrong row",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 1,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 1,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] receives the result of row 1, expected 0",
+    "wave 0: D[0][0] receives the result of row 1, expected 0"
+   ],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "wrong column",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 3,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 3,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] receives the result of column(s) 3, expected 0",
+    "wave 0: D[0][0] receives the result of column(s) 3, expected 0"
+   ],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "k-blocks missing",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 64,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] stored with k-blocks [1] missing",
+    "wave 0: D[0][0] stored with k-blocks [1] missing"
+   ],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "extra k-blocks: listed as past K",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0,
+        1
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0,
+        1
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] stored with k-blocks [1] past K",
+    "wave 0: D[0][0] stored with k-blocks [1] past K"
+   ],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "poison",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "poison": "adds the same partial sum twice at (0, 0)"
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] stored from a value that adds the same partial sum twice at (0, 0)"
+   ],
+   "stores": []
+  },
+  {
+   "case": "d_rows: row 0 expects A row 16",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "d_rows": "m + 16",
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] receives the result of row 0, expected 16",
+    "wave 0: D[0][0] receives the result of row 0, expected 16"
+   ],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "d_rows: -1 rows are not checked",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "d_rows": "-1 for m = 0, else m",
+   "bytes": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ],
+    [
+     32,
+     {
+      "rec": {
+       "m": 1,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     33,
+     {
+      "rec": {
+       "m": 1,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     1,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "d_cols: a fused epilogue's column pair",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "d_cols": "(2n, 2n + 1)",
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": [
+        0,
+        1
+       ],
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": [
+        0,
+        1
+       ],
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "d_kblocks: row 0 holds k-block 1 only",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 64,
+   "d_kblocks": "{1}",
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        1
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        1
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     0,
+     0,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "the same cell twice",
+   "check": "store",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     0,
+     0,
+     2
+    ]
+   ]
+  },
+  {
+   "case": "scatter atomic: one of the expected rows",
+   "check": "atomic",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "scatter": {
+    "0": [
+     3,
+     5
+    ]
+   },
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 3,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 3,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "stores": [
+    [
+     0,
+     0,
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "scatter atomic: an unexpected row",
+   "check": "atomic",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "scatter": {
+    "0": [
+     3,
+     5
+    ]
+   },
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 4,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 4,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] += row 4 column 0 over 1 of 1 k-blocks; expected one of rows [3, 5], column 0"
+   ],
+   "stores": [
+    [
+     0,
+     0,
+     4,
+     1
+    ]
+   ]
+  },
+  {
+   "case": "scatter atomic: untagged",
+   "check": "atomic",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "scatter": {
+    "0": [
+     3,
+     5
+    ]
+   },
+   "bytes": [
+    [
+     0,
+     0
+    ],
+    [
+     1,
+     0
+    ]
+   ],
+   "errors": [
+    "wave 0: D[0][0] += a value with no accumulator provenance"
+   ],
+   "stores": []
+  },
+  {
+   "case": "atomic into D without scatter",
+   "check": "atomic",
+   "layout": {
+    "rowmajor_d": {
+     "ld_bytes": 32,
+     "elem_bytes": 2
+    }
+   },
+   "K": 32,
+   "bytes": [
+    [
+     0,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ],
+    [
+     1,
+     {
+      "rec": {
+       "m": 0,
+       "n": 0,
+       "k": [
+        0
+       ],
+       "pid": 0
+      }
+     }
+    ]
+   ],
+   "errors": [],
+   "raised": "wave 0: an atomic add into D",
+   "stores": []
+  }
+ ]
+}

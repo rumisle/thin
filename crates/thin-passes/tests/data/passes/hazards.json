@@ -1,0 +1,1291 @@
+{
+ "target": "gfx1201",
+ "notation": "+ marks inserted lines; delay text is rendered by the native pass",
+ "cases": [
+  {
+   "name": "tracked scalar destination followed by scalar consumer",
+   "input": [
+    "v_cndmask_b32_e64 v17, v6, v7, s10",
+    "s_cselect_b32 s11, 5, 27",
+    "s_add_co_u32 s18, s11, 9",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cndmask_b32_e64 v17, v6, v7, s10",
+    "s_cselect_b32 s11, 5, 27",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s18, s11, 9",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "carry pair pairing s8 then s8",
+   "input": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s8",
+    "s_cselect_b32 s8, 17, 29",
+    "s_or_b32 s19, s8, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s8",
+    "s_cselect_b32 s8, 17, 29",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_or_b32 s19, s8, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "carry pair pairing s9 then s8",
+   "input": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s9",
+    "s_cselect_b32 s8, 17, 29",
+    "s_or_b32 s19, s8, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s9",
+    "s_cselect_b32 s8, 17, 29",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_or_b32 s19, s8, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "carry pair pairing s8 then s9",
+   "input": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s8",
+    "s_cselect_b32 s9, 17, 29",
+    "s_or_b32 s19, s9, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s8",
+    "s_cselect_b32 s9, 17, 29",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_or_b32 s19, s9, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "carry pair pairing s13 then s13",
+   "input": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s13",
+    "s_cselect_b32 s13, 17, 29",
+    "s_or_b32 s19, s13, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s13",
+    "s_cselect_b32 s13, 17, 29",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_or_b32 s19, s13, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "scalar selected value used as a vector carry selector",
+   "input": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s8",
+    "s_cselect_b32 s9, 17, 29",
+    "v_add_co_ci_u32_e64 v20, vcc_lo, 5, v18, s9",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v18, vcc_lo, 3, v6, s8",
+    "s_cselect_b32 s9, 17, 29",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32_e64 v20, vcc_lo, 5, v18, s9",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "selected VCC consumed by scalar arithmetic",
+   "input": [
+    "v_cndmask_b32 v16, v8, v9, vcc_lo",
+    "s_cselect_b32 vcc_lo, 33, 47",
+    "s_xor_b32 s20, vcc_lo, 5",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cndmask_b32 v16, v8, v9, vcc_lo",
+    "s_cselect_b32 vcc_lo, 33, 47",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_xor_b32 s20, vcc_lo, 5",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "selected VCC consumed by vector conditional move",
+   "input": [
+    "v_cndmask_b32 v16, v8, v9, vcc_lo",
+    "s_cselect_b32 vcc_lo, 33, 47",
+    "v_cndmask_b32 v21, v10, v11, vcc_lo",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cndmask_b32 v16, v8, v9, vcc_lo",
+    "s_cselect_b32 vcc_lo, 33, 47",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "v_cndmask_b32 v21, v10, v11, vcc_lo",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "vector carry result then VCC readers",
+   "input": [
+    "v_add_co_ci_u32_e64 v19, s14, 1, v6, vcc_lo",
+    "v_add_co_u32 v22, vcc_lo, v7, v19",
+    "v_add_co_ci_u32 v23, vcc_lo, v9, v10, vcc_lo",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v19, s14, 1, v6, vcc_lo",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_u32 v22, vcc_lo, v7, v19",
+    "+ s_wait_alu depctr_va_vcc(0)",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32 v23, vcc_lo, v9, v10, vcc_lo",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "scalar VCC copy commits vector state before next vector writer",
+   "input": [
+    "v_add_co_ci_u32_e64 v19, s14, 1, v6, vcc_lo",
+    "v_add_co_u32 v22, vcc_lo, v7, v19",
+    "s_mov_b32 s23, vcc_lo",
+    "v_add_co_ci_u32 v24, vcc_lo, v9, v10, vcc_lo",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v19, s14, 1, v6, vcc_lo",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_u32 v22, vcc_lo, v7, v19",
+    "s_mov_b32 s23, vcc_lo",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32 v24, vcc_lo, v9, v10, vcc_lo",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "merged SALU and VALU condition states both reach consumer",
+   "input": [
+    "v_cndmask_b32 v18, v7, v8, vcc_lo",
+    "s_cmp_eq_u32 s25, 0",
+    "s_cbranch_scc0 .Lhz_scalar",
+    "v_cmp_gt_f32_e64 vcc_lo, v4, v5",
+    "s_branch .Lhz_merge",
+    ".Lhz_scalar:",
+    "s_cselect_b32 vcc_lo, 51, 63",
+    ".Lhz_merge:",
+    "v_cndmask_b32 v26, v12, v13, vcc_lo",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cndmask_b32 v18, v7, v8, vcc_lo",
+    "s_cmp_eq_u32 s25, 0",
+    "s_cbranch_scc0 .Lhz_scalar",
+    "v_cmp_gt_f32_e64 vcc_lo, v4, v5",
+    "s_branch .Lhz_merge",
+    ".Lhz_scalar:",
+    "s_cselect_b32 vcc_lo, 51, 63",
+    ".Lhz_merge:",
+    "+ s_wait_alu depctr_sa_sdst(0) depctr_va_vcc(0)",
+    "v_cndmask_b32 v26, v12, v13, vcc_lo",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "loop back edge establishes a scalar pair at its header",
+   "input": [
+    "s_nop 0",
+    ".Lhz_head:",
+    "s_getpc_b64 s[26:27]",
+    "s_add_co_u32 s29, s26, 3",
+    "v_cndmask_b32_e64 v20, v8, v9, s26",
+    "s_cbranch_scc0 .Lhz_head",
+    "s_endpgm"
+   ],
+   "output": [
+    "s_nop 0",
+    ".Lhz_head:",
+    "s_getpc_b64 s[26:27]",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s29, s26, 3",
+    "v_cndmask_b32_e64 v20, v8, v9, s26",
+    "s_cbranch_scc0 .Lhz_head",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "unpaired program counter write requires no wait",
+   "input": [
+    "s_getpc_b64 s[30:31]",
+    "s_add_co_u32 s32, s30, 5",
+    "v_cndmask_b32_e64 v22, v10, v11, s30",
+    "s_endpgm"
+   ],
+   "output": [
+    "s_getpc_b64 s[30:31]",
+    "s_add_co_u32 s32, s30, 5",
+    "v_cndmask_b32_e64 v22, v10, v11, s30",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "unpaired state crosses an ordinary control label",
+   "input": [
+    "s_getpc_b64 s[34:35]",
+    "s_add_co_u32 s36, s34, 5",
+    "s_branch .Lhz_plain",
+    ".Lhz_plain:",
+    "v_cndmask_b32_e64 v23, v10, v11, s34",
+    "s_endpgm"
+   ],
+   "output": [
+    "s_getpc_b64 s[34:35]",
+    "s_add_co_u32 s36, s34, 5",
+    "s_branch .Lhz_plain",
+    ".Lhz_plain:",
+    "v_cndmask_b32_e64 v23, v10, v11, s34",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "vector carry output has immediate and later dependent readers",
+   "input": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v18, s38",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "+ s_wait_alu depctr_va_sdst(0)",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v18, s38",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "scalar copy between vector reads of one scalar selector",
+   "input": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "s_mov_b32 s40, s38",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v18, s38",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "s_mov_b32 s40, s38",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v18, s38",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "buffer memory operation does not commit vector selector state",
+   "input": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "buffer_load_b32 v31, off, s[44:47], s48",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v31, s38",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "buffer_load_b32 v31, off, s[44:47], s48",
+    "+ s_wait_alu depctr_va_sdst(0)",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v31, s38",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "scalar memory operation does not commit vector selector state",
+   "input": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "s_load_b32 s49, s[50:51], 12",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v18, s38",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v25, s38, 2, v14, s38",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_u32 v27, s38, v15, v25",
+    "s_load_b32 s49, s[50:51], 12",
+    "+ s_wait_alu depctr_va_sdst(0)",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_co_ci_u32_e64 v28, s39, v17, v18, s38",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "ordinary scalar comparison destination is not tracked",
+   "input": [
+    "v_cmp_eq_f32_e64 s52, v5, v6",
+    "s_cselect_b32 s52, 43, 47",
+    "s_add_co_u32 s53, s52, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cmp_eq_f32_e64 s52, v5, v6",
+    "s_cselect_b32 s52, 43, 47",
+    "s_add_co_u32 s53, s52, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "SALU nops before a selected write do not retire its pairing",
+   "input": [
+    "v_add_co_ci_u32_e64 v25, vcc_lo, 2, v14, s54",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_cselect_b32 s55, 11, 13",
+    "s_add_co_u32 s56, s55, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v25, vcc_lo, 2, v14, s54",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_cselect_b32 s55, 11, 13",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s56, s55, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "SALU nops after a selected write do not retire its pairing",
+   "input": [
+    "v_add_co_ci_u32_e64 v25, vcc_lo, 2, v14, s54",
+    "s_cselect_b32 s55, 11, 13",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_add_co_u32 s56, s55, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v25, vcc_lo, 2, v14, s54",
+    "s_cselect_b32 s55, 11, 13",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "s_nop 0",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s56, s55, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "buffer completion establishes the VMEM commit rule",
+   "input": [
+    "v_add_co_ci_u32_e64 v29, s65, 2, v20, s65",
+    "buffer_load_b32 v33, off, s[60:63], s64",
+    "s_wait_loadcnt 0",
+    "s_getpc_b64 s[64:65]",
+    "s_add_co_u32 s68, s64, 11",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v29, s65, 2, v20, s65",
+    "buffer_load_b32 v33, off, s[60:63], s64",
+    "s_wait_loadcnt 0",
+    "s_getpc_b64 s[64:65]",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s68, s64, 11",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "global completion establishes the VMEM commit rule",
+   "input": [
+    "v_add_co_ci_u32_e64 v29, s65, 2, v20, s65",
+    "global_load_b32 v33, v[34:35], off offset:16",
+    "s_wait_loadcnt 0",
+    "s_getpc_b64 s[64:65]",
+    "s_add_co_u32 s68, s64, 11",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v29, s65, 2, v20, s65",
+    "global_load_b32 v33, v[34:35], off offset:16",
+    "s_wait_loadcnt 0",
+    "s_getpc_b64 s[64:65]",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s68, s64, 11",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "flat completion establishes the VMEM commit rule",
+   "input": [
+    "v_add_co_ci_u32_e64 v29, s65, 2, v20, s65",
+    "flat_load_b32 v33, v[34:35]",
+    "s_wait_loadcnt 0",
+    "s_wait_dscnt 0",
+    "s_getpc_b64 s[64:65]",
+    "s_add_co_u32 s68, s64, 11",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v29, s65, 2, v20, s65",
+    "flat_load_b32 v33, v[34:35]",
+    "s_wait_loadcnt 0",
+    "s_wait_dscnt 0",
+    "s_getpc_b64 s[64:65]",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s68, s64, 11",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "four DS nops age out tracked scalar pairs",
+   "input": [
+    "v_add_co_ci_u32_e64 v30, s69, 2, v21, s69",
+    "ds_nop",
+    "ds_nop",
+    "ds_nop",
+    "ds_nop",
+    "s_getpc_b64 s[68:69]",
+    "s_add_co_u32 s72, s68, 13",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v30, s69, 2, v21, s69",
+    "ds_nop",
+    "ds_nop",
+    "ds_nop",
+    "ds_nop",
+    "s_getpc_b64 s[68:69]",
+    "s_add_co_u32 s72, s68, 13",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "three DS nops retain tracked scalar pairs",
+   "input": [
+    "v_add_co_ci_u32_e64 v30, s69, 2, v21, s69",
+    "ds_nop",
+    "ds_nop",
+    "ds_nop",
+    "s_getpc_b64 s[68:69]",
+    "s_add_co_u32 s72, s68, 13",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_co_ci_u32_e64 v30, s69, 2, v21, s69",
+    "ds_nop",
+    "ds_nop",
+    "ds_nop",
+    "s_getpc_b64 s[68:69]",
+    "+ s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s72, s68, 13",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "raw numeric ALU wait commits selected scalar state",
+   "input": [
+    "v_cndmask_b32_e64 v32, v15, v16, s75",
+    "s_cselect_b32 s74, 5, 31",
+    "s_wait_alu 0xfff8",
+    "s_add_co_u32 s75, s74, 17",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cndmask_b32_e64 v32, v15, v16, s75",
+    "s_cselect_b32 s74, 5, 31",
+    "s_wait_alu 65528",
+    "s_add_co_u32 s75, s74, 17",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "explicit symbolic ALU wait is reused",
+   "input": [
+    "v_cndmask_b32_e64 v32, v15, v16, s75",
+    "s_cselect_b32 s74, 5, 31",
+    "s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s75, s74, 17",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cndmask_b32_e64 v32, v15, v16, s75",
+    "s_cselect_b32 s74, 5, 31",
+    "s_wait_alu depctr_sa_sdst(0)",
+    "s_add_co_u32 s75, s74, 17",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "SALU work between CMPX and permlane does not remove CMPX hazard",
+   "input": [
+    "v_mov_b32 v36, 9",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "s_or_b32 s77, s76, 5",
+    "v_permlane16_b32 v37, v35, s77, s76",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v36, 9",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "s_or_b32 s77, s76, 5",
+    "+ v_mov_b32 v35, v35",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_b32 v37, v35, s77, s76",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "permlanex16 directly follows CMPX across a basic block",
+   "input": [
+    "v_mov_b32 v36, 9",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_permlanex16_b32 v38, v34, s79, s78",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v36, 9",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "+ v_mov_b32 v34, v34",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlanex16_b32 v38, v34, s79, s78",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "variable permlane directly follows CMPX across a basic block",
+   "input": [
+    "v_mov_b32 v36, 9",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_permlane16_var_b32 v39, v33, v32",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v36, 9",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "+ v_mov_b32 v33, v33",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_var_b32 v39, v33, v32",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "one vector nop does not retire CMPX state",
+   "input": [
+    "v_mov_b32 v36, 9",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_nop",
+    "v_permlane16_b32 v40, v31, s81, s80",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v36, 9",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_nop",
+    "+ v_mov_b32 v31, v31",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_b32 v40, v31, s81, s80",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "seven vector nops do not retire CMPX state",
+   "input": [
+    "v_mov_b32 v36, 9",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_permlane16_b32 v41, v30, s83, s82",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v36, 9",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "v_nop",
+    "+ v_mov_b32 v30, v30",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_b32 v41, v30, s83, s82",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "e64 CMPX also protects its subsequent permlane",
+   "input": [
+    "v_cmpx_gt_f32_e64 23, v28",
+    "v_permlane16_b32 v42, v29, s85, s84",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cmpx_gt_f32_e64 23, v28",
+    "+ v_mov_b32 v29, v29",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_b32 v42, v29, s85, s84",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "real VALU work retires CMPX state",
+   "input": [
+    "v_mov_b32 v36, 9",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_mul_f32 v43, v26, 2.0",
+    "v_permlane16_b32 v44, v27, s87, s86",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v36, 9",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cmpx_gt_f32 19, v36",
+    "s_branch .Lhz_lane",
+    ".Lhz_lane:",
+    "v_mul_f32 v43, v26, 2.0",
+    "v_permlane16_b32 v44, v27, s87, s86",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "CMPX hazard survives on only one incoming path",
+   "input": [
+    "v_cmpx_ge_f32 29, v25",
+    "s_cbranch_scc0 .Lhz_permute",
+    "v_add_f32 v45, v24, 1.0",
+    ".Lhz_permute:",
+    "v_permlane16_b32 v46, v23, s89, s88",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cmpx_ge_f32 29, v25",
+    "s_cbranch_scc0 .Lhz_permute",
+    "v_add_f32 v45, v24, 1.0",
+    ".Lhz_permute:",
+    "+ v_mov_b32 v23, v23",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_b32 v46, v23, s89, s88",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "second WMMA consumes previous result in its A operand",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_wmma_f32_16x16x16_bf16 v[80:87], v[16:19], v[56:59], v[80:87]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "+ v_nop",
+    "v_wmma_f32_16x16x16_bf16 v[80:87], v[16:19], v[56:59], v[80:87]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "second WMMA consumes previous result in its B operand",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_wmma_f32_16x16x16_f16 v[88:95], v[60:63], v[16:19], v[88:95]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "+ v_nop",
+    "v_wmma_f32_16x16x16_f16 v[88:95], v[60:63], v[16:19], v[88:95]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "accumulator C overlap alone needs no WMMA spacing nop",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_wmma_f16_16x16x16_f16 v[16:19], v[64:67], v[68:71], v[16:19]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_wmma_f16_16x16x16_f16 v[16:19], v[64:67], v[68:71], v[16:19]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "integer WMMA B input overlaps an earlier floating result",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_wmma_i32_16x16x16_iu8 v[96:103], v[72:73], v[16:17], v[96:103]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "+ v_nop",
+    "v_wmma_i32_16x16x16_iu8 v[96:103], v[72:73], v[16:17], v[96:103]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "SWM MAC index register overlaps earlier matrix result",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_swmmac_f32_16x16x32_bf16 v[104:111], v[74:77], v[78:85], v18",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "+ v_nop",
+    "v_swmmac_f32_16x16x32_bf16 v[104:111], v[74:77], v[78:85], v18",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "SWM MAC accumulator overlap alone is permitted",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_swmmac_f32_16x16x32_f16 v[16:23], v[86:89], v[90:97], v112",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_swmmac_f32_16x16x32_f16 v[16:23], v[86:89], v[90:97], v112",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "ordinary VALU instruction spaces two matrix operations",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_sub_f32 v124, v114, 2.0",
+    "v_wmma_f32_16x16x16_f16 v[120:127], v[16:19], v[128:131], v[120:127]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_sub_f32 v124, v114, 2.0",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_wmma_f32_16x16x16_f16 v[120:127], v[16:19], v[128:131], v[120:127]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "SALU instruction does not space two matrix operations",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "s_xor_b32 s90, s90, 3",
+    "v_wmma_f32_16x16x16_f16 v[132:139], v[16:19], v[140:143], v[132:139]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "s_xor_b32 s90, s90, 3",
+    "+ v_nop",
+    "v_wmma_f32_16x16x16_f16 v[132:139], v[16:19], v[140:143], v[132:139]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "one instruction VALU dependence gets dep1 delay",
+   "input": [
+    "v_mul_f32 v150, v151, 3.0",
+    "v_add_f32 v152, v150, 1.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mul_f32 v150, v151, 3.0",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_f32 v152, v150, 1.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "one intervening VALU instruction yields dep2 delay",
+   "input": [
+    "v_mul_f32 v153, v154, 3.0",
+    "v_xor_b32 v155, v156, 7",
+    "v_sub_f32 v157, 9.0, v153",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mul_f32 v153, v154, 3.0",
+    "v_xor_b32 v155, v156, 7",
+    "+ s_delay_alu 2    ; hazard: instid0(VALU_DEP_2)",
+    "v_sub_f32 v157, 9.0, v153",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "youngest of two producing VALU writes determines delay",
+   "input": [
+    "v_add_f32 v158, v159, 1.0",
+    "v_mul_f32 v160, v161, 2.0",
+    "v_sub_f32 v162, v158, v160",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_f32 v158, v159, 1.0",
+    "v_mul_f32 v160, v161, 2.0",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_sub_f32 v162, v158, v160",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "four VALU distance ignores an interleaved SALU operation",
+   "input": [
+    "v_mov_b32 v163, 13",
+    "v_xor_b32 v164, v165, 3",
+    "s_mov_b32 s91, 17",
+    "v_mov_b32 v166, 15",
+    "v_mov_b32 v167, 19",
+    "v_add_f32 v168, v163, 2.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v163, 13",
+    "v_xor_b32 v164, v165, 3",
+    "s_mov_b32 s91, 17",
+    "v_mov_b32 v166, 15",
+    "v_mov_b32 v167, 19",
+    "+ s_delay_alu 4    ; hazard: instid0(VALU_DEP_4)",
+    "v_add_f32 v168, v163, 2.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "five VALU distance is beyond the insertion window",
+   "input": [
+    "v_mov_b32 v169, 13",
+    "v_xor_b32 v170, v171, 3",
+    "v_mov_b32 v172, 15",
+    "v_mov_b32 v173, 19",
+    "v_mov_b32 v174, 21",
+    "v_add_f32 v175, v169, 2.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v169, 13",
+    "v_xor_b32 v170, v171, 3",
+    "v_mov_b32 v172, 15",
+    "v_mov_b32 v173, 19",
+    "v_mov_b32 v174, 21",
+    "v_add_f32 v175, v169, 2.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "VMEM wide address read needs no arithmetic delay hint",
+   "input": [
+    "v_mov_b32 v176, 31",
+    "global_load_b128 v[180:183], v176, s[92:93]",
+    "s_wait_loadcnt 0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v176, 31",
+    "global_load_b128 v[180:183], v176, s[92:93]",
+    "s_wait_loadcnt 0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "VCC comparison to conditional move gets a VALU delay",
+   "input": [
+    "v_cmp_gt_f32_e64 vcc_lo, v177, v178",
+    "v_cndmask_b32_e64 v179, v184, v185, vcc_lo",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_cmp_gt_f32_e64 vcc_lo, v177, v178",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cndmask_b32_e64 v179, v184, v185, vcc_lo",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "memory wait retires arithmetic dependence bookkeeping",
+   "input": [
+    "v_lshl_add_u32 v186, s94, 6, v0",
+    "s_wait_kmcnt 0",
+    "v_cmp_lt_u32_e64 vcc_lo, s95, v186",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_lshl_add_u32 v186, s94, 6, v0",
+    "s_wait_kmcnt 0",
+    "v_cmp_lt_u32_e64 vcc_lo, s95, v186",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "memory destination overwrite replaces older VALU provenance",
+   "input": [
+    "v_mov_b32 v187, 33",
+    "global_load_b32 v187, v188, s[96:97]",
+    "v_add_f32 v189, v187, 4.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v187, 33",
+    "global_load_b32 v187, v188, s[96:97]",
+    "v_add_f32 v189, v187, 4.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "ALU wait does not masquerade as a memory wait",
+   "input": [
+    "v_mov_b32 v190, 35",
+    "s_wait_alu depctr_va_sdst(0)",
+    "v_xor_b32 v191, v190, 7",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v190, 35",
+    "s_wait_alu depctr_va_sdst(0)",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_xor_b32 v191, v190, 7",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "transcendental result feeds a VALU consumer",
+   "input": [
+    "v_exp_f32 v192, v193",
+    "v_mul_f32 v194, v192, 2.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_exp_f32 v192, v193",
+    "+ s_delay_alu 5    ; hazard: instid0(TRANS32_DEP_1)",
+    "v_mul_f32 v194, v192, 2.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "simultaneous transcendental and VALU dependencies are encoded together",
+   "input": [
+    "v_exp_f32 v195, v196",
+    "v_mul_f32 v197, v198, 2.0",
+    "v_add_f32 v199, v195, v197",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_exp_f32 v195, v196",
+    "v_mul_f32 v197, v198, 2.0",
+    "+ s_delay_alu 641    ; hazard: instid0(VALU_DEP_1) | instid1(TRANS32_DEP_1)",
+    "v_add_f32 v199, v195, v197",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "second transcendental operation creates dep2 on the older result",
+   "input": [
+    "v_exp_f32 v200, v201",
+    "v_sqrt_f32 v202, v203",
+    "v_mul_f32 v204, v200, 3.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_exp_f32 v200, v201",
+    "v_sqrt_f32 v202, v203",
+    "+ s_delay_alu 6    ; hazard: instid0(TRANS32_DEP_2)",
+    "v_mul_f32 v204, v200, 3.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "existing delay instruction satisfies the VALU dependence",
+   "input": [
+    "v_mul_f32 v205, v206, 3.0",
+    "s_delay_alu 1",
+    "v_add_f32 v207, v205, 4.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mul_f32 v205, v206, 3.0",
+    "s_delay_alu 1",
+    "v_add_f32 v207, v205, 4.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "matrix result does not become a normal arithmetic dependency",
+   "input": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_add_f32 v208, v16, 2.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_wmma_f32_16x16x16_f16 v[16:23], v[48:51], v[52:55], v[16:23]",
+    "v_add_f32 v208, v16, 2.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "matrix input still depends on the immediately preceding VALU result",
+   "input": [
+    "v_add_f32 v209, v210, 2.0",
+    "v_wmma_f32_16x16x16_f16 v[212:219], v[209:212], v[220:223], v[212:219]",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_add_f32 v209, v210, 2.0",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_wmma_f32_16x16x16_f16 v[212:219], v[209:212], v[220:223], v[212:219]",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "untargeted label preserves the arithmetic producer distance",
+   "input": [
+    "v_mul_f32 v224, v225, 2.0",
+    ".Lhz_annotation:",
+    "v_add_f32 v226, v224, 3.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mul_f32 v224, v225, 2.0",
+    ".Lhz_annotation:",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_add_f32 v226, v224, 3.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "targeted label begins a fresh hazard block",
+   "input": [
+    "v_mul_f32 v227, v228, 2.0",
+    "s_cbranch_scc0 .Lhz_target",
+    ".Lhz_target:",
+    "v_add_f32 v229, v227, 3.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mul_f32 v227, v228, 2.0",
+    "s_cbranch_scc0 .Lhz_target",
+    ".Lhz_target:",
+    "v_add_f32 v229, v227, 3.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "inserted CMPX copy counts in subsequent arithmetic distance",
+   "input": [
+    "v_cmpx_ge_f32 37, v230",
+    "v_add_f32 v231, v232, 5.0",
+    "s_xor_b32 s98, s98, 1",
+    "v_cmpx_ge_f32 41, v230",
+    "v_permlane16_b32 v233, v231, s99, s98",
+    "s_endpgm"
+   ],
+   "show_rerun": true,
+   "output": [
+    "v_cmpx_ge_f32 37, v230",
+    "v_add_f32 v231, v232, 5.0",
+    "s_xor_b32 s98, s98, 1",
+    "v_cmpx_ge_f32 41, v230",
+    "+ s_delay_alu 2    ; hazard: instid0(VALU_DEP_2)",
+    "+ v_mov_b32 v231, v231",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_permlane16_b32 v233, v231, s99, s98",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "VALU overwrite ends transcendental tracking before a conversion",
+   "input": [
+    "v_rcp_iflag_f32 v234, v235",
+    "v_mul_f32 v234, v234, 3.0",
+    "v_cvt_u32_f32 v234, v234",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_rcp_iflag_f32 v234, v235",
+    "+ s_delay_alu 5    ; hazard: instid0(TRANS32_DEP_1)",
+    "v_mul_f32 v234, v234, 3.0",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_cvt_u32_f32 v234, v234",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "transcendental overwrite replaces older VALU tracking",
+   "input": [
+    "v_mov_b32 v236, 45",
+    "v_exp_f32 v236, v237",
+    "v_add_f32 v238, v236, 6.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_mov_b32 v236, 45",
+    "v_exp_f32 v236, v237",
+    "+ s_delay_alu 5    ; hazard: instid0(TRANS32_DEP_1)",
+    "v_add_f32 v238, v236, 6.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "partial VALU overwrite preserves adjacent transcendental dependency",
+   "input": [
+    "v_exp_f32 v239, v240",
+    "v_sqrt_f32 v241, v242",
+    "v_mov_b32 v239, 47",
+    "v_add_f32 v243, v239, v241",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_exp_f32 v239, v240",
+    "v_sqrt_f32 v241, v242",
+    "v_mov_b32 v239, 47",
+    "+ s_delay_alu 641    ; hazard: instid0(VALU_DEP_1) | instid1(TRANS32_DEP_1)",
+    "v_add_f32 v243, v239, v241",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  },
+  {
+   "name": "newest of repeated writers remains the tracked producer",
+   "input": [
+    "v_exp_f32 v244, v245",
+    "v_mul_f32 v244, v244, 2.0",
+    "v_sqrt_f32 v244, v244",
+    "v_add_f32 v246, v244, 1.0",
+    "s_endpgm"
+   ],
+   "output": [
+    "v_exp_f32 v244, v245",
+    "+ s_delay_alu 5    ; hazard: instid0(TRANS32_DEP_1)",
+    "v_mul_f32 v244, v244, 2.0",
+    "+ s_delay_alu 1    ; hazard: instid0(VALU_DEP_1)",
+    "v_sqrt_f32 v244, v244",
+    "+ s_delay_alu 5    ; hazard: instid0(TRANS32_DEP_1)",
+    "v_add_f32 v246, v244, 1.0",
+    "s_endpgm"
+   ],
+   "rerun_needs_more": false
+  }
+ ]
+}

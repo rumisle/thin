@@ -1,0 +1,320 @@
+{
+ "notation": "Byte-level device calls, no target needed. Names in scope: `runtime` (thin.runtime), the dtypes `F32`, `BF16`, `U8`, and `f32(*xs)`, the little-endian f32 bytes of xs. `steps`: `steps_setup` makes one emulated device `emu` with a 48-byte f32 ramp and a 48-byte filled sink; every step's `call` then runs in that namespace in list order (an earlier step's refusal does not stop the next). `ok` is the call's `r`: bytes as hex, null for None and for a group that was made; else `raises`/`message`. `guards`: `guards_setup` writes a host-memory device `h` against the device-implementer protocol, keeping the default guard. Its stand-in kernel reads a 16-byte kernarg (`poke_args`: a buffer's pointer, its size, then how many bytes to scribble past its end and before its start) and writes those bytes outside the buffer. Guards run in order in one namespace; `ok` is `r`; a guard fault also records `cause`, and `synced` is the last text the sync hook received (launch names joined by '; ', or 'the stream').",
+ "steps_setup": "emu = runtime.EmulatedDevice()\nramp = emu.tensor(F32, f32(*(2.5 - 0.75 * i for i in range(12))))\nsink = emu.tensor(F32, nbytes=48, fill=0x3C)",
+ "steps": [
+  {
+   "what": "read back a tensor made from twelve f32 values",
+   "call": "r = emu.read(ramp)",
+   "ok": "000020400000e03f0000803f0000803e000000bf0000a0bf000000c0000030c0000060c0000088c00000a0c00000b8c0"
+  },
+  {
+   "what": "read the third 16-byte window of the ramp",
+   "call": "r = emu.read(emu.slice(ramp, 32, 16))",
+   "ok": "000060c0000088c00000a0c00000b8c0"
+  },
+  {
+   "what": "an empty slice at the very end",
+   "call": "r = emu.read(emu.slice(ramp, 48, 0))",
+   "ok": ""
+  },
+  {
+   "what": "a tensor made by nbytes holds its fill byte",
+   "call": "r = emu.read(sink)",
+   "ok": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c"
+  },
+  {
+   "what": "copy the ramp's first window into the sink's second, fill its third with 0xA5",
+   "call": "emu.copy(emu.slice(sink, 16, 16), emu.slice(ramp, 0, 16))\nemu.fill(emu.slice(sink, 32, 16), 0xA5)\nr = emu.read(sink)",
+   "ok": "3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c000020400000e03f0000803f0000803ea5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5"
+  },
+  {
+   "what": "a bf16 tensor of no bytes",
+   "call": "r = emu.read(emu.tensor(BF16, nbytes=0))",
+   "ok": ""
+  },
+  {
+   "what": "data given with nbytes",
+   "call": "r = emu.tensor(U8, bytes(3), nbytes=3)",
+   "raises": "LaunchError",
+   "message": "a tensor of its data or of nbytes, one of them"
+  },
+  {
+   "what": "only a fill: neither data nor nbytes",
+   "call": "r = emu.tensor(BF16, fill=7)",
+   "raises": "LaunchError",
+   "message": "a tensor of its data or of nbytes, one of them"
+  },
+  {
+   "what": "ten bytes cannot be f32 elements",
+   "call": "r = emu.tensor(F32, nbytes=10)",
+   "raises": "LaunchError",
+   "message": "a f32 tensor of 10 bytes: whole elements"
+  },
+  {
+   "what": "five bytes cannot be bf16 elements",
+   "call": "r = emu.tensor(BF16, nbytes=5)",
+   "raises": "LaunchError",
+   "message": "a bf16 tensor of 5 bytes: whole elements"
+  },
+  {
+   "what": "three bytes of data cannot be bf16 elements",
+   "call": "r = emu.tensor(BF16, b\"\\x80\\x3f\\x00\")",
+   "raises": "LaunchError",
+   "message": "a bf16 tensor of 3 bytes: whole elements"
+  },
+  {
+   "what": "a negative size that is still a multiple of the element",
+   "call": "r = emu.tensor(F32, nbytes=-8)",
+   "raises": "LaunchError",
+   "message": "a f32 tensor of -8 bytes: whole elements"
+  },
+  {
+   "what": "nbytes a float",
+   "call": "r = emu.tensor(U8, nbytes=8.0)",
+   "raises": "LaunchError",
+   "message": "a u8 tensor of 8.0 bytes: whole elements"
+  },
+  {
+   "what": "a window running past the end",
+   "call": "r = emu.slice(ramp, 32, 32)",
+   "raises": "LaunchError",
+   "message": "a slice of 32 bytes at 32 of a f32 buffer of 48: inside it, whole elements, at a multiple of 16"
+  },
+  {
+   "what": "a window at offset 8",
+   "call": "r = emu.slice(ramp, 8, 8)",
+   "raises": "LaunchError",
+   "message": "a slice of 8 bytes at 8 of a f32 buffer of 48: inside it, whole elements, at a multiple of 16"
+  },
+  {
+   "what": "a window at a negative offset",
+   "call": "r = emu.slice(ramp, -16, 16)",
+   "raises": "LaunchError",
+   "message": "a slice of 16 bytes at -16 of a f32 buffer of 48: inside it, whole elements, at a multiple of 16"
+  },
+  {
+   "what": "a window of 6 bytes of f32",
+   "call": "r = emu.slice(ramp, 0, 6)",
+   "raises": "LaunchError",
+   "message": "a slice of 6 bytes at 0 of a f32 buffer of 48: inside it, whole elements, at a multiple of 16"
+  },
+  {
+   "what": "copy a 32-byte window into the 48-byte sink",
+   "call": "r = emu.copy(sink, emu.slice(ramp, 16, 32))",
+   "raises": "LaunchError",
+   "message": "a copy of 32 bytes into 48: equal sizes"
+  },
+  {
+   "what": "fill with the first value past a byte",
+   "call": "r = emu.fill(sink, 1 << 8)",
+   "raises": "LaunchError",
+   "message": "a fill of 256: a byte"
+  },
+  {
+   "what": "fill with -1",
+   "call": "r = emu.fill(sink, -1)",
+   "raises": "LaunchError",
+   "message": "a fill of -1: a byte"
+  },
+  {
+   "what": "fill with a bool",
+   "call": "r = emu.fill(ramp, True)",
+   "raises": "LaunchError",
+   "message": "a fill of True: a byte"
+  },
+  {
+   "what": "a fresh device asked to fill this device's sink",
+   "call": "r = runtime.EmulatedDevice().fill(sink, 0)",
+   "raises": "LaunchError",
+   "message": "a buffer of another device (48 bytes)"
+  },
+  {
+   "what": "plain bytes given where a buffer belongs",
+   "call": "r = emu.read(b\"\\x00\" * 16)",
+   "raises": "LaunchError",
+   "message": "a buffer of another device (? bytes)"
+  },
+  {
+   "what": "close the device",
+   "call": "r = emu.close()",
+   "ok": null
+  },
+  {
+   "what": "a tensor asked of the closed device",
+   "call": "r = emu.tensor(U8, nbytes=16)",
+   "raises": "LaunchError",
+   "message": "a closed device: every call refused"
+  },
+  {
+   "what": "a read on the closed device",
+   "call": "r = emu.read(sink)",
+   "raises": "LaunchError",
+   "message": "a closed device: every call refused"
+  },
+  {
+   "what": "a second close",
+   "call": "r = emu.close()",
+   "raises": "LaunchError",
+   "message": "a closed device: every call refused"
+  },
+  {
+   "what": "a group of world=0",
+   "call": "r = runtime.emulated_group(world=0)",
+   "raises": "LaunchError",
+   "message": "a group of 0 ranks: a positive int"
+  },
+  {
+   "what": "a group of -3 ranks",
+   "call": "r = runtime.emulated_group(-3)",
+   "raises": "LaunchError",
+   "message": "a group of -3 ranks: a positive int"
+  },
+  {
+   "what": "a group with two unknown interleaving keys beside a known one",
+   "call": "r = runtime.emulated_group(3, jitter=0, warp=2, lanes=1)",
+   "raises": "LaunchError",
+   "message": "a group's interleaving ['lanes', 'warp']: the Cluster's are ['skew', 'speed', 'jitter', 'wave_jitter', 'quantum', 'resident', 'order', 'wg_speed', 'lockstep']"
+  },
+  {
+   "what": "a group of no stall rounds",
+   "call": "r = runtime.emulated_group(4, stall_rounds=0)",
+   "raises": "LaunchError",
+   "message": "a group's stall_rounds 0: a positive int"
+  },
+  {
+   "what": "a group of 2.5 stall rounds",
+   "call": "r = runtime.emulated_group(2, stall_rounds=2.5)",
+   "raises": "LaunchError",
+   "message": "a group's stall_rounds 2.5: a positive int"
+  },
+  {
+   "what": "a group of 2.0 ranks",
+   "call": "r = runtime.emulated_group(2.0)",
+   "raises": "LaunchError",
+   "message": "a group of 2.0 ranks: a positive int"
+  },
+  {
+   "what": "a group of True ranks",
+   "call": "r = runtime.emulated_group(True)",
+   "raises": "LaunchError",
+   "message": "a group of True ranks: a positive int"
+  },
+  {
+   "what": "a group of two ranks with a known interleaving key is made",
+   "call": "r = runtime.emulated_group(2, speed=[1, 3])",
+   "ok": null
+  }
+ ],
+ "guards_setup": "class Host(runtime.Device):\n    def __init__(self):\n        super().__init__()\n        self.synced, self.runs, self.blocks = [], [], {}\n        self.next_base = 0x7A0000\n    def alloc_bytes(self, n, fill, meta):\n        base = self.next_base\n        self.next_base += 0x10000\n        self.blocks[base] = bytearray([fill]) * n\n        return base, base\n    def write_bytes(self, handle, offset, data):\n        self.blocks[handle][offset:offset + len(data)] = data\n    def read_bytes(self, handle, offset, n):\n        return bytes(self.blocks[handle][offset:offset + n])\n    def copy_bytes(self, dst, dst_offset, src, src_offset, n):\n        self.blocks[dst][dst_offset:dst_offset + n] = self.blocks[src][src_offset:src_offset + n]\n    def fill_bytes(self, handle, offset, n, byte):\n        self.blocks[handle][offset:offset + n] = bytes([byte]) * n\n    def sync(self, what):\n        self.synced.append(what)\n    def free(self):\n        self.blocks.clear()\n    def load(self, image, code_object, asm, block, key):\n        return (\"loaded\", key)\n    def run(self, code, key, grid, block, kernarg, what, cooperative):\n        ptr = int.from_bytes(kernarg[0:8], \"little\")\n        n = int.from_bytes(kernarg[8:12], \"little\")\n        past, before = kernarg[12], kernarg[13]\n        base = max(b for b in self.blocks if b <= ptr)\n        mem, at = self.blocks[base], ptr - base\n        mem[at + n:at + n + past] = b\"\\xee\" * past\n        mem[at - before:at] = b\"\\xee\" * before\n        self.runs.append([what, list(grid), cooperative])\ndef poke_args(t, past=0, before=0):\n    return (\n        t.ptr.to_bytes(8, \"little\") + t.nbytes.to_bytes(4, \"little\")\n        + bytes([past, before, 0, 0])\n    )\nh = Host()\nlhs = h.tensor(F32, nbytes=16)\nrhs = h.tensor(BF16, f32(1.5, -2.0, 0.25, 8.0))\nacc = h.tensor(U8, nbytes=32, fill=9)\nprog = runtime.Program(h, \"poke\", (64, 1), 16, h.load(b\"\", None, \"\", (64, 1), \"poke\"))\nfar = Host().tensor(U8, nbytes=48)",
+ "guards": [
+  {
+   "what": "the guard width, its fill, and pointers past each allocation's guard",
+   "call": "r = {\"guard\": h.guard, \"fill\": runtime.GUARD_FILL, \"lhs\": hex(lhs.ptr), \"rhs\": hex(rhs.ptr), \"window\": hex(h.slice(acc, 16, 16).ptr), \"head\": h.blocks[0x7A0000][:4].hex()}",
+   "ok": {
+    "guard": 4096,
+    "fill": 91,
+    "lhs": "0x7a1000",
+    "rhs": "0x7b1000",
+    "window": "0x7c1010",
+    "head": "5b5b5b5b"
+   }
+  },
+  {
+   "what": "three clean launches, one name twice, one cooperative, then a wait",
+   "call": "runtime.dispatch(prog, (4, 1, 1), poke_args(lhs), {\"lhs\": lhs}, what=\"scale\")\nruntime.dispatch(prog, (2, 2, 1), poke_args(rhs), {\"lhs\": lhs, \"rhs\": rhs}, what=\"shift\")\nruntime.dispatch(prog, (1, 1, 1), poke_args(lhs), {\"lhs\": lhs}, what=\"scale\", cooperative=True)\nh.wait()\nr = {\"synced\": h.synced[-1], \"runs\": h.runs[-3:]}",
+   "ok": {
+    "synced": "scale; shift",
+    "runs": [
+     [
+      "scale",
+      [
+       4,
+       1,
+       1
+      ],
+      false
+     ],
+     [
+      "shift",
+      [
+       2,
+       2,
+       1
+      ],
+      false
+     ],
+     [
+      "scale",
+      [
+       1,
+       1,
+       1
+      ],
+      true
+     ]
+    ]
+   }
+  },
+  {
+   "what": "a launch scribbles 2 bytes past acc, a later one reads acc; wait",
+   "call": "runtime.dispatch(prog, (1, 1, 1), poke_args(acc, past=2), {\"acc\": acc}, what=\"spill\")\nruntime.dispatch(prog, (3, 1, 1), poke_args(acc), {\"acc\": acc, \"lhs\": lhs}, what=\"reader\")\nh.wait()",
+   "raises": "DeviceFault",
+   "message": "spill; reader: a guard of acc written",
+   "cause": "bounds:acc",
+   "synced": "spill; reader"
+  },
+  {
+   "what": "an unnamed launch scribbles 1 byte before lhs; wait: the fault also names reader, whose check of lhs the previous fault cut short",
+   "call": "runtime.dispatch(prog, (1, 1, 1), poke_args(lhs, before=1), {\"lhs\": lhs})\nh.wait()",
+   "raises": "DeviceFault",
+   "message": "reader; poke: a guard of lhs written",
+   "cause": "bounds:lhs",
+   "synced": "poke"
+  },
+  {
+   "what": "a kernarg 4 bytes short",
+   "call": "runtime.dispatch(prog, (1, 1, 1), poke_args(rhs)[:12], {\"rhs\": rhs}, what=\"short\")",
+   "raises": "LaunchError",
+   "message": "poke: a kernarg of 12 bytes, the code object's 16"
+  },
+  {
+   "what": "a buffer of a second host device",
+   "call": "runtime.dispatch(prog, (1, 1, 1), poke_args(rhs), {\"rhs\": rhs, \"far\": far})",
+   "raises": "LaunchError",
+   "message": "a buffer of another device (48 bytes)"
+  },
+  {
+   "what": "a wait after the faults with nothing enqueued",
+   "call": "h.synced.clear()\nh.wait()\nr = {\"synced\": h.synced}",
+   "ok": {
+    "synced": [
+     "the stream"
+    ]
+   }
+  },
+  {
+   "what": "program() of 32 counting bytes",
+   "call": "r = runtime.program(h, bytes(range(32)), \"\", \"probe\")",
+   "raises": "LaunchError",
+   "message": "probe: the code object: not a little-endian ELF64"
+  },
+  {
+   "what": "program() of an ELF64 header for machine 0",
+   "call": "r = runtime.program(h, b\"\\x7fELF\\x02\\x01\" + bytes(58), \"\", \"probe\")",
+   "raises": "LaunchError",
+   "message": "probe: the code object: e_machine 0, not AMDGPU (224)"
+  },
+  {
+   "what": "program() of junk without a key",
+   "call": "r = runtime.program(h, b\"\\x00\\xff\" * 8, \"\")",
+   "raises": "LaunchError",
+   "message": "a kernel: the code object: not a little-endian ELF64"
+  },
+  {
+   "what": "a dispatch on the closed device",
+   "call": "h.close()\nruntime.dispatch(prog, (1, 1, 1), poke_args(lhs), {\"lhs\": lhs}, what=\"late\")",
+   "raises": "LaunchError",
+   "message": "a closed device: every call refused"
+  }
+ ]
+}

@@ -1,0 +1,237 @@
+{
+ "write_args": {
+  "symbol": "k",
+  "text_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000081bf",
+  "descriptor_hex": "00040000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "metadata": {
+   "amdhsa.version": [
+    1,
+    2
+   ],
+   "amdhsa.kernels": [
+    {
+     ".name": "k",
+     ".symbol": "k.kd",
+     ".kernarg_segment_size": 16,
+     ".group_segment_fixed_size": 1024,
+     ".args": [
+      {
+       ".offset": 0,
+       ".size": 8,
+       ".value_kind": "global_buffer"
+      }
+     ]
+    }
+   ],
+   "amdhsa.target": "amdgcn-amd-amdhsa--gfx1201"
+  },
+  "e_flags": 78
+ },
+ "image_sha256": "c0264b718be17aa2538658d0400b8a089829bb8a4955fa2505d6976ddb922816",
+ "image_len": 2592,
+ "image_file": "codeobject_k.co",
+ "sections": [
+  [
+   "",
+   0,
+   0,
+   0,
+   0,
+   0,
+   0
+  ],
+  [
+   ".note",
+   7,
+   2,
+   400,
+   400,
+   220,
+   0
+  ],
+  [
+   ".dynsym",
+   11,
+   2,
+   624,
+   624,
+   72,
+   5
+  ],
+  [
+   ".gnu.hash",
+   1879048182,
+   2,
+   696,
+   696,
+   36,
+   2
+  ],
+  [
+   ".hash",
+   5,
+   2,
+   732,
+   732,
+   24,
+   2
+  ],
+  [
+   ".dynstr",
+   3,
+   2,
+   756,
+   756,
+   8,
+   0
+  ],
+  [
+   ".rodata",
+   1,
+   2,
+   768,
+   768,
+   64,
+   0
+  ],
+  [
+   ".text",
+   1,
+   6,
+   5120,
+   1024,
+   516,
+   0
+  ],
+  [
+   ".dynamic",
+   6,
+   3,
+   9736,
+   1544,
+   112,
+   5
+  ],
+  [
+   ".symtab",
+   2,
+   0,
+   0,
+   1656,
+   72,
+   10
+  ],
+  [
+   ".strtab",
+   3,
+   0,
+   0,
+   1728,
+   8,
+   0
+  ],
+  [
+   ".shstrtab",
+   3,
+   0,
+   0,
+   1736,
+   88,
+   0
+  ]
+ ],
+ "descriptor_after_write_hex": "00040000000000001000000000000000001100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+ "code_metadata": "{\"amdhsa.kernels\":[{\".args\":[{\".offset\":0,\".size\":8,\".value_kind\":\"global_buffer\"}],\".group_segment_fixed_size\":1024,\".kernarg_segment_size\":16}],\"amdhsa.target\":\"amdgcn-amd-amdhsa--gfx1201\",\"amdhsa.version\":[1,2]}",
+ "code_digests": {
+  "ident": "bbafd38c6ab4fe36447f8474165e3e52c5c6a63359f3ee36bee964bf5eeb78af",
+  "e_flags": "c0736411a62ec0f4aca1e1133550491bd09b6fa99ae36c7b2f85a12c4dc387d1",
+  "text": "fb9a10eae0b0c182930ee54330427a4282ef352fc58aa42f2ddea0a65d75ff28",
+  "descriptor": "152e2dec55845eebe22ac7249ae2aecd547bb9d177aa900c65ee1dd0c4f3c544",
+  "metadata": "39e9226025ffe636c1d1e052977179d7f0d5cca610cddd0efa4ab98fc5fe6b60"
+ },
+ "target": "gfx1201",
+ "lds": 1024,
+ "kernarg": 16,
+ "write_e_flags": {
+  "metadata": {
+   "amdhsa.kernels": [
+    {
+     ".name": "k",
+     ".symbol": "k.kd"
+    }
+   ]
+  },
+  "text_hex": "000081bf",
+  "descriptor_hex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "cases": [
+   {
+    "e_flags": 78,
+    "read_e_flags": 78,
+    "target": "gfx1201"
+   },
+   {
+    "e_flags": 334,
+    "read_e_flags": 334,
+    "target": "gfx1201"
+   },
+   {
+    "e_flags": 846,
+    "read_e_flags": 846,
+    "target": "gfx1201"
+   },
+   {
+    "e_flags": 4294967118,
+    "read_e_flags": 4294967118,
+    "target": "gfx1201"
+   },
+   {
+    "e_flags": 76,
+    "refused": "CodeObjectError"
+   },
+   {
+    "e_flags": 0,
+    "refused": "CodeObjectError"
+   }
+  ]
+ },
+ "note_padding": {
+  "write_args": {
+   "symbol": "k",
+   "text_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff000081bf",
+   "descriptor_hex": "00040000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+   "metadata": {
+    "amdhsa.version": [
+     1,
+     2
+    ],
+    "amdhsa.kernels": [
+     {
+      ".name": "k",
+      ".symbol": "k.kd",
+      ".kernarg_segment_size": 16,
+      ".group_segment_fixed_size": 1024,
+      ".args": [
+       {
+        ".offset": 0,
+        ".size": 8,
+        ".value_kind": "global_buffer"
+       }
+      ]
+     }
+    ],
+    "amdhsa.target": "amdgcn-amd-amdhsa--gfx1201",
+    "x": "abc"
+   },
+   "e_flags": 78
+  },
+  "msgpack_len": 206,
+  "namesz": 7,
+  "descsz": 206,
+  "type": 32,
+  "note_size": 228,
+  "note_hex": "07000000ce00000020000000414d44475055000084ae616d646873612e6b65726e656c739185a52e617267739183a72e6f666673657400a52e73697a6508ab2e76616c75655f6b696e64ad676c6f62616c5f627566666572b92e67726f75705f7365676d656e745f66697865645f73697a65cd0400b52e6b65726e6172675f7365676d656e745f73697a6510a52e6e616d65a16ba72e73796d626f6ca46b2e6b64ad616d646873612e746172676574ba616d6467636e2d616d642d616d646873612d2d67667831323031ae616d646873612e76657273696f6e920102a178a36162630000",
+  "image_sha256": "f75c5d2ae63a3708446125aaaa4e42680ef03a3cf1db8ca6b138ef7be9e4224d",
+  "image_len": 2592,
+  "read_back_metadata_equal": true
+ }
+}

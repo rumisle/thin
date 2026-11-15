@@ -1,0 +1,34 @@
+[package]
+name = "thin-ir"
+description = "The IR of thin: values, operands, instructions, the stream, snapshots, CFG, dataflow solvers, analyses and the verifier"
+keywords = ["gpu", "compiler", "ir", "dataflow", "amdgpu"]
+categories = ["compilers"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+thin-target.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+thin-test-support = { path = "../../tests/rust" }
+serde_json.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-passes.workspace = true
+thin-targets.workspace = true
+thin-dsl.workspace = true
+thin-codegen.workspace = true
+thin-emu.workspace = true
+
+
+[[test]]
+name = "ir"
+harness = false

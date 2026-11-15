@@ -1,0 +1,87 @@
+{
+ "same_stream_twice_equal_positions": [
+  true,
+  true
+ ],
+ "in_s2": false,
+ "s2_copy_equal_to_x": false,
+ "count_s1": 2,
+ "rfind": 1,
+ "rfind_before_1": 0,
+ "index": 0,
+ "passed_label": ".Lloop_#:",
+ "passed_branch": "s_cbranch_scc1 .Lend_#",
+ "comment_notes": {
+  "call": "comment(\"tile ready\", comment=\"local copy completed\", tag=(\"tile\", 3), abl=(\"warmup\", \"probe\"), stage=(\"mov\", 17), loc=11)",
+  "made": {
+   "op": "ir.comment",
+   "fields": {
+    "text": "; tile ready"
+   },
+   "comment": "local copy completed",
+   "tag": [
+    "tile",
+    3
+   ],
+   "abl": [
+    "probe",
+    "warmup"
+   ],
+   "stage": [
+    "mov",
+    17
+   ],
+   "loc": 11
+  }
+ },
+ "comment_unknown_keyword": "TypeError",
+ "waits_notes": {
+  "call": "waits(on, {\"load\": 0, \"store\": 1, \"ds\": 3, \"km\": 0}, comment=\"all engines\", loc=13)",
+  "made": [
+   {
+    "op": "s_wait_loadcnt",
+    "fields": {
+     "loadcnt": 0
+    },
+    "comment": "all engines",
+    "tag": [],
+    "abl": [],
+    "stage": [],
+    "loc": 13
+   },
+   {
+    "op": "s_wait_storecnt",
+    "fields": {
+     "storecnt": 1
+    },
+    "comment": "all engines",
+    "tag": [],
+    "abl": [],
+    "stage": [],
+    "loc": 13
+   },
+   {
+    "op": "s_wait_dscnt",
+    "fields": {
+     "dscnt": 3
+    },
+    "comment": "all engines",
+    "tag": [],
+    "abl": [],
+    "stage": [],
+    "loc": 13
+   },
+   {
+    "op": "s_wait_kmcnt",
+    "fields": {
+     "kmcnt": 0
+    },
+    "comment": "all engines",
+    "tag": [],
+    "abl": [],
+    "stage": [],
+    "loc": 13
+   }
+  ]
+ }
+}

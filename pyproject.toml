@@ -1,0 +1,98 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "thin"
+description = "A Python DSL for writing AMD GPU kernels (gfx1201, RDNA 4) at the instruction level, with an emulator"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "FSL-1.1-ALv2"
+authors = [{ name = "rumisle" }]
+dynamic = ["version"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
+]
+dependencies = ["numpy>=1.26"]
+
+[project.urls]
+Repository = "https://github.com/rumisle/thin"
+Documentation = "https://github.com/rumisle/thin/tree/main/docs"
+
+[project.optional-dependencies]
+# Users bring their own torch build (often a ROCm one), so it is never pinned.
+torch = ["torch>=2.3"]
+dev = ["pytest>=8", "ruff>=0.6", "mpmath>=1.3"]
+
+# uv installs this group by default: the dev extra (which pip installs with
+# `pip install -e '.[dev]'`) and metron, a separate distribution in this
+# repository (`pip install -e python/metron`).
+[dependency-groups]
+dev = ["thin[dev]", "metron"]
+
+[tool.uv]
+# The editable install is a built extension: rebuild it when the Rust
+# sources, the manifests or the files they embed change (uv otherwise only
+# watches pyproject.toml, and a .rs edit would go unseen). Embedded files:
+# thin-targets' tables (include_str!) and the code object a Rust test
+# embeds (include_bytes!); no crate has a build.rs.
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "rust-toolchain.toml" },
+    { file = "crates/**/*.rs" },
+    { file = "crates/**/Cargo.toml" },
+    { file = "crates/thin-targets/data/**" },
+    { file = "crates/thin-formats/tests/data/formats/*.co" },
+]
+
+[tool.uv.workspace]
+members = ["python/metron"]
+
+[tool.uv.sources]
+metron = { workspace = true }
+
+[tool.maturin]
+manifest-path = "crates/thin-py/Cargo.toml"
+module-name = "thin._native"
+python-source = "python"
+features = ["pyo3/extension-module"]
+# `uv sync` and `pip install -e` build the fast-rebuilding profile; wheels
+# are built with `maturin build --profile dist` (Cargo.toml).
+editable-profile = "iterate"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-rfE"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["python", "python/metron/src", "."]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "D", "N", "SIM", "RUF"]
+# Docstrings say what a thing is (noun phrases), not imperative commands.
+ignore = ["D105", "D107", "D203", "D213", "D401"]
+
+# Exception names without an Error suffix are deliberate (Diag, Refused, Deadlock).
+allowed-confusables = ["–"]
+
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ["DeviceFault", "Diag", "NoFixpoint", "Refused", "NotEmulated", "Collision", "Deadlock", "IpcPolicy", "ScopeModel", "EmuLimit"]
+
+[tool.ruff.lint.per-file-ignores]
+# Public API names: the tensor makers In, Out, InOut and the GEMM problem's K.
+"python/thin/opspec/__init__.py" = ["N802"]
+"python/thin/emu/gemm.py" = ["N803"]
+"tests/**" = ["D"]
+"**/*.pyi" = ["D"]
+
+[tool.ruff.format]
+docstring-code-format = true

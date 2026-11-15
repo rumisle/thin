@@ -1,0 +1,175 @@
+[
+ {
+  "text": ".text\nreader_tile:\n\ts_nop 3\n\ts_endpgm\n",
+  "code": [
+   [
+    "label",
+    "reader_tile",
+    2
+   ],
+   [
+    "ins",
+    "s_nop 3",
+    3
+   ],
+   [
+    "ins",
+    "s_endpgm",
+    4
+   ]
+  ],
+  "once": {},
+  "block": {},
+  "meta": []
+ },
+ {
+  "text": ".amdgcn_target \"amdgcn-amd-amdhsa--gfx1201\"\n.text\n.Ltile:\n\ts_mov_b32 s22, 17 // seed\n\ts_xor_b32 s22, s22, 3 ; update\n.p2align 5\n\ts_cbranch_scc1 .Ltile\n",
+  "code": [
+   [
+    "label",
+    ".Ltile",
+    3
+   ],
+   [
+    "ins",
+    "s_mov_b32 s22, 17",
+    4
+   ],
+   [
+    "ins",
+    "s_xor_b32 s22, s22, 3",
+    5
+   ],
+   [
+    "align",
+    5,
+    6
+   ],
+   [
+    "ins",
+    "s_cbranch_scc1 .Ltile",
+    7
+   ]
+  ],
+  "once": {
+   ".amdgcn_target": [
+    "\"amdgcn-amd-amdhsa--gfx1201\"",
+    1
+   ]
+  },
+  "block": {},
+  "meta": []
+ },
+ {
+  "text": "\ts_nop 3\n",
+  "refused": "line 1: s_nop 3: outside .text"
+ },
+ {
+  "text": ".text\n\ts_nop 2\n.inject 9\n",
+  "refused": "line 3: .inject 9: not a directive this encoder takes"
+ },
+ {
+  "text": ".text\n.p2align 5, 0xff\n",
+  "refused": "line 2: .p2align 5, 0xff: an alignment is a power of two up to 2^12 with no fill"
+ },
+ {
+  "text": ".text\n.p2align 14\n",
+  "refused": "line 2: .p2align 14: an alignment is a power of two up to 2^12 with no fill"
+ },
+ {
+  "text": ".amdgcn_target \"first\"\n// gap\n.amdgcn_target \"second\"\n",
+  "refused": "line 3: .amdgcn_target \"second\": given twice"
+ },
+ {
+  "text": ".text\n\ts_nop 2\n\ts_endpgm\n.section .rodata\n.amdhsa_kernel reader_tile\n.amdhsa_next_free_vgpr 7\n.amdhsa_next_free_sgpr 12\n.end_amdhsa_kernel\n",
+  "code": [
+   [
+    "ins",
+    "s_nop 2",
+    2
+   ],
+   [
+    "ins",
+    "s_endpgm",
+    3
+   ]
+  ],
+  "once": {
+   ".amdhsa_kernel": [
+    "reader_tile",
+    5
+   ]
+  },
+  "block": {
+   "next_free_sgpr": [
+    "12",
+    7
+   ],
+   "next_free_vgpr": [
+    "7",
+    6
+   ]
+  },
+  "meta": []
+ },
+ {
+  "text": ".amdhsa_kernel reader_tile\n.amdhsa_next_free_sgpr 8\n.amdhsa_next_free_sgpr 12\n.end_amdhsa_kernel\n",
+  "refused": "line 3: .amdhsa_next_free_sgpr 12: given twice"
+ },
+ {
+  "text": ".amdgpu_metadata\n---\nlayout:\n  - 7\n  - 11\n...\n.end_amdgpu_metadata\n",
+  "code": [],
+  "once": {
+   ".amdgpu_metadata": [
+    "",
+    1
+   ]
+  },
+  "block": {},
+  "meta": [
+   "layout:",
+   "  - 7",
+   "  - 11"
+  ]
+ },
+ {
+  "text": ".amdgpu_metadata\nlayout: 7\n.end_amdgpu_metadata\n",
+  "refused": "line 3: .amdgpu_metadata: a YAML document, --- to ..."
+ },
+ {
+  "text": ".amdgpu_metadata\n---\nlayout: 7\n...\n",
+  "refused": ".amdgpu_metadata without its end"
+ },
+ {
+  "text": ".text\nleft:\n\ts_nop 3\n.section .rodata\n.text\nright:\n\ts_endpgm\n",
+  "code": [
+   [
+    "label",
+    "left",
+    2
+   ],
+   [
+    "ins",
+    "s_nop 3",
+    3
+   ],
+   [
+    "label",
+    "right",
+    6
+   ],
+   [
+    "ins",
+    "s_endpgm",
+    7
+   ]
+  ],
+  "once": {},
+  "block": {},
+  "meta": []
+ },
+ {
+  "text": ".section .rodata\n\ts_nop 7\n",
+  "refused": "line 2: s_nop 7: outside .text"
+ }
+]

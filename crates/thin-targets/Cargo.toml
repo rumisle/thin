@@ -1,0 +1,40 @@
+[package]
+name = "thin-targets"
+description = "thin's target instances (gfx1201: tables, form rules, encoder, hazard pass, code-object facts) and their registry"
+keywords = ["gpu", "amdgpu", "rdna4", "assembler", "compiler"]
+include = ["src/**", "data/**", "Cargo.toml", "LICENSE.md", "NOTICE"]
+categories = ["compilers", "hardware-support"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde_json.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-passes.workspace = true
+thin-ir.workspace = true
+
+[dev-dependencies]
+thin-test-support = { path = "../../tests/rust" }
+serde_json.workspace = true
+flate2.workspace = true
+sha2.workspace = true
+thin-formats.workspace = true
+thin-target.workspace = true
+thin-ir.workspace = true
+thin-passes.workspace = true
+thin-dsl.workspace = true
+thin-codegen.workspace = true
+thin-emu.workspace = true
+
+
+[lints]
+workspace = true
+
+
+[[test]]
+name = "target"
+harness = false

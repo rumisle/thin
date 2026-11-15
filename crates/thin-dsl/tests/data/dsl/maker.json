@@ -1,0 +1,623 @@
+{
+ "notation": "Each case is a DSL snippet (`src`) run on a fresh Builder for gfx1201, with `b` the Builder, `V`, `S` its files and every name of the language imported. `built` is the stream the Builder made, before any pass: one line per instruction, `<form name> <operands> {fields}; <attributes>`. A register operand is written as VReg repr (`<file>:<value name>[<index in group>]x<dwords>` and `+<lo>` when lo != 0); a named register by its name; an immediate as its value, with the writer's spelling in quotes when it has one (`16'0x10'`); a block as `@label`. Source modifiers are written `-x`, `|x|`. Fields are in stored order. Attributes in a fixed order: comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset: none or var, ordered), m0_set, waves_taken, fence. `values` lists the program's values in id order: `id file name n= align= [index=] [pin=] [same_as=]`. `records` holds the Program's lane regions and loops, the deferred records' kinds, each file's entered / pinned groups and lanes-covered names, and the wave index. `error` is the refusal (exception class and message) raised while the snippet ran. `render` (the whole pipeline's output) is the final.s; `render_error` a refusal of the pipeline's passes.",
+ "cases": [
+  {
+   "name": "raw_mnemonic_dotted_comment",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nacc = V.u32(name=\"acc\")\nb.emit(O.op(\"v_xor_b32\", acc, w, u))\nb.emit(O.op(\"v.add.u32\", acc, acc, 40, comment=\"acc + 40\"))\nb.emit(O.op(\"v_mul_lo_u32\", acc, 0x12345, acc))\nb.emit(O.op(\"v_mad_u32_u24\", acc, u, 12, acc))",
+   "built": [
+    "v_xor_b32 v:acc#1[0]x1, v:w#1[0]x1, v:u#1[0]x1",
+    "v_add_nc_u32 v:acc#1[0]x1, v:acc#1[0]x1, 40 ; comment=\"acc + 40\"",
+    "v_mul_lo_u32 v:acc#1[0]x1, 74565, v:acc#1[0]x1",
+    "v_mad_u32_u24 v:acc#1[0]x1, v:u#1[0]x1, 12, v:acc#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v acc#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_xor_b32 v0, v4, v3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_add_nc_u32 v0, v0, 40                                      // acc + 40",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_lo_u32 v0, 74565, v0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mad_u32_u24 v0, v3, 12, v0"
+   ]
+  },
+  {
+   "name": "vcc_exec_named_operands",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nb.emit(O.op(\"v_cmp_ne_u32\", O.VCC, 0, w))\nsave = S.mask(name=\"save\")\nb.emit(O.op(\"s_and_saveexec_b32\", save, O.VCC))\nb.emit(O.op(\"s_or_b32\", O.EXEC, O.EXEC, save))\nb.emit(O.op(\"s_mov_b32\", \"exec\", save))",
+   "built": [
+    "v_cmp_ne_u32 vcc_lo, 0, v:w#1[0]x1",
+    "s_and_saveexec_b32 s:save#1[0]x1, vcc_lo",
+    "s_or_b32 exec_lo, exec_lo, s:save#1[0]x1",
+    "s_mov_b32 exec_lo, s:save#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s save#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_cmp_ne_u32 vcc_lo, 0, v4",
+    "\ts_and_saveexec_b32 s0, vcc_lo",
+    "\ts_or_b32 exec_lo, exec_lo, s0",
+    "\ts_mov_b32 exec_lo, s0"
+   ]
+  },
+  {
+   "name": "immediate_spellings_dead_write",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nb.emit(O.op(\"s_mov_b32\", k1, \"0x40\"))\nb.emit(O.op(\"s_mov_b32\", k1, -16))\nb.emit(O.op(\"v_mov_b32\", w, \"-2.0\"))\nb.emit(O.op(\"s_mov_b32\", k1, 64))\nb.emit(O.op(\"v_mov_b32\", w, 4.0))",
+   "built": [
+    "s_mov_b32 s:k1#1[0]x1, 64'0x40'",
+    "s_mov_b32 s:k1#1[0]x1, -16",
+    "v_mov_b32 v:w#1[0]x1, -2.0",
+    "s_mov_b32 s:k1#1[0]x1, 64",
+    "v_mov_b32 v:w#1[0]x1, 4.0"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "`v_mov_b32 v4, -2.0` (kernel.py:6): its value is written over on every path before a read (`v_mov_b32 v4, 4.0` (kernel.py:8) writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+   }
+  },
+  {
+   "name": "branch_to_text_label",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nb.emit(O.op(\"s_cmp_lg_u32\", k1, 7))\nb.emit(O.op(\"s_cbranch_scc0\", \".Lskip\"))\nb.emit(O.op(\"s_nop\", 3))\nb.put_label(\".Lskip\")",
+   "built": [
+    "s_cmp_lg_u32 s:k1#1[0]x1, 7",
+    "s_cbranch_scc0 @.Lskip",
+    "s_nop 3",
+    "ir.label {name=.Lskip}"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\ts_cmp_lg_u32 s2, 7",
+    "\ts_cbranch_scc0 .Lskip",
+    "\ts_nop 3",
+    ".Lskip:"
+   ]
+  },
+  {
+   "name": "dpp_fields_nested_modifiers",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nfa, fb = V.f32(name=\"fa\", at=5), V.f32(name=\"fb\", at=6)\nr = V.f32(1.0, name=\"r\")\nb.emit(O.op(\"v_fma_f32\", r, O.abs_(fa), O.neg(fb), r))\nb.emit(O.op(\"v_mul_f32_dpp\", r, fb, r, dpp=\"quad_perm:[3,2,1,0]\", row_mask=0xF, bank_mask=0xF))\nb.emit(O.op(\"v_fma_f32\", r, O.abs_(O.neg(fb)), O.neg(O.abs_(fa)), r))",
+   "built": [
+    "v_mov_b32 v:r#1[0]x1, 1.0 ; comment=\"r = 1.0\"",
+    "v_fma_f32 v:r#1[0]x1, |v:fa#1[0]x1|, -v:fb#1[0]x1, v:r#1[0]x1",
+    "v_mul_f32_dpp v:r#1[0]x1, v:fb#1[0]x1, v:r#1[0]x1 {dpp=quad_perm:[3,2,1,0], row_mask=15, bank_mask=15}",
+    "v_fma_f32 v:r#1[0]x1, |v:fb#1[0]x1|, -|v:fa#1[0]x1|, v:r#1[0]x1"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 v fa#1 n=1 align=1 pin=5",
+    "5 v fb#1 n=1 align=1 pin=6",
+    "6 v r#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1",
+     "fa#1",
+     "fb#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v0, 1.0                                            // r = 1.0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_fma_f32 v0, |v5|, -v6, v0",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mul_f32_dpp v0, v6, v0 quad_perm:[3,2,1,0] row_mask:0xf bank_mask:0xf",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_fma_f32 v0, |v6|, -|v5|, v0"
+   ]
+  },
+  {
+   "name": "memory_family_forms_in_flight",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\ngp = S.ptr(name=\"gp\", at=6)\nrsrc = S.u32(n=4, name=\"rsrc\", at=8)\nc1, c4, c16 = S.u32(name=\"c1\"), S.u32(n=4, name=\"c4\"), S.u32(n=16, name=\"c16\")\nv2, v3, b8 = V.u32(n=2, name=\"v2\"), V.u32(n=3, name=\"v3\"), V.u32(name=\"b8\")\nb.emit(O.s_load(c4, gp, 0x40))\nb.emit(O.s_load(c1, gp, k0))\nb.emit(O.s_load(c16, gp))\nb.emit(O.global_load(v3, u, gp, offset=-12))\nb.emit(O.global_load(b8, u, gp, bytes=1))\nb.emit(O.global_load(v2, w))\nb.emit(O.buffer_load(b8, w, rsrc, offset=32, bytes=2, signed=True))\nb.emit(O.buffer_load(v2, None, rsrc, k1))\nb.wait(c1, c4, c16, v2, v3, b8)\nb.emit(O.global_store(w, v3[1:3], gp, offset=128))\nb.emit(O.global_store(u, b8, gp, bytes=2))\nb.emit(O.buffer_store(v2[0], w, rsrc, k0, offset=12))\nb.emit(O.ds_write(u, b8, 8, bytes=1))\nb.emit(O.ds_read(v3, w, 512))",
+   "built": [
+    "s_load_b128 s:c4#1[0]x4, s:gp#1[0]x2, 64'0x40'",
+    "s_load_b32 s:c1#1[0]x1, s:gp#1[0]x2, s:k0#1[0]x1",
+    "s_load_b512 s:c16#1[0]x16, s:gp#1[0]x2, 0'0x0'",
+    "global_load_b96 v:v3#1[0]x3, v:u#1[0]x1, s:gp#1[0]x2 {offset=-12}",
+    "global_load_u8 v:b8#1[0]x1, v:u#1[0]x1, s:gp#1[0]x2",
+    "global_load_b64 v:v2#1[0]x2, v:w#1[0]x1, off",
+    "buffer_load_i16 v:b8#1[0]x1, v:w#1[0]x1, s:rsrc#1[0]x4, 0 {offen=True, offset=32}",
+    "buffer_load_b64 v:v2#1[0]x2, off, s:rsrc#1[0]x4, s:k1#1[0]x1",
+    "ir.wait_regs s:c1#1[0]x1, s:c4#1[0]x4, s:c16#1[0]x16, v:v2#1[0]x2, v:v3#1[0]x3, v:b8#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs s:c1#1[0]x1, s:c4#1[0]x4, s:c16#1[0]x16, v:v2#1[0]x2, v:v3#1[0]x3, v:b8#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs s:c1#1[0]x1, s:c4#1[0]x4, s:c16#1[0]x16, v:v2#1[0]x2, v:v3#1[0]x3, v:b8#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs s:c1#1[0]x1, s:c4#1[0]x4, s:c16#1[0]x16, v:v2#1[0]x2, v:v3#1[0]x3, v:b8#1[0]x1 {counter=km, said=, regions=()}",
+    "global_store_b64 v:w#1[0]x1, v:v3#1[0]x2+1, s:gp#1[0]x2 {offset=128} ; wait_uses=[s:c1#1[0]x1, s:c4#1[0]x4, s:c16#1[0]x16, v:v2#1[0]x2, v:v3#1[0]x3, v:b8#1[0]x1]",
+    "global_store_b16 v:u#1[0]x1, v:b8#1[0]x1, s:gp#1[0]x2",
+    "buffer_store_b32 v:v2#1[0]x1, v:w#1[0]x1, s:rsrc#1[0]x4, s:k0#1[0]x1 {offen=True, offset=12}",
+    "ds_store_b8 v:u#1[0]x1, v:b8#1[0]x1 {offset=8}",
+    "ds_load_b96 v:v3#1[0]x3, v:w#1[0]x1 {offset=512}"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s gp#1 n=2 align=2 pin=6",
+    "5 s rsrc#1 n=4 align=4 pin=8",
+    "6 s c1#1 n=1 align=1",
+    "7 s c4#1 n=4 align=4",
+    "8 s c16#1 n=16 align=4",
+    "9 v v2#1 n=2 align=2",
+    "10 v v3#1 n=3 align=2",
+    "11 v b8#1 n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "gp#1",
+     "rsrc#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "buffer_load_i16 v:b8#1, v:w#1, s:rsrc#1x4, 0 offen offset:32 (after the entry) touches a register while the load on it may be in flight on some path: it needs loadcnt(1) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "buffer_offsets_staged_in_flight",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\nrsrc = S.u32(n=4, name=\"rsrc\", at=8)\ngot = V.u32(name=\"got\")\nb.emit(O.buffer_load(got, u, rsrc, k1, offset=1 << 24))\nb.emit(O.buffer_load(got, w, rsrc, offset=8388608))",
+   "built": [
+    "s_add_co_u32 s:_lit[0]x1, s:k1#1[0]x1, 16777216'0x1000000' ; comment=\"(staged: offset past the buffer immediate)\"",
+    "buffer_load_b32 v:got#1[0]x1, v:u#1[0]x1, s:rsrc#1[0]x4, s:_lit[0]x1 {offen=True} ; staged=('add', 's:k1#1[0]x1', 16777216)",
+    "s_mov_b32 s:_lit[0]x1, 8388608'0x800000' ; comment=\"(staged: no room in the encoding)\"",
+    "buffer_load_b32 v:got#1[0]x1, v:w#1[0]x1, s:rsrc#1[0]x4, s:_lit[0]x1 {offen=True} ; staged=('mov', 8388608)"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s rsrc#1 n=4 align=4 pin=8",
+    "5 v got#1 n=1 align=1",
+    "6 s _lit n=1 align=1"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "rsrc#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "buffer_load_b32 v:got#1, v:w#1, s:rsrc#1x4, s:_lit offen (after the entry) touches a register while the load on it may be in flight on some path: it needs loadcnt(0) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "placement_publication_tags",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\n\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.op(\"global_load_b32\", u, w, gp, tag=(\"lap\", 3)))\nb.wait(u)\nb.emit(O.place(O.op(\"global_store_b32\", w, u, gp), \"first\", \"second\"))\nb.emit(O.op(\"s_nop\", 1, abl=(\"y\", \"z\")))\nb.emit(O.published(O.op(\"global_atomic_xor_b32\", w, u, gp), \"one wave owns it\"))",
+   "built": [
+    "global_load_b32 v:u#1[0]x1, v:w#1[0]x1, s:gp#1[0]x2 ; tag=('lap', 3)",
+    "ir.wait_regs v:u#1[0]x1 {counter=load, said=, regions=()}",
+    "ir.wait_regs v:u#1[0]x1 {counter=store, said=, regions=()}",
+    "ir.wait_regs v:u#1[0]x1 {counter=ds, said=, regions=()}",
+    "ir.wait_regs v:u#1[0]x1 {counter=km, said=, regions=()}",
+    "global_store_b32 v:w#1[0]x1, v:u#1[0]x1, s:gp#1[0]x2 ; wait_uses=[v:u#1[0]x1] places=['first', 'second']",
+    "s_nop 1 ; abl=['y', 'z']",
+    "global_atomic_xor_b32 v:w#1[0]x1, v:u#1[0]x1, s:gp#1[0]x2 ; published=\"one wave owns it\""
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s gp#1 n=2 align=2 pin=6"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "gp#1"
+    ]
+   },
+   "render": [
+    "\tglobal_load_b32 v3, v4, s[6:7]",
+    "\ts_wait_loadcnt 0",
+    "\tglobal_store_b32 v4, v3, s[6:7]",
+    "\ts_nop 1",
+    "\tglobal_atomic_xor_b32 v4, v3, s[6:7]"
+   ]
+  },
+  {
+   "name": "too_many_operands",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_mul_lo_u32\", u, w, k0, 3))",
+   "error": {
+    "class": "ValueError",
+    "message": "`v_mul_lo_u32 v:u#1, v:w#1, s:k0#1, 3`: no gfx1201 form has this mnemonic and operand count (the target's operand table)"
+   }
+  },
+  {
+   "name": "pre_gfx12_mnemonic",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"s_add_u32\", k0, k0, k1))",
+   "error": {
+    "class": "ValueError",
+    "message": "`s_add_u32 s:k0#1, s:k0#1, s:k1#1`: no gfx1201 form has this mnemonic and operand count (the target's operand table)"
+   }
+  },
+  {
+   "name": "dotted_name_absent",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v.twiddle.b32\", w, u, w))",
+   "error": {
+    "class": "ValueError",
+    "message": "v.twiddle.b32: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "three_sgprs_one_valu",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nk2 = S.u32(name=\"k2\", at=4)\nb.emit(O.op(\"v_med3_u32\", u, k1, k2, k0))",
+   "error": {
+    "class": "ValueError",
+    "message": "v_med3_u32: reads k1#1, k2#1, k0#1: a VALU op reads 2 SGPRs or literals at most on gfx1201 (the constant bus) - move the others into VGPRs first (v_mov_b32), or write it as an expression, which moves them"
+   }
+  },
+  {
+   "name": "two_sgprs_and_literal",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_add3_u32\", w, k0, 0x4321, k1))",
+   "error": {
+    "class": "ValueError",
+    "message": "v_add3_u32: reads k0#1, k1#1, 17185: a VALU op reads 2 SGPRs or literals at most on gfx1201 (the constant bus) - move the others into VGPRs first (v_mov_b32), or write it as an expression, which moves them"
+   }
+  },
+  {
+   "name": "salu_literal_pair",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"s_and_b32\", k0, 0x1234, 0x5678))",
+   "error": {
+    "class": "ValueError",
+    "message": "s_and_b32: two literal operands [4660, 22136]: stage one in an SGPR"
+   }
+  },
+  {
+   "name": "scalar_global_address",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.op(\"global_load_u16\", u, k1, gp))",
+   "error": {
+    "class": "ValueError",
+    "message": "global_load_u16: s:k1#1[0]x1 an SGPR where the instruction takes a VGPR (an address / voffset / data: a V value - V.u32(x) moves it; a buffer's scalar offset is its soffset)"
+   }
+  },
+  {
+   "name": "scalar_lds_address",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"ds_store_b32\", k0, w))",
+   "error": {
+    "class": "ValueError",
+    "message": "ds_store_b32: s:k0#1[0]x1 an SGPR where the instruction takes a VGPR (an address / voffset / data: a V value - V.u32(x) moves it; a buffer's scalar offset is its soffset)"
+   }
+  },
+  {
+   "name": "lds_offset_at_64k",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"ds_store_b32\", u, w, offset=65536))",
+   "error": {
+    "class": "ValueError",
+    "message": "ds_store_b32: LDS offset 65536 out of range (offset 0..65535, offset0 / offset1 0..255; unsigned): put the rest into the address register (a second base: addr + 65536 k, or addr - 16 for a negative one)"
+   }
+  },
+  {
+   "name": "global_offset_below_range",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.op(\"global_store_b32\", u, w, gp, offset=-8388609))",
+   "error": {
+    "class": "ValueError",
+    "message": "global offset -8388609 out of range (-8388608..8388607): put the rest into the address or the scalar base; the families split a formula address (O.global_load(d, p + t)) themselves"
+   }
+  },
+  {
+   "name": "buffer_offen_pair",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nrsrc = S.u32(n=4, name=\"rsrc\", at=8)\ntwo = V.u32(n=2, name=\"two\", at=10)\nb.emit(O.op(\"buffer_store_b32\", w, two, rsrc, k0, offen=True))",
+   "error": {
+    "class": "ValueError",
+    "message": "buffer_store_b32: vaddr v:two#1[0]x2 is 2 VGPRs - offen takes one (a 64-bit offset: its range past 2^32)"
+   }
+  },
+  {
+   "name": "unknown_op_field",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_add_nc_u32\", u, w, u, glc=1))",
+   "error": {
+    "class": "ValueError",
+    "message": "v_add_nc_u32: no field glc (the fields: dpp, row_mask, bank_mask, bound_ctrl, offen, idxen, offset, offset0, offset1, th, scope, op_sel, op_sel_hi, neg_lo, neg_hi, clamp, omod)"
+   }
+  },
+  {
+   "name": "store_temporal_hint",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.op(\"global_store_b32\", w, u, gp, th=\"TH_STORE_NT\"))",
+   "built": [
+    "global_store_b32 v:w#1[0]x1, v:u#1[0]x1, s:gp#1[0]x2 {th=TH_STORE_NT}"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s gp#1 n=2 align=2 pin=6"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "gp#1"
+    ]
+   },
+   "render": [
+    "\tglobal_store_b32 v4, v3, s[6:7] th:TH_STORE_NT"
+   ]
+  },
+  {
+   "name": "store_temporal_hint_unknown",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.op(\"global_store_b32\", w, u, gp, th=\"TH_STORE_ZZ\"))",
+   "built": [
+    "global_store_b32 v:w#1[0]x1, v:u#1[0]x1, s:gp#1[0]x2 {th=TH_STORE_ZZ}"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s gp#1 n=2 align=2 pin=6"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "gp#1"
+    ]
+   },
+   "render_error": {
+    "class": "Diag",
+    "message": "kernel.py:4: `global_store_b32`: th: 'TH_STORE_ZZ', not one of TH_LOAD_RT, TH_LOAD_NT, TH_LOAD_HT, TH_LOAD_LU, TH_LOAD_NT_RT, TH_LOAD_RT_NT, TH_LOAD_NT_HT, TH_LOAD_BYPASS, TH_STORE_RT, TH_STORE_NT, TH_STORE_HT, TH_STORE_WB, TH_STORE_NT_RT, TH_STORE_RT_NT, TH_STORE_NT_HT, TH_STORE_NT_WB, TH_STORE_BYPASS, TH_ATOMIC_RT, TH_ATOMIC_RETURN, TH_ATOMIC_NT, TH_ATOMIC_NT_RETURN, TH_ATOMIC_CASCADE_RT, TH_ATOMIC_CASCADE_NT"
+   }
+  },
+  {
+   "name": "family_store_cache_fields",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.global_store(u, w, gp, th=\"TH_STORE_HT\", scope=\"SCOPE_DEV\"))",
+   "built": [
+    "global_store_b32 v:u#1[0]x1, v:w#1[0]x1, s:gp#1[0]x2 {th=TH_STORE_HT, scope=SCOPE_DEV}"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2",
+    "4 s gp#1 n=2 align=2 pin=6"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1",
+     "gp#1"
+    ]
+   },
+   "render": [
+    "\tglobal_store_b32 v3, v4, s[6:7] th:TH_STORE_HT scope:SCOPE_DEV"
+   ]
+  },
+  {
+   "name": "operand_none_last",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_and_b32\", u, w, None))",
+   "error": {
+    "class": "ValueError",
+    "message": "v_and_b32: operand 2 is None (a register, a value or a constant expected)"
+   }
+  },
+  {
+   "name": "operand_false",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"s_mov_b32\", k0, False))",
+   "error": {
+    "class": "ValueError",
+    "message": "s_mov_b32: operand 1 is a bool"
+   }
+  },
+  {
+   "name": "single_sgpr_in_64bit_slot",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\npr = S.u64(name=\"pr\", at=4)\nb.emit(O.op(\"s_lshl_b64\", pr, k0, 3))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "`s_lshl_b64 s:pr#1x2, s:k0#1, 3` (s:pr#1[0]x2, s:k0#1[0]x1): s:k0#1[0]x1 is 1 SGPR where the instruction takes 2 (the widths of the role table's forms, the target's operand table: a 64-bit operand is an SGPR pair, allocated aligned)"
+   }
+  },
+  {
+   "name": "abs_on_integer_slot",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_sub_nc_u32\", w, u, O.abs_(w)))",
+   "built": [
+    "v_sub_nc_u32 v:w#1[0]x1, v:u#1[0]x1, |v:w#1[0]x1|"
+   ],
+   "values": [
+    "0 v u#1 n=1 align=1 pin=3",
+    "1 v w#1 n=1 align=1 pin=4",
+    "2 s k0#1 n=1 align=1 pin=1",
+    "3 s k1#1 n=1 align=1 pin=2"
+   ],
+   "records": {
+    "v.pinned": [
+     "u#1",
+     "w#1"
+    ],
+    "s.pinned": [
+     "k0#1",
+     "k1#1"
+    ]
+   },
+   "render_error": {
+    "class": "Diag",
+    "message": "kernel.py:3: `v_sub_nc_u32`: operand 2: modifiers on slot OPR_VGPR, which takes none"
+   }
+  },
+  {
+   "name": "family_store_six_dwords",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nsix = V.u32(n=6, name=\"six\")\nb.emit(O.global_store(u, six, gp))",
+   "error": {
+    "class": "ValueError",
+    "message": "global_store: v:six#1[0]x6 is 6 dword(s); the forms take 1, 2, 3, 4"
+   }
+  },
+  {
+   "name": "family_three_bytes",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nb.emit(O.global_store(w, u, gp, bytes=3))",
+   "error": {
+    "class": "ValueError",
+    "message": "global_store: bytes=3: 1 or 2 (a whole dword or more: no bytes=)"
+   }
+  },
+  {
+   "name": "family_byte_into_quad",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nrsrc = S.u32(n=4, name=\"rsrc\", at=8)\nquad = V.u32(n=4, name=\"quad\")\nb.emit(O.buffer_load(quad, w, rsrc, bytes=1))",
+   "error": {
+    "class": "ValueError",
+    "message": "buffer_load: bytes=1: one dword's low bytes, not v:quad#1[0]x4 (4 dwords)"
+   }
+  },
+  {
+   "name": "family_signed_dword",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nrsrc = S.u32(n=4, name=\"rsrc\", at=8)\nb.emit(O.buffer_load(u, w, rsrc, signed=True))",
+   "error": {
+    "class": "ValueError",
+    "message": "buffer_load: signed= is a 1- or 2-byte load's (bytes=1 or 2)"
+   }
+  },
+  {
+   "name": "scalar_load_six_dwords",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nsix = S.u32(n=6, name=\"six\")\nb.emit(O.s_load(six, gp, 16))",
+   "error": {
+    "class": "ValueError",
+    "message": "s_load: s:six#1[0]x6 is 6 dword(s); the forms take 1, 2, 4, 8, 16"
+   }
+  },
+  {
+   "name": "buffer_offset_at_2_23",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nO.buffer_off(1 << 23)",
+   "error": {
+    "class": "ValueError",
+    "message": "buffer offset 8388608 out of range (0..8388607)"
+   }
+  },
+  {
+   "name": "buffer_offset_negative",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nO.buffer_off(-4)",
+   "error": {
+    "class": "ValueError",
+    "message": "buffer offset -4 out of range (0..8388607)"
+   }
+  },
+  {
+   "name": "scalar_store_pair_absent",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\ntwo = S.u32(n=2, name=\"two\", at=10)\nb.emit(O.s_store(two, gp, 16))",
+   "error": {
+    "class": "ValueError",
+    "message": "s.store.b64: gfx1201 has no such op"
+   }
+  },
+  {
+   "name": "published_without_reason",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\ngp = S.ptr(name=\"gp\", at=6)\nO.published(O.op(\"global_store_b32\", u, w, gp), \"\")",
+   "error": {
+    "class": "ValueError",
+    "message": "published(): say why"
+   }
+  },
+  {
+   "name": "float_literal_on_bus",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_fma_f32\", V.f32(name=\"fd\"), k0, -3.7, k1))",
+   "error": {
+    "class": "ValueError",
+    "message": "v_fma_f32: reads k0#1, k1#1, -3.7: a VALU op reads 2 SGPRs or literals at most on gfx1201 (the constant bus) - move the others into VGPRs first (v_mov_b32), or write it as an expression, which moves them"
+   }
+  },
+  {
+   "name": "vcc_on_bus",
+   "src": "u, w = V.u32(name=\"u\", at=3), V.u32(name=\"w\", at=4)\nk0, k1 = S.u32(name=\"k0\", at=1), S.u32(name=\"k1\", at=2)\nb.emit(O.op(\"v_add3_u32\", u, O.VCC, k0, k1))",
+   "error": {
+    "class": "ValueError",
+    "message": "v_add3_u32: reads k0#1, k1#1, vcc_lo: a VALU op reads 2 SGPRs or literals at most on gfx1201 (the constant bus) - move the others into VGPRs first (v_mov_b32), or write it as an expression, which moves them"
+   }
+  }
+ ]
+}

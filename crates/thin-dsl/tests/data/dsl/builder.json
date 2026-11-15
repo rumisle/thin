@@ -1,0 +1,443 @@
+{
+ "notation": "Each case is a DSL snippet (`src`) run on a fresh Builder for gfx1201, with `b` the Builder, `V`, `S` its files and every name of the language imported. `built` is the stream the Builder made, before any pass: one line per instruction, `<form name> <operands> {fields}; <attributes>`. A register operand is written as VReg repr (`<file>:<value name>[<index in group>]x<dwords>` and `+<lo>` when lo != 0); a named register by its name; an immediate as its value, with the writer's spelling in quotes when it has one (`16'0x10'`); a block as `@label`. Source modifiers are written `-x`, `|x|`. Fields are in stored order. Attributes in a fixed order: comment, tag, abl, alias_ok, staged, wait_uses, in_region, places, published, lds=(region, what, field, offset: none or var, ordered), m0_set, waves_taken, fence. `values` lists the program's values in id order: `id file name n= align= [index=] [pin=] [same_as=]`. `records` holds the Program's lane regions and loops, the deferred records' kinds, each file's entered / pinned groups and lanes-covered names, and the wave index. `error` is the refusal (exception class and message) raised while the snippet ran. `render` (the whole pipeline's output) is the final.s; `render_error` a refusal of the pipeline's passes.",
+ "cases": [
+  {
+   "name": "stream_markers",
+   "src": "b.nop(2)\nb.comment(\"stage the tile\")\nb.barrier(fence=True)\nb.put_label(\".Lstage\")\nb.barrier(\"rows published\")\nb.nop()",
+   "built": [
+    "s_nop 2",
+    "ir.comment {text=; stage the tile}",
+    "s_barrier_signal -1",
+    "s_barrier_wait 65535 ; comment=\"[lds fence]\" fence",
+    "ir.label {name=.Lstage}",
+    "s_barrier_signal -1",
+    "s_barrier_wait 65535 ; comment=\"rows published\"",
+    "s_nop 0"
+   ],
+   "values": [],
+   "render": [
+    "\ts_nop 2",
+    "; stage the tile",
+    "\ts_barrier_signal -1",
+    "\ts_barrier_wait 65535                                         // [lds fence]",
+    ".Lstage:",
+    "\ts_barrier_signal -1",
+    "\ts_barrier_wait 65535                                         // rows published",
+    "\ts_nop 0"
+   ]
+  },
+  {
+   "name": "claims_recorded",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nbase, flag = S.u32(name=\"base\", at=4), S.u32(name=\"flag\", at=5)\n\nb.uniform(\"scc\", flag, base, why=\"the flag is broadcast from one wave\")\nb.undefined(val, why=\"the first trip writes val\")\nb.assume(col, lo=16, hi=63, why=\"upper lanes only\")\nb.discard(col, \"the column index is not reused\")",
+   "built": [
+    "ir.uniform scc, s:flag#1[0]x1, s:base#1[0]x1 {why=the flag is broadcast from one wave}",
+    "ir.undefined v:val#1[0]x1 {why=the first trip writes val}",
+    "ir.assume v:col#1[0]x1 {lo=16, hi=63, why=upper lanes only}",
+    "ir.discard v:col#1[0]x1 {why=the column index is not reused}"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3",
+    "2 s base#1 n=1 align=1 pin=4",
+    "3 s flag#1 n=1 align=1 pin=5"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ],
+    "s.pinned": [
+     "base#1",
+     "flag#1"
+    ]
+   },
+   "render": [
+    "; uniform: scc, s5, s4 (the flag is broadcast from one wave)",
+    "; undefined: v3 (the first trip writes val)",
+    "; assume: v2 in [16, 63] (upper lanes only)",
+    "; discard v2: the column index is not reused"
+   ]
+  },
+  {
+   "name": "ablation_drops_marked",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.ablate = {\"tail\"}\nb.emit(O.op(\"v_mov_b32\", val, 7))\nwith b.ablatable(None, \"tail\"):\n    b.emit(O.op(\"v_add_nc_u32\", val, 5, val))\nb.emit(O.op(\"v_lshlrev_b32\", val, 3, val, abl=(\"tail\",)))",
+   "built": [
+    "v_mov_b32 v:val#1[0]x1, 7"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v3, 7"
+   ]
+  },
+  {
+   "name": "ablation_class_kept",
+   "src": "dst = V.u32(name=\"dst\", at=6)\nwith b.ablatable(\"warm\", \"pro\"):\n    b.emit(O.op(\"v_mov_b32\", dst, 21))",
+   "built": [
+    "v_mov_b32 v:dst#1[0]x1, 21 ; abl=['pro', 'warm']"
+   ],
+   "values": [
+    "0 v dst#1 n=1 align=1 pin=6"
+   ],
+   "records": {
+    "v.pinned": [
+     "dst#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v6, 21"
+   ]
+  },
+  {
+   "name": "alias_waiver_dead_write",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nk = S.u32(name=\"k\", at=6)\nwith b.alias_ok(\"val#1\", col, over=(k,), why=\"the aliasing branch is never taken\"):\n    b.emit(O.op(\"v_add_nc_u32\", val, col, col))\nwith b.alias_ok(\"tmp\", why=\"a name not made yet\"):\n    b.emit(O.op(\"v_mov_b32\", val, 17))",
+   "built": [
+    "v_add_nc_u32 v:val#1[0]x1, v:col#1[0]x1, v:col#1[0]x1 ; alias_ok=[('col#1', 'k#1'), ('val#1', 'k#1')]",
+    "v_mov_b32 v:val#1[0]x1, 17 ; alias_ok=[('tmp', None)]"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3",
+    "2 s k#1 n=1 align=1 pin=6"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ],
+    "s.pinned": [
+     "k#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "`v_add_nc_u32 v3, v2, v2` (kernel.py:5): its value is written over on every path before a read (`v_mov_b32 v3, 17` (kernel.py:7) writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+   }
+  },
+  {
+   "name": "alias_waiver_read_after",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nwith b.alias_ok(col, why=\"col and val share a lane\"):\n    b.emit(O.op(\"v_sub_nc_u32\", val, col, val))\nb.emit(O.op(\"v_xor_b32\", col, val, col))",
+   "built": [
+    "v_sub_nc_u32 v:val#1[0]x1, v:col#1[0]x1, v:val#1[0]x1 ; alias_ok=[('col#1', None)]",
+    "v_xor_b32 v:col#1[0]x1, v:val#1[0]x1, v:col#1[0]x1"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ]
+   },
+   "render": [
+    "\tv_sub_nc_u32 v3, v2, v3",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_xor_b32 v2, v3, v2"
+   ]
+  },
+  {
+   "name": "hold_then_release",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.hold(\"callee\", col)\nb.emit(O.op(\"v_mov_b32\", val, 13))\nb.release(\"callee\")\nb.emit(O.op(\"v_mov_b32\", col, val))",
+   "built": [
+    "v_mov_b32 v:val#1[0]x1, 13",
+    "v_mov_b32 v:col#1[0]x1, v:val#1[0]x1"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ]
+   },
+   "render": [
+    "\tv_mov_b32 v3, 13",
+    "\ts_delay_alu 1                                                // hazard: instid0(VALU_DEP_1)",
+    "\tv_mov_b32 v2, v3"
+   ]
+  },
+  {
+   "name": "needs_recorded",
+   "src": "b.need(\"same_grid\", \"a generation counter is shared\", arg=\"gen\")\nb.need(\"co_resident\", \"spins on a peer's flag\")\nassert sorted(b.needs) == [\"co_resident\", \"same_grid\"]\nassert b.needs[\"same_grid\"] == {\"gen\": \"a generation counter is shared\"}",
+   "built": [],
+   "values": [],
+   "records": {
+    "needs": {
+     "co_resident": "spins on a peer's flag",
+     "same_grid": {
+      "gen": "a generation counter is shared"
+     }
+    }
+   },
+   "render": []
+  },
+  {
+   "name": "position_after_emit",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.emit(O.op(\"v_mov_b32\", val, 40))\nmark = b.pos\nb.emit(O.op(\"v_not_b32\", val, 41))\nassert b.pos - mark == 1\nassert b.last.op == \"v_not_b32\"\nassert [i.op for i in b.emitted(mark)] == [\"v_not_b32\"]\nassert [i.op for i in b.emitted(0, mark)] == [\"v_mov_b32\"]",
+   "built": [
+    "v_mov_b32 v:val#1[0]x1, 40",
+    "v_not_b32 v:val#1[0]x1, 41"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3"
+   ],
+   "records": {
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "`v_mov_b32 v3, 40` (kernel.py:3): its value is written over on every path before a read (`v_not_b32 v3, 41` (kernel.py:5) writes it again) (dead write): drop the write, or b.discard(reg, why) where it is not read; an ablation variant that switched the reader off - b.ablate"
+   }
+  },
+  {
+   "name": "issued_per_counter",
+   "src": "src = S.ptr(name=\"src\", at=2)\nidx = V.u32(name=\"idx\", at=1)\n\nq = V.u32(name=\"q\", at=4)\ncnt = S.u32(name=\"cnt\", at=8)\nb.emit(O.s_load(cnt, src))\nb.emit(O.op(\"global_load_b32\", q, idx, src))\nb.emit(O.op(\"global_load_b32\", q, idx, src))\nassert [b.issued(c) for c in (\"load\", \"km\", \"store\", \"ds\")] == [2, 1, 0, 0]",
+   "built": [
+    "s_load_b32 s:cnt#1[0]x1, s:src#1[0]x2, 0'0x0'",
+    "global_load_b32 v:q#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2",
+    "global_load_b32 v:q#1[0]x1, v:idx#1[0]x1, s:src#1[0]x2"
+   ],
+   "values": [
+    "0 s src#1 n=2 align=2 pin=2",
+    "1 v idx#1 n=1 align=1 pin=1",
+    "2 v q#1 n=1 align=1 pin=4",
+    "3 s cnt#1 n=1 align=1 pin=8"
+   ],
+   "records": {
+    "v.pinned": [
+     "idx#1",
+     "q#1"
+    ],
+    "s.pinned": [
+     "src#1",
+     "cnt#1"
+    ]
+   },
+   "render_error": {
+    "class": "ScheduleError",
+    "message": "global_load_b32 v:q#1, v:idx#1, s:src#1x2 (after the entry) touches a register while the load on it may be in flight on some path: it needs loadcnt(0) - add a wait in the schedule"
+   }
+  },
+  {
+   "name": "held_register_written",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.hold(\"epilogue\", col, val)\nb.emit(O.op(\"v_add_nc_u32\", val, col, 1))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "v_add_nc_u32 v:val#1, v:col#1, 1: writes v:val#1[0]x1, held by epilogue"
+   }
+  },
+  {
+   "name": "held_twice",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.hold(\"outer\", val)\nb.hold(\"inner\", col, val)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "hold inner: v:val#1[0]x1 is already held by outer"
+   }
+  },
+  {
+   "name": "emit_after_seal",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.emit(O.op(\"v_mov_b32\", val, 3))\nb.seal()\nb.emit(O.op(\"v_mov_b32\", val, 4))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "the kernel's passes have run (render, derive): nothing more is emitted"
+   }
+  },
+  {
+   "name": "nop_after_seal",
+   "src": "b.seal()\nb.nop(1)",
+   "error": {
+    "class": "ScheduleError",
+    "message": "the kernel's passes have run (render, derive): nothing more is emitted"
+   }
+  },
+  {
+   "name": "ablated_branch",
+   "src": "b.ablate = {\"skip\"}\nb.emit(O.op(\"s_cbranch_scc1\", \".Lout\", abl=(\"skip\",)))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "s_cbranch_scc1 .Lout: ablated (['skip']) - control flow is not ablatable: mark the instructions to drop, not the block around them"
+   }
+  },
+  {
+   "name": "uniform_without_reason",
+   "src": "base, flag = S.u32(name=\"base\", at=4), S.u32(name=\"flag\", at=5)\nb.uniform(base, flag, why=\"\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "uniform(): say why (why=)"
+   }
+  },
+  {
+   "name": "undefined_without_reason",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nb.undefined(col, val, why=\"\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "undefined(): say why (why=)"
+   }
+  },
+  {
+   "name": "undefined_special_register",
+   "src": "b.undefined(O.M0, why=\"m0 is set later\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "undefined(m0): registers of the v / s / a files"
+   }
+  },
+  {
+   "name": "undefined_exec_register",
+   "src": "b.undefined(O.EXEC, why=\"exec is restored later\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "undefined(exec): registers of the v / s / a files"
+   }
+  },
+  {
+   "name": "assume_without_reason",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nb.assume(val, lo=1, hi=8, why=\"\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "assume(): say why (why=)"
+   }
+  },
+  {
+   "name": "assume_inverted_range",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nb.assume(val, lo=200, hi=100, why=\"backwards\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "assume(v:val#1, lo=200, hi=100): 0 <= lo <= hi < 2^32 (u32 values)"
+   }
+  },
+  {
+   "name": "assume_above_u32",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nb.assume(col, hi=1 << 32, why=\"too wide\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "assume(v:col#1, lo=0, hi=4294967296): 0 <= lo <= hi < 2^32 (u32 values)"
+   }
+  },
+  {
+   "name": "assume_special_register",
+   "src": "b.assume(O.VCC, hi=1, why=\"a flag\")",
+   "error": {
+    "class": "ScheduleError",
+    "message": "assume(vcc): a register of the v / s / a files"
+   }
+  },
+  {
+   "name": "discard_without_reason",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nb.discard(val, \"\")",
+   "error": {
+    "class": "ValueError",
+    "message": "discard needs the reason (why)"
+   }
+  },
+  {
+   "name": "alias_ok_without_reason",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nwith b.alias_ok(\"val#1\", over=(col,), why=\"\"):\n    b.nop(0)",
+   "error": {
+    "class": "ValueError",
+    "message": "alias_ok needs the argument (why)"
+   }
+  },
+  {
+   "name": "need_unknown",
+   "src": "b.need(\"exclusive\", \"one kernel at a time\")",
+   "error": {
+    "class": "ValueError",
+    "message": "need('exclusive', arg=None): co_resident, or same_grid with its argument"
+   }
+  },
+  {
+   "name": "need_same_grid_without_arg",
+   "src": "b.need(\"same_grid\", \"generations\")",
+   "error": {
+    "class": "ValueError",
+    "message": "need('same_grid', arg=None): co_resident, or same_grid with its argument"
+   }
+  },
+  {
+   "name": "issued_unknown_counter",
+   "src": "b.issued(\"lgkm\")",
+   "error": {
+    "class": "ValueError",
+    "message": "issued(\"lgkm\"): one of load, store, ds, km"
+   }
+  },
+  {
+   "name": "second_entry",
+   "src": "b.entry(Args(z=u32))\nb.entry(Args(z=u32))",
+   "error": {
+    "class": "ScheduleError",
+    "message": "entry: made once a kernel"
+   }
+  },
+  {
+   "name": "fork_away_from_branch",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nb.emit(O.op(\"v_mov_b32\", col, 5))\nsnap = b.fork()\nb.emit(O.op(\"v_add_nc_u32\", val, col, 2))\nb.cnt = snap",
+   "error": {
+    "class": "ScheduleError",
+    "message": "a path starts from a fork not taken at a branch (the instructions around it: `v_mov_b32 v:col#1, 5 | v_add_nc_u32 v:val#1, v:col#1, 2`); fork right before or right after the branch instruction"
+   }
+  },
+  {
+   "name": "fork_first_instruction",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\n\nsnap = b.fork()\nb.emit(O.op(\"v_mov_b32\", val, 6))\nb.cnt = snap",
+   "error": {
+    "class": "ScheduleError",
+    "message": "a path starts from a fork not taken at a branch (the instructions around it: `(none) | v_mov_b32 v:val#1, 6`); fork right before or right after the branch instruction"
+   }
+  },
+  {
+   "name": "claims_inside_lanes",
+   "src": "col, val = V.u32(name=\"col\", at=2), V.u32(name=\"val\", at=3)\nbase, flag = S.u32(name=\"base\", at=4), S.u32(name=\"flag\", at=5)\n\nwith b.lanes(col >= 32):\n    b.uniform(flag, why=\"written before the region\")\n    b.assume(col, lo=32, hi=63, why=\"the region's lanes\")",
+   "built": [
+    "v_cmp_le_u32 vcc_lo, 32, v:col#1[0]x1 ; comment=\"col >= 32\"",
+    "s_mov_b32 exec_lo, vcc_lo",
+    "ir.uniform s:flag#1[0]x1 {why=written before the region} ; in_region=1",
+    "ir.assume v:col#1[0]x1 {lo=32, hi=63, why=the region's lanes} ; in_region=1",
+    "s_mov_b32 exec_lo, -1"
+   ],
+   "values": [
+    "0 v col#1 n=1 align=1 pin=2",
+    "1 v val#1 n=1 align=1 pin=3",
+    "2 s base#1 n=1 align=1 pin=4",
+    "3 s flag#1 n=1 align=1 pin=5"
+   ],
+   "records": {
+    "regions": [
+     "id=1 entry=`s_mov_b32 exec_lo, vcc_lo` save=None checked=True"
+    ],
+    "v.pinned": [
+     "col#1",
+     "val#1"
+    ],
+    "s.pinned": [
+     "base#1",
+     "flag#1"
+    ]
+   },
+   "render": [
+    "\tv_cmp_le_u32 vcc_lo, 32, v2                                  // col >= 32",
+    "\ts_mov_b32 exec_lo, vcc_lo",
+    "; uniform: s5 (written before the region)",
+    "; assume: v2 in [32, 63] (the region's lanes)",
+    "\ts_mov_b32 exec_lo, -1"
+   ]
+  }
+ ]
+}

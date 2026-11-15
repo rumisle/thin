@@ -1,0 +1,2599 @@
+{
+ "notation": "Abstract streams recorded in each case; both CFG block policies are native results.",
+ "cases": [
+  {
+   "name": "no_rows",
+   "stream": [],
+   "behavior": "an empty instruction stream",
+   "cfg": {
+    "succ": [],
+    "preds": [],
+    "starts": [],
+    "block_of": [],
+    "block_succ": [],
+    "block_preds": [],
+    "rpo": [],
+    "back_edges": [],
+    "reached": []
+   },
+   "cfg_label_blocks": {
+    "succ": [],
+    "preds": [],
+    "starts": [],
+    "block_of": [],
+    "block_succ": [],
+    "block_preds": [],
+    "rpo": [],
+    "back_edges": [],
+    "reached": []
+   }
+  },
+  {
+   "name": "linear",
+   "stream": [
+    "op",
+    "end"
+   ],
+   "behavior": "straight-line fall-through to an end",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ]
+    ],
+    "starts": [
+     0
+    ],
+    "block_of": [
+     0,
+     0
+    ],
+    "block_succ": [
+     []
+    ],
+    "block_preds": [
+     []
+    ],
+    "rpo": [
+     0
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ]
+    ],
+    "starts": [
+     0
+    ],
+    "block_of": [
+     0,
+     0
+    ],
+    "block_succ": [
+     []
+    ],
+    "block_preds": [
+     []
+    ],
+    "rpo": [
+     0
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "self_cycle",
+   "stream": [
+    "cycle:",
+    "op",
+    "op",
+    "br cycle",
+    "end"
+   ],
+   "behavior": "a label and conditional back-edge in one non-label block",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      0,
+      4
+     ],
+     []
+    ],
+    "preds": [
+     [
+      3
+     ],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ]
+    ],
+    "starts": [
+     0,
+     4
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "block_succ": [
+     [
+      0,
+      1
+     ],
+     []
+    ],
+    "block_preds": [
+     [
+      0
+     ],
+     [
+      0
+     ]
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [
+     [
+      0,
+      0
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      0,
+      4
+     ],
+     []
+    ],
+    "preds": [
+     [
+      3
+     ],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ]
+    ],
+    "starts": [
+     0,
+     4
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "block_succ": [
+     [
+      0,
+      1
+     ],
+     []
+    ],
+    "block_preds": [
+     [
+      0
+     ],
+     [
+      0
+     ]
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [
+     [
+      0,
+      0
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "split_and_join",
+   "stream": [
+    "op",
+    "br right",
+    "op",
+    "op",
+    "jmp joined",
+    "right:",
+    "op",
+    "joined:",
+    "end"
+   ],
+   "behavior": "two conditional arms, an unconditional edge and a join",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      5,
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      7
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      1
+     ],
+     [
+      5
+     ],
+     [
+      4,
+      6
+     ],
+     [
+      7
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     5,
+     7
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     2,
+     2,
+     3,
+     3
+    ],
+    "block_succ": [
+     [
+      2,
+      1
+     ],
+     [
+      3
+     ],
+     [
+      3
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     [
+      0
+     ],
+     [
+      1,
+      2
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      5,
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      7
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      1
+     ],
+     [
+      5
+     ],
+     [
+      4,
+      6
+     ],
+     [
+      7
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     5,
+     7
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     2,
+     2,
+     3,
+     3
+    ],
+    "block_succ": [
+     [
+      2,
+      1
+     ],
+     [
+      3
+     ],
+     [
+      3
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     [
+      0
+     ],
+     [
+      1,
+      2
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "untargeted_labels",
+   "stream": [
+    "head:",
+    "op",
+    "note:",
+    "op",
+    "op",
+    "br head",
+    "end"
+   ],
+   "behavior": "labels not targeted by a branch, including the back-edge target",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      0,
+      6
+     ],
+     []
+    ],
+    "preds": [
+     [
+      5
+     ],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ]
+    ],
+    "starts": [
+     0,
+     6
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     0,
+     1
+    ],
+    "block_succ": [
+     [
+      0,
+      1
+     ],
+     []
+    ],
+    "block_preds": [
+     [
+      0
+     ],
+     [
+      0
+     ]
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [
+     [
+      0,
+      0
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      0,
+      6
+     ],
+     []
+    ],
+    "preds": [
+     [
+      5
+     ],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     6
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     1,
+     2
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     []
+    ],
+    "block_preds": [
+     [
+      1
+     ],
+     [
+      0
+     ],
+     [
+      1
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2
+    ],
+    "back_edges": [
+     [
+      1,
+      0
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "adjacent_target",
+   "stream": [
+    "op",
+    "op",
+    "br nearby",
+    "nearby:",
+    "op",
+    "end"
+   ],
+   "behavior": "a conditional branch whose target is the next instruction",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ]
+    ],
+    "starts": [
+     0,
+     3
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     1
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ]
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ]
+    ],
+    "starts": [
+     0,
+     3
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     1
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ]
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "missing_targets",
+   "stream": [
+    "op",
+    "br missing_cond",
+    "op",
+    "op",
+    "jmp missing_jump",
+    "end"
+   ],
+   "behavior": "conditional and unconditional references to absent labels",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     []
+    ],
+    "starts": [
+     0,
+     2,
+     5
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     2
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     []
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     []
+    ],
+    "starts": [
+     0,
+     2,
+     5
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     2
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     []
+    ],
+    "rpo": [
+     0,
+     1
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     false
+    ]
+   }
+  },
+  {
+   "name": "unreached_regions",
+   "stream": [
+    "op",
+    "jmp live",
+    "op",
+    "orphan:",
+    "op",
+    "live:",
+    "op",
+    "end",
+    "op"
+   ],
+   "behavior": "unreached rows before a label and after an end",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      5
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      1,
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     []
+    ],
+    "starts": [
+     0,
+     2,
+     5,
+     8
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     2,
+     2,
+     2,
+     3
+    ],
+    "block_succ": [
+     [
+      2
+     ],
+     [
+      2
+     ],
+     [],
+     []
+    ],
+    "block_preds": [
+     [],
+     [],
+     [
+      0,
+      1
+     ],
+     []
+    ],
+    "rpo": [
+     0,
+     2
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     true,
+     true,
+     true,
+     false
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      5
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      1,
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     []
+    ],
+    "starts": [
+     0,
+     2,
+     3,
+     5,
+     8
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     2,
+     2,
+     3,
+     3,
+     3,
+     4
+    ],
+    "block_succ": [
+     [
+      3
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [],
+     []
+    ],
+    "block_preds": [
+     [],
+     [],
+     [
+      1
+     ],
+     [
+      0,
+      2
+     ],
+     []
+    ],
+    "rpo": [
+     0,
+     3
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     false,
+     false,
+     false,
+     true,
+     true,
+     true,
+     false
+    ]
+   }
+  },
+  {
+   "name": "repeated_label",
+   "stream": [
+    "twice:",
+    "op",
+    "br twice",
+    "twice:",
+    "op",
+    "op",
+    "br twice",
+    "end"
+   ],
+   "behavior": "a repeated label name with branches resolving to its first row",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ]
+    ],
+    "starts": [
+     0,
+     3,
+     7
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     1,
+     1,
+     2
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      1,
+      2
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0,
+      1
+     ],
+     [
+      1
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2
+    ],
+    "back_edges": [
+     [
+      1,
+      1
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ]
+    ],
+    "starts": [
+     0,
+     3,
+     7
+    ],
+    "block_of": [
+     0,
+     0,
+     0,
+     1,
+     1,
+     1,
+     1,
+     2
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      1,
+      2
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0,
+      1
+     ],
+     [
+      1
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2
+    ],
+    "back_edges": [
+     [
+      1,
+      1
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "inner_and_outer_cycles",
+   "stream": [
+    "op",
+    "outer:",
+    "op",
+    "inner:",
+    "op",
+    "op",
+    "br inner",
+    "op",
+    "br outer",
+    "end"
+   ],
+   "behavior": "an inner loop nested in an outer loop",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0,
+      8
+     ],
+     [
+      1
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ]
+    ],
+    "starts": [
+     0,
+     1,
+     3,
+     7,
+     9
+    ],
+    "block_of": [
+     0,
+     1,
+     1,
+     2,
+     2,
+     2,
+     2,
+     3,
+     3,
+     4
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      1,
+      4
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0,
+      3
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "back_edges": [
+     [
+      2,
+      2
+     ],
+     [
+      3,
+      1
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      3,
+      7
+     ],
+     [
+      8
+     ],
+     [
+      1,
+      9
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0,
+      8
+     ],
+     [
+      1
+     ],
+     [
+      2,
+      6
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ]
+    ],
+    "starts": [
+     0,
+     1,
+     3,
+     7,
+     9
+    ],
+    "block_of": [
+     0,
+     1,
+     1,
+     2,
+     2,
+     2,
+     2,
+     3,
+     3,
+     4
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      2,
+      3
+     ],
+     [
+      1,
+      4
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0,
+      3
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "back_edges": [
+     [
+      2,
+      2
+     ],
+     [
+      3,
+      1
+     ]
+    ],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "implicit_fall_off",
+   "stream": [
+    "op",
+    "br later",
+    "op",
+    "op",
+    "later:",
+    "op"
+   ],
+   "behavior": "a forward branch and no end-of-program instruction",
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      4,
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      4
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     4
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     2,
+     2
+    ],
+    "block_succ": [
+     [
+      2,
+      1
+     ],
+     [
+      2
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     [
+      0,
+      1
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      4,
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      4
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     4
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     2,
+     2
+    ],
+    "block_succ": [
+     [
+      2,
+      1
+     ],
+     [
+      2
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     [
+      0,
+      1
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "wave_resolved_taken_first",
+   "stream": [
+    "op",
+    "brw aside",
+    "op",
+    "op",
+    "aside:",
+    "op",
+    "brw done",
+    "op",
+    "op",
+    "done:",
+    "end"
+   ],
+   "behavior": "two wave-resolved conditional branches, first taken and second not",
+   "waves": [
+    [
+     1,
+     true
+    ],
+    [
+     6,
+     false
+    ]
+   ],
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      4
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ],
+     [
+      9
+     ],
+     [
+      10
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [],
+     [
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ],
+     [
+      9
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     4,
+     7
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     2,
+     2,
+     2,
+     3,
+     3,
+     3,
+     3
+    ],
+    "block_succ": [
+     [
+      2
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [],
+     [
+      0,
+      1
+     ],
+     [
+      2
+     ]
+    ],
+    "rpo": [
+     0,
+     2,
+     3
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     false,
+     false,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      4
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ],
+     [
+      9
+     ],
+     [
+      10
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [],
+     [
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      7
+     ],
+     [
+      8
+     ],
+     [
+      9
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     4,
+     7,
+     9
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     2,
+     2,
+     2,
+     3,
+     3,
+     4,
+     4
+    ],
+    "block_succ": [
+     [
+      2
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [],
+     [
+      0,
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ]
+    ],
+    "rpo": [
+     0,
+     2,
+     3,
+     4
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     false,
+     false,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true
+    ]
+   }
+  },
+  {
+   "name": "wave_resolved_taken_second",
+   "stream": [
+    "op",
+    "brw aside",
+    "op",
+    "op",
+    "aside:",
+    "op",
+    "brw done",
+    "op",
+    "op",
+    "done:",
+    "end"
+   ],
+   "behavior": "the same graph with the complementary branch decisions",
+   "waves": [
+    [
+     1,
+     false
+    ],
+    [
+     6,
+     true
+    ]
+   ],
+   "cfg": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      9
+     ],
+     [
+      8
+     ],
+     [
+      9
+     ],
+     [
+      10
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [],
+     [
+      7
+     ],
+     [
+      6,
+      8
+     ],
+     [
+      9
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     7,
+     9
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     1,
+     1,
+     1,
+     2,
+     2,
+     3,
+     3
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      3
+     ],
+     [
+      3
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     [],
+     [
+      1,
+      2
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     3
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     true,
+     true
+    ]
+   },
+   "cfg_label_blocks": {
+    "succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [
+      6
+     ],
+     [
+      9
+     ],
+     [
+      8
+     ],
+     [
+      9
+     ],
+     [
+      10
+     ],
+     []
+    ],
+    "preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      3
+     ],
+     [
+      4
+     ],
+     [
+      5
+     ],
+     [],
+     [
+      7
+     ],
+     [
+      6,
+      8
+     ],
+     [
+      9
+     ]
+    ],
+    "starts": [
+     0,
+     2,
+     4,
+     7,
+     9
+    ],
+    "block_of": [
+     0,
+     0,
+     1,
+     1,
+     2,
+     2,
+     2,
+     3,
+     3,
+     4,
+     4
+    ],
+    "block_succ": [
+     [
+      1
+     ],
+     [
+      2
+     ],
+     [
+      4
+     ],
+     [
+      4
+     ],
+     []
+    ],
+    "block_preds": [
+     [],
+     [
+      0
+     ],
+     [
+      1
+     ],
+     [],
+     [
+      2,
+      3
+     ]
+    ],
+    "rpo": [
+     0,
+     1,
+     2,
+     4
+    ],
+    "back_edges": [],
+    "reached": [
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     true,
+     false,
+     false,
+     true,
+     true
+    ]
+   }
+  }
+ ]
+}
