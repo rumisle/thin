@@ -2165,6 +2165,124 @@ def test_gfx942_packed_f32_ops_and_provenance():
     assert len(prob.stores) == 256
 
 
+def test_gfx942_hw_suite_compiles_and_emulates_cleanly():
+    """Preflight every kernel generator in `tests/hw/test_gfx942_hw.py` on CPU + `thin.emu`."""
+    import numpy as np
+
+    import thin
+    from tests.hw import test_gfx942_hw as hw
+    from thin.target import targeting
+
+    before = thin.use_store(None)
+    try:
+        with targeting("gfx942"):
+            # 1. Collectives & clocks
+            k1 = thin.compile(hw.gen_collectives_and_clocks)
+            x = np.arange(64, dtype=np.float32) + 1.0
+            r1 = k1.bind(
+                (1,),
+                {
+                    "src": x,
+                    "out_red": np.zeros(64, dtype=np.float32),
+                    "out_max": np.zeros(64, dtype=np.float32),
+                    "out_scan": np.zeros(64, dtype=np.float32),
+                    "clocks": np.zeros(4, dtype=np.uint32),
+                },
+            ).emulate()
+            np.testing.assert_allclose(r1["out_scan"], np.cumsum(x), rtol=0, atol=0)
+
+            # 2. Representative dense MFMA (AGPR + VGPR), broadcast/f64/hazard chain, sparse SMFMAC
+            for shape, acc_file in [("f32_32x32x8_f16", "a"), ("f32_16x16x32_fp8_bf8", "v")]:
+                ab_dw, cd_dw = hw.DENSE_SHAPES[shape]
+                kd = thin.compile(hw.gen_mfma_dense, shape=shape, acc_file=acc_file)
+                kd.bind(
+                    (1,),
+                    {
+                        "a": np.zeros(64 * ab_dw, dtype=np.uint32),
+                        "b": np.zeros(64 * ab_dw, dtype=np.uint32),
+                        "c": np.zeros(64 * cd_dw, dtype=np.uint32),
+                        "d": np.zeros(64 * cd_dw, dtype=np.uint32),
+                    },
+                ).emulate()
+
+            kb = thin.compile(hw.gen_mfma_bcast_f64_and_hazards)
+            kb.bind(
+                (1,),
+                {
+                    "pa": np.zeros(64 * 2, dtype=np.uint32),
+                    "pb": np.zeros(64 * 2, dtype=np.uint32),
+                    "pf64": np.zeros(64 * 12, dtype=np.uint32),
+                    "out_bcast": np.zeros(64 * 4, dtype=np.uint32),
+                    "out_f64": np.zeros(64 * 8, dtype=np.uint32),
+                    "out_chain": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+
+            ks = thin.compile(hw.gen_smfmac, shape="f32_16x16x64_fp8_fp8")
+            ks.bind(
+                (1,),
+                {
+                    "a": np.zeros(64 * 2, dtype=np.uint32),
+                    "b": np.zeros(64 * 4, dtype=np.uint32),
+                    "idx": np.full(64, 0x4444_4444, dtype=np.uint32),
+                    "c": np.zeros(64 * 4, dtype=np.uint32),
+                    "d": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+
+            # 3. FNUZ FP8/BF8 conversions
+            kc = thin.compile(hw.gen_fnuz_fp8_bf8_cvt)
+            kc.bind(
+                (1,),
+                {
+                    "x0": np.full(64, -0.0, dtype=np.float32),
+                    "x1": np.full(64, 1.0, dtype=np.float32),
+                    "x2": np.full(64, np.inf, dtype=np.float32),
+                    "x3": np.full(64, np.nan, dtype=np.float32),
+                    "out_fp8": np.zeros(64, dtype=np.uint32),
+                    "out_bf8": np.zeros(64, dtype=np.uint32),
+                },
+            ).emulate()
+
+            # 4. VMEM->LDS DMA + ds_write2/read2 + ds_read_b128
+            kl = thin.compile(hw.gen_vmem_to_lds_and_ds2)
+            rl = kl.bind(
+                (1,),
+                {
+                    "src_g": np.arange(64, dtype=np.uint32) + 10,
+                    "src_b": np.arange(64, dtype=np.uint32) + 20,
+                    "out_g": np.zeros(64, dtype=np.uint32),
+                    "out_b": np.zeros(64, dtype=np.uint32),
+                    "out_ds2": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+            np.testing.assert_array_equal(rl["out_g"], (np.arange(64, dtype=np.uint32) + 10)[::-1])
+            np.testing.assert_array_equal(rl["out_b"], (np.arange(64, dtype=np.uint32) + 20)[::-1])
+
+            # 5. GFX9 DPP & packed f32/b32 ops + multi-XCD atomics
+            kp = thin.compile(hw.gen_dpp_and_packed_f32)
+            kp.bind(
+                (1,),
+                {
+                    "src_p": np.ones(64 * 4, dtype=np.float32).view(np.uint32),
+                    "out_dpp": np.zeros(64 * 4, dtype=np.uint32),
+                    "out_pk": np.zeros(64 * 8, dtype=np.uint32),
+                },
+            ).emulate()
+
+            ka = thin.compile(hw.gen_multi_xcd_atomics)
+            ra = ka.bind(
+                (8,),
+                {
+                    "counts": np.zeros(16, dtype=np.uint32),
+                    "per_wg": np.zeros(8, dtype=np.uint32),
+                },
+            ).emulate()
+            assert ra["counts"].tolist() == [16 * 8 * 9 // 2] * 16
+    finally:
+        thin.use_store(before)
+
+
 def test_gfx942_cdna3_scalar_exec_partial_and_setreg_hazards() -> None:
     """CDNA3 Table 11 / GCNHazardRecognizer wait states on VCC, RWLane, EXEC, PartialDst, setreg."""
     import thin

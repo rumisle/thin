@@ -7,10 +7,11 @@ counted), or the process above its RSS ceiling. A test marked
 ``slow("<section>")`` is held to that section's ``seconds`` and
 ``peak_rss_mb`` instead.
 
-A test marked ``gfx1201`` needs that GPU: it skips unless HIP has one,
-runs with the first one current (torch's and HIP's), and is held to the
-``[gfx1201]`` budgets as a slow test is to its section. ``pytest -m
-gfx1201`` runs the hardware suite alone.
+A test marked ``gfx1201`` or ``gfx942`` needs that GPU: it skips unless HIP
+has one, runs with the first matching device and ``targeting(...)`` current,
+and is held to the ``[gfx1201]`` / ``[gfx942]`` budgets as a slow test is to
+its section. ``pytest -m gfx1201`` or ``pytest -m gfx942`` runs that target's
+hardware suite alone.
 
 ``THIN_BUDGET_SCALE`` multiplies the time budgets on a slower machine
 (tests/budgets.py); the header, the cost line and every time violation
@@ -88,7 +89,13 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "gfx1201: needs a gfx1201 (RDNA 4) GPU; runs on the first one, skips without"
     )
-    config.addinivalue_line("markers", "gpu: a GPU cross-check; every gfx1201 test is one")
+    config.addinivalue_line(
+        "markers",
+        "gfx942: needs a gfx942 (CDNA 3 / MI300X) GPU; runs on the first one, skips without",
+    )
+    config.addinivalue_line(
+        "markers", "gpu: a GPU cross-check; every gfx1201 or gfx942 test is one"
+    )
     config.addinivalue_line(
         "markers",
         "isolated: runs in a child process of its own (graph capture has a per-process limit)",
@@ -105,39 +112,57 @@ def pytest_runtest_logreport(report):
     DURATIONS[report.nodeid] += report.duration
 
 
-_GPU: list[int | None] = []
-"""HIP's index of the first gfx1201, or None: asked once a session."""
+_HARDWARE_TARGETS = ("gfx1201", "gfx942")
+_GPUS: dict[str, int | None] = {}
+"""HIP's index of the first GPU of each target arch, or None: asked once a session."""
 
 
-def _gfx1201() -> int | None:
-    """HIP's index of the first gfx1201, or None (none, or no torch to run on it)."""
-    if not _GPU:
+def _gpu(arch: str) -> int | None:
+    """HIP's index of the first ``arch`` GPU, or None (none, or no torch to run on it)."""
+    if arch not in _GPUS:
         import importlib.util
 
         from thin.runtime import hip
 
         archs, _ = hip.gpus()
         torch = importlib.util.find_spec("torch") is not None
-        _GPU.append(archs.index("gfx1201") if "gfx1201" in archs and torch else None)
-    return _GPU[0]
+        _GPUS[arch] = archs.index(arch) if arch in archs and torch else None
+    return _GPUS[arch]
+
+
+def _gfx1201() -> int | None:
+    """HIP's index of the first gfx1201, or None (none, or no torch to run on it)."""
+    return _gpu("gfx1201")
+
+
+def _gfx942() -> int | None:
+    """HIP's index of the first gfx942, or None (none, or no torch to run on it)."""
+    return _gpu("gfx942")
 
 
 @pytest.fixture(autouse=True)
-def _on_the_gfx1201(request):
-    """Makes the gfx1201 current for a test marked so: a machine may have
-    others (an APU's integrated GPU enumerates too), and the runtime runs on
-    the current one."""
-    if request.node.get_closest_marker("gfx1201") is None:
+def _on_the_target_gpu(request):
+    """Makes the marked target GPU and ``targeting(arch)`` current for a hardware test."""
+    arch = next(
+        (a for a in _HARDWARE_TARGETS if request.node.get_closest_marker(a) is not None),
+        None,
+    )
+    if arch is None:
         yield
         return
     import torch
 
-    index = _gfx1201()
+    from thin.target import targeting
+
+    index = _gpu(arch)
     before = torch.cuda.current_device()
     torch.cuda.set_device(index)
-    assert torch.cuda.get_device_properties(index).gcnArchName.split(":")[0] == "gfx1201"
-    yield
-    torch.cuda.set_device(before)
+    assert torch.cuda.get_device_properties(index).gcnArchName.split(":")[0] == arch
+    try:
+        with targeting(arch):
+            yield
+    finally:
+        torch.cuda.set_device(before)
 
 
 _ISOLATED: set = set()
@@ -173,11 +198,12 @@ def pytest_collection_modifyitems(items):
         if item.get_closest_marker("isolated") is not None and not os.environ.get(_CHILD):
             item.runtest = lambda item=item: _in_a_child(item)
             _ISOLATED.add(item.nodeid)
-        if item.get_closest_marker("gfx1201") is not None:
-            SLOW.setdefault(item.nodeid, "gfx1201")  # an explicit slow section wins
-            item.add_marker(pytest.mark.gpu)
-            if _gfx1201() is None:
-                item.add_marker(pytest.mark.skip(reason="needs a gfx1201 GPU and torch"))
+        for arch in _HARDWARE_TARGETS:
+            if item.get_closest_marker(arch) is not None:
+                SLOW.setdefault(item.nodeid, arch)  # an explicit slow section wins
+                item.add_marker(pytest.mark.gpu)
+                if _gpu(arch) is None:
+                    item.add_marker(pytest.mark.skip(reason=f"needs a {arch} GPU and torch"))
 
 
 def _cost() -> tuple[float, float | None, float | None]:
@@ -254,12 +280,15 @@ def pytest_terminal_summary(terminalreporter):
 
 
 _RAN_GPU: list[bool] = [False]
-"""Whether a gfx1201 test ran (not skipped) this session."""
+"""Whether a GPU hardware test ran (not skipped) this session."""
 
 
 def pytest_runtest_setup(item):
     """Notes a hardware test about to run."""
-    if item.get_closest_marker("gfx1201") is not None and _gfx1201() is not None:
+    if any(
+        item.get_closest_marker(arch) is not None and _gpu(arch) is not None
+        for arch in _HARDWARE_TARGETS
+    ):
         _RAN_GPU[0] = True
 
 
