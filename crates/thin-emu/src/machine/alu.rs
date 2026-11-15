@@ -936,8 +936,13 @@ fn valu_inner(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result
         }
         "v.fma.mix.f32" => fma_mix(e, wv, ins)?,
         "v.mul.f64" | "v.fma.f64" => f64_op(e, wv, ins, canon)?,
-        "v.mov.b32.dpp" | "v.max.f32.dpp" | "v.min.f32.dpp" | "v.add.f32.dpp" => {
-            dpp(e, wv, ins, canon)?;
+        "v.pk.fma.f32" | "v.pk.mul.f32" | "v.pk.add.f32" | "v.pk.mov.b32" => {
+            pk_f32_op(e, wv, ins, canon)?;
+        }
+        c if c.ends_with(".dpp") => {
+            if !dpp(e, wv, ins, c)? {
+                return Ok(false);
+            }
         }
         "v.fma.f32" | "v.fmac.f32" | "v.dot2.f32.bf16" => {
             let (x, y) = (wv.vread(arg(1)?, 0)?, wv.vread(arg(2)?, 0)?);
@@ -1552,10 +1557,126 @@ fn class_f32(x: u32) -> u32 {
     }
 }
 
-/// The DPP source lane of lane `l`, or none when out of its row (RDNA4 ISA
-/// guide DPP_CTRL table: row_shr / row_ror read lane n − k, the
-/// rotation wrapping within the row, row_shl lane n + k).
-fn dpp_source(ins: &Ins, l: usize) -> Result<Option<usize>, EmuError> {
+/// One 32-bit dword (`sel` in `0..=1`) of a 64-bit VOP3P packed source.
+/// Inline integers sign-extend into dword 1; 32-bit inline floats occupy
+/// `[31:0]` with `0` in `[63:32]`.
+fn pk_src_dword(wv: &Wave, o: &Operand, sel: usize) -> Result<Src, EmuError> {
+    match &o.base {
+        Base::Literal(v, _) if sel == 0 => Ok(Src::splat(*v)),
+        Base::Literal(v, text) => {
+            let int = text.parse::<i64>().is_ok() || text.trim_start_matches('-').starts_with("0x");
+            let hi = if int && (*v as i32) < 0 { u32::MAX } else { 0 };
+            Ok(Src::splat(hi))
+        }
+        _ => wv.vread(o, sel as u32),
+    }
+}
+
+/// CDNA 3 packed 32-bit VOP3P ops: `v_pk_fma_f32`, `v_pk_mul_f32`,
+/// `v_pk_add_f32`, and `v_pk_mov_b32`.
+///
+/// For `v_pk_mov_b32`, `op_sel[0]` selects the source dword of `S0` written to
+/// `D0[31:0]` and `op_sel[1]` selects the source dword of `S1` written to
+/// `D0[63:32]` (`op_sel_hi`, `neg_lo`, `neg_hi`, and `clamp` are ignored by
+/// hardware). For the arithmetic ops, `op_sel` / `neg_lo` control `D0[31:0]`
+/// and `op_sel_hi` (defaulting to `[1, 1(, 1)]`) / `neg_hi` control
+/// `D0[63:32]`, with optional DX10 `[+0.0, 1.0]` clamping.
+fn pk_f32_op(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<(), EmuError> {
+    let w = wv.w;
+    let ops = &ins.operands;
+    if ["mul", "div", "omod"]
+        .iter()
+        .any(|k| ins.field(k).is_some())
+    {
+        return Err(limit(format!(
+            "{}: output modifier (mul, div, omod) is not modelled",
+            ins.text
+        )));
+    }
+    if ops.iter().any(|o| o.neg || o.abs) {
+        return Err(limit(format!(
+            "{}: source abs / neg is not modelled on packed 32-bit ops",
+            ins.text
+        )));
+    }
+    let fma3 = canon == "v.pk.fma.f32";
+    let nsrc = if fma3 { 3 } else { 2 };
+    if ops.len() != nsrc + 1 {
+        return Err(fault(format!("{}: operand count", ins.text)));
+    }
+    let exec = wv.exec;
+    if canon == "v.pk.mov.b32" {
+        let s0 = pk_src_dword(wv, &ops[1], list_at(ins, "op_sel", 0, 0) as usize & 1)?;
+        let s1 = pk_src_dword(wv, &ops[2], list_at(ins, "op_sel", 1, 0) as usize & 1)?;
+        wv.vwrite(&ops[0], 0, &s0.v, copy_tags(&s0, w).as_deref(), exec)?;
+        return wv.vwrite(&ops[0], 1, &s1.v, copy_tags(&s1, w).as_deref(), exec);
+    }
+    let clamp = ins.field("clamp").is_some_and(|f| field_int(f) != 0);
+    let mut outs = [[0u32; MAX_W]; 2];
+    let mut tags: [Option<Vec<Lane>>; 2] = [None, None];
+    for half in 0..2 {
+        let mut srcs = Vec::with_capacity(nsrc);
+        for i in 0..nsrc {
+            let (sel, neg) = if half == 0 {
+                (
+                    list_at(ins, "op_sel", i, 0) as usize & 1,
+                    list_at(ins, "neg_lo", i, 0) & 1 != 0,
+                )
+            } else {
+                (
+                    list_at(ins, "op_sel_hi", i, 1) as usize & 1,
+                    list_at(ins, "neg_hi", i, 0) & 1 != 0,
+                )
+            };
+            let mut s = pk_src_dword(wv, &ops[1 + i], sel)?;
+            if neg {
+                for v in &mut s.v[..w] {
+                    *v ^= 0x8000_0000;
+                }
+            }
+            srcs.push(s);
+        }
+        for l in 0..w {
+            let (a, b) = (srcs[0].v[l], srcs[1].v[l]);
+            let mut r = match canon {
+                "v.pk.fma.f32" => fma(a, b, srcs[2].v[l]),
+                "v.pk.mul.f32" => num::nan32(f(a) * f(b), &[a, b]),
+                _ => num::nan32(f(a) + f(b), &[a, b]),
+            };
+            if clamp {
+                let fv = f(r);
+                r = if fv.is_nan() || fv <= 0.0 {
+                    0
+                } else if fv >= 1.0 {
+                    1.0f32.to_bits()
+                } else {
+                    r
+                };
+            }
+            outs[half][l] = r;
+        }
+        tags[half] = match canon {
+            "v.pk.fma.f32" => {
+                match float_rule(e, w, srcs[0].tags(w), srcs[1].tags(w), false, false)? {
+                    Some(p) => float_rule(e, w, &p, srcs[2].tags(w), false, true)?,
+                    None => float_rule(e, w, &zeros(w), srcs[2].tags(w), false, true)?,
+                }
+            }
+            "v.pk.mul.f32" => float_rule(e, w, srcs[0].tags(w), srcs[1].tags(w), false, false)?,
+            _ => float_rule(e, w, srcs[0].tags(w), srcs[1].tags(w), false, true)?,
+        };
+    }
+    wv.vwrite(&ops[0], 0, &outs[0], tags[0].as_deref(), exec)?;
+    wv.vwrite(&ops[0], 1, &outs[1], tags[1].as_deref(), exec)
+}
+
+/// The DPP source lane of lane `l` in a `w`-lane wave, or `None` when out of
+/// bounds so `bound_ctrl` applies (AMD CDNA 3 / RDNA 4 DPP_CTRL tables:
+/// `row_bcast:15` reads `(l & 0x30) - 1` for `l > 15` else OOB; `row_bcast:31`
+/// reads lane `31` for `l > 31` else OOB; `wave_shl:1` / `wave_shr:1` shift
+/// across the wave with OOB at the boundary; `wave_rol:1` / `wave_ror:1`
+/// rotate across `w`).
+fn dpp_source(ins: &Ins, l: usize, w: usize) -> Result<Option<usize>, EmuError> {
     let (row, col) = (l / 16, l % 16);
     if let Some(Field::List(q)) = ins.field("quad_perm") {
         let sel = q.get(l & 3).copied().unwrap_or(0) as usize & 3;
@@ -1587,22 +1708,34 @@ fn dpp_source(ins: &Ins, l: usize) -> Result<Option<usize>, EmuError> {
     }
     if let Some(n) = ins.field("row_bcast") {
         return match field_int(n) {
-            15 => Ok(Some(if row & 1 == 1 { (row - 1) * 16 + 15 } else { l })),
-            31 => Ok(Some(if row >= 2 { 31 } else { l })),
+            15 => Ok((l > 15).then(|| (l & 0x30) - 1)),
+            31 => Ok((l > 31).then_some(31)),
             _ => Err(limit("dpp control not emulated: row_bcast".into())),
         };
     }
-    if ins.field("wave_shr").is_some() {
+    if let Some(n) = ins.field("wave_shr") {
+        if field_int(n) != 1 {
+            return Err(limit("dpp control not emulated: wave_shr".into()));
+        }
         return Ok((l >= 1).then(|| l - 1));
     }
-    if ins.field("wave_shl").is_some() {
-        return Ok(Some(l + 1));
+    if let Some(n) = ins.field("wave_shl") {
+        if field_int(n) != 1 {
+            return Err(limit("dpp control not emulated: wave_shl".into()));
+        }
+        return Ok((l + 1 < w).then_some(l + 1));
     }
-    if ins.field("wave_ror").is_some() {
-        return Ok(Some((l + 63) % 64));
+    if let Some(n) = ins.field("wave_ror") {
+        if field_int(n) != 1 {
+            return Err(limit("dpp control not emulated: wave_ror".into()));
+        }
+        return Ok(Some((l + w - 1) % w));
     }
-    if ins.field("wave_rol").is_some() {
-        return Ok(Some((l + 1) % 64));
+    if let Some(n) = ins.field("wave_rol") {
+        if field_int(n) != 1 {
+            return Err(limit("dpp control not emulated: wave_rol".into()));
+        }
+        return Ok(Some((l + 1) % w));
     }
     let control: Vec<&str> = ins
         .fields
@@ -1636,10 +1769,18 @@ fn dpp_writes(ins: &Ins, exec: u64, w: usize) -> u64 {
         & exec
 }
 
-fn dpp(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<(), EmuError> {
+fn dpp(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, EmuError> {
     let w = wv.w;
     let ops = &ins.operands;
-    let x = wv.vread(&ops[1], 0)?;
+    if ops.len() < 2 {
+        return Err(fault(format!("{}: operand missing", ins.text)));
+    }
+    let plain0 = Operand {
+        base: ops[1].base.clone(),
+        neg: false,
+        abs: false,
+    };
+    let raw = wv.vread(&plain0, 0)?;
     let old = wv.vread(&ops[0], 0)?;
     let set = |k: &str| ins.field(k).is_some_and(|f| field_int(f) != 0);
     let bound = set("bound_ctrl");
@@ -1648,58 +1789,123 @@ fn dpp(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<(), Em
     let fetch_inactive = set("fi");
     let mut srcs = [None; MAX_W];
     for (l, s) in srcs.iter_mut().enumerate().take(w) {
-        *s = dpp_source(ins, l)?.filter(|s| *s < w && (fetch_inactive || mask_bit(wv.exec, *s)));
+        *s = dpp_source(ins, l, w)?.filter(|s| *s < w && (fetch_inactive || mask_bit(wv.exec, *s)));
+    }
+    let mut xs = Src::splat(0);
+    for l in 0..w {
+        if let Some(s) = srcs[l] {
+            xs.v[l] = raw.v[s];
+            if raw.tagged {
+                xs.tags_mut()[l] = raw.tag(s);
+            }
+        }
+    }
+    if ops[1].abs {
+        for v in &mut xs.v[..w] {
+            *v &= 0x7FFF_FFFF;
+        }
+    }
+    if ops[1].neg {
+        for v in &mut xs.v[..w] {
+            *v ^= 0x8000_0000;
+        }
     }
     let writes = dpp_writes(ins, wv.exec, w);
     let mut out = [0u32; MAX_W];
     let mut t = old.tags(w).to_vec();
-    if canon == "v.mov.b32.dpp" {
+    let base = canon.strip_suffix(".dpp").unwrap_or(canon);
+    if base == "v.mov.b32" || base == "v.not.b32" {
         for l in 0..w {
-            match srcs[l] {
-                Some(s) => {
-                    out[l] = x.v[s];
-                    t[l] = x.tag(s);
-                }
-                None if bound => {
-                    out[l] = 0;
-                    t[l] = [0; 4];
-                }
-                None => out[l] = old.v[l],
+            if srcs[l].is_some() || bound {
+                out[l] = if base == "v.not.b32" {
+                    !xs.v[l]
+                } else {
+                    xs.v[l]
+                };
+                t[l] = xs.tag(l);
+            } else {
+                out[l] = old.v[l];
             }
         }
-        let tagged = x.tagged || old.tagged;
-        return wv.vwrite(&ops[0], 0, &out, tagged.then_some(t.as_slice()), writes);
+        let tagged = xs.tagged || old.tagged;
+        wv.vwrite(&ops[0], 0, &out, tagged.then_some(t.as_slice()), writes)?;
+        return Ok(true);
     }
-    let y = wv.vread(&ops[2], 0)?;
-    let mut xs = Src::splat(0);
-    for l in 0..w {
-        if let Some(s) = srcs[l] {
-            xs.v[l] = x.v[s];
-            if x.tagged {
-                xs.tags_mut()[l] = x.tag(s);
+    let y = ops
+        .get(2)
+        .ok_or_else(|| fault(format!("{}: operand 2 missing", ins.text)))?;
+    let y = wv.vread(y, 0)?;
+    let mut vals = [0u32; MAX_W];
+    let rt = if let Some((op, stat, add)) = float2(base) {
+        for l in 0..w {
+            vals[l] = op(xs.v[l], y.v[l]);
+        }
+        float_rule(e, w, xs.tags(w), y.tags(w), stat, add)?
+    } else if matches!(
+        base,
+        "v.max.f32" | "v.min.f32" | "v.max.num.f32" | "v.min.num.f32"
+    ) {
+        let max = base.starts_with("v.max");
+        for l in 0..w {
+            vals[l] = if max {
+                fmax(xs.v[l], y.v[l])
+            } else {
+                fmin(xs.v[l], y.v[l])
+            };
+        }
+        float_rule(e, w, xs.tags(w), y.tags(w), true, false)?
+    } else if base == "v.fmac.f32" || base == "v.mac.f32" {
+        for l in 0..w {
+            vals[l] = fma(xs.v[l], y.v[l], old.v[l]);
+        }
+        match float_rule(e, w, xs.tags(w), y.tags(w), false, false)? {
+            Some(p) => float_rule(e, w, &p, old.tags(w), false, true)?,
+            None => float_rule(e, w, &zeros(w), old.tags(w), false, true)?,
+        }
+    } else if base == "v.cndmask.b32" {
+        let m = match ops.get(3) {
+            Some(m) => wv.sread64(m)?,
+            None => wv.vcc,
+        };
+        let mut ct = zeros(w);
+        for l in 0..w {
+            let pick = mask_bit(m, l);
+            vals[l] = if pick { y.v[l] } else { xs.v[l] };
+            ct[l] = if pick { y.tag(l) } else { xs.tag(l) };
+        }
+        (xs.tagged || y.tagged).then_some(ct)
+    } else if let Some(op) = binop_int(base) {
+        for l in 0..w {
+            vals[l] = op(xs.v[l], y.v[l]);
+        }
+        int_rule(e, w, &xs, &y, None, false)?
+    } else if matches!(base, "v.and.b32" | "v.or.b32") {
+        let mut bytes = zeros(w);
+        for l in 0..w {
+            let (a, b) = (xs.v[l], y.v[l]);
+            if base == "v.and.b32" {
+                vals[l] = a & b;
+                bytes[l] = rules::and_lane(a, &xs.tag(l), b, &y.tag(l));
+            } else {
+                vals[l] = a | b;
+                bytes[l] = rules::or_lane(a, &xs.tag(l), b, &y.tag(l));
             }
         }
-    }
-    let (stat, add) = (!canon.starts_with("v.add"), canon.starts_with("v.add"));
-    for l in 0..w {
-        let r = match canon {
-            "v.max.f32.dpp" => fmax(xs.v[l], y.v[l]),
-            "v.min.f32.dpp" => fmin(xs.v[l], y.v[l]),
-            _ => num::nan32(f(xs.v[l]) + f(y.v[l]), &[xs.v[l], y.v[l]]),
-        };
-        out[l] = if srcs[l].is_none() && !bound {
-            old.v[l]
-        } else {
-            r
-        };
-    }
-    let rt = float_rule(e, w, xs.tags(w), y.tags(w), stat, add)?;
+        int_rule(e, w, &xs, &y, Some(bytes), false)?
+    } else {
+        return Ok(false);
+    };
+    let tagged = rt.is_some() || old.tagged;
     for l in 0..w {
         if srcs[l].is_some() || bound {
+            out[l] = vals[l];
             t[l] = rt.as_ref().map_or([0; 4], |rt| rt[l]);
+        } else {
+            out[l] = old.v[l];
         }
     }
-    wv.vwrite(&ops[0], 0, &out, Some(&t), writes)
+    wv.vwrite(&ops[0], 0, &out, tagged.then_some(t.as_slice()), writes)?;
+    Ok(true)
 }
 
 // --------------------------------------------------------------- scalar

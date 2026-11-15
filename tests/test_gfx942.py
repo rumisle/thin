@@ -1824,6 +1824,347 @@ def test_gfx942_lds_bank_conflict_model_and_ds_2addr() -> None:
         assert all(v[2] == 0 for v in m2.banks.values())
 
 
+def test_gfx942_dpp_controls_and_wave64_collectives():
+    """GFX9 DPP controls (`row_bcast:15/31`, `wave_*`, `row_newbcast`) + DSL `across`/`scan`."""
+    import numpy as np
+
+    import thin
+    from thin.emu import Cluster, Memory
+    from thin.target import targeting
+
+    lanes = np.arange(64, dtype=np.uint32)
+    x_f32 = (lanes.astype(np.float32) + 1.0).copy()
+
+    def run_dpp_asm(body_asm: str, *, dtype=np.float32) -> np.ndarray:
+        mem = Memory()
+        src_b = mem.alloc("src", 64 * 4)
+        src_b.write(0, x_f32.tobytes() if dtype == np.float32 else (lanes + 10).tobytes())
+        out_b = mem.alloc("out", 64 * 4, tagged=False)
+        ka = mem.alloc("ka", 16, tagged=False)
+        ka.write(0, np.array([src_b.base, out_b.base], dtype=np.uint64).tobytes())
+        asm = f"""\
+\ts_load_dwordx4 s[4:7], s[0:1], 0x0
+\ts_waitcnt lgkmcnt(0)
+\tv_lshlrev_b32 v1, 2, v0
+\tglobal_load_dword v2, v1, s[4:5]
+\ts_waitcnt vmcnt(0)
+{body_asm}
+\tglobal_store_dword v1, v3, s[6:7]
+\ts_endpgm
+"""
+        with targeting("gfx942"):
+            Cluster(
+                asm,
+                {"wgsize": 64, "vgpr": 16, "agpr": 0, "user_sgprs": 2},
+                mem,
+                [ka],
+                grid=(1,),
+            ).run()
+        return np.frombuffer(bytes(out_b.data), dtype=dtype).copy()
+
+    # 1. Classic CDNA3 64-lane inclusive scan via DPP `row_shr` + `row_bcast:15` + `row_bcast:31`:
+    got_scan = run_dpp_asm("""\
+\tv_mov_b32 v3, v2
+\tv_add_f32_dpp v3, v3, v3 row_shr:1 row_mask:0xf bank_mask:0xf bound_ctrl:1
+\tv_add_f32_dpp v3, v3, v3 row_shr:2 row_mask:0xf bank_mask:0xf bound_ctrl:1
+\tv_add_f32_dpp v3, v3, v3 row_shr:4 row_mask:0xf bank_mask:0xf bound_ctrl:1
+\tv_add_f32_dpp v3, v3, v3 row_shr:8 row_mask:0xf bank_mask:0xf bound_ctrl:1
+\tv_add_f32_dpp v3, v3, v3 row_bcast:15 row_mask:0xa bank_mask:0xf
+\tv_add_f32_dpp v3, v3, v3 row_bcast:31 row_mask:0xc bank_mask:0xf""")
+    np.testing.assert_allclose(got_scan, np.cumsum(x_f32), rtol=0, atol=0)
+
+    # 2. Exact AMD ISA OOB semantics on `row_bcast:15` and `row_bcast:31` with `row_mask:0xf`:
+    #    - `row_bcast:15`: Row 0 OOB, Row 1 -> lane 15, Row 2 -> lane 31, Row 3 -> lane 47!
+    got_bc15_keep = run_dpp_asm("""\
+\tv_mov_b32 v3, -99.0
+\tv_mov_b32_dpp v3, v2 row_bcast:15 row_mask:0xf bank_mask:0xf""")
+    want_bc15_keep = np.concatenate(
+        [
+            np.full(16, -99.0, dtype=np.float32),
+            np.full(16, x_f32[15], dtype=np.float32),
+            np.full(16, x_f32[31], dtype=np.float32),
+            np.full(16, x_f32[47], dtype=np.float32),
+        ]
+    )
+    np.testing.assert_array_equal(got_bc15_keep, want_bc15_keep)
+
+    got_bc15_zero = run_dpp_asm("""\
+\tv_mov_b32 v3, -99.0
+\tv_mov_b32_dpp v3, v2 row_bcast:15 row_mask:0xf bank_mask:0xf bound_ctrl:1""")
+    want_bc15_zero = want_bc15_keep.copy()
+    want_bc15_zero[:16] = 0.0
+    np.testing.assert_array_equal(got_bc15_zero, want_bc15_zero)
+
+    #    - `row_bcast:31`: Rows 0 & 1 OOB, Rows 2 & 3 -> lane 31!
+    got_bc31_keep = run_dpp_asm("""\
+\tv_mov_b32 v3, -77.0
+\tv_mov_b32_dpp v3, v2 row_bcast:31 row_mask:0xf bank_mask:0xf""")
+    want_bc31_keep = np.concatenate(
+        [np.full(32, -77.0, dtype=np.float32), np.full(32, x_f32[31], dtype=np.float32)]
+    )
+    np.testing.assert_array_equal(got_bc31_keep, want_bc31_keep)
+
+    got_bc31_zero = run_dpp_asm("""\
+\tv_mov_b32 v3, -77.0
+\tv_mov_b32_dpp v3, v2 row_bcast:31 row_mask:0xf bank_mask:0xf bound_ctrl:1""")
+    want_bc31_zero = want_bc31_keep.copy()
+    want_bc31_zero[:32] = 0.0
+    np.testing.assert_array_equal(got_bc31_zero, want_bc31_zero)
+
+    # 3. `wave_shl:1`, `wave_shr:1`, `wave_rol:1`, `wave_ror:1`, `row_newbcast:7`:
+    u_in = lanes + 10
+    got_wshl = run_dpp_asm(
+        "\tv_mov_b32 v3, 777\n\tv_mov_b32_dpp v3, v2 wave_shl:1 row_mask:0xf bank_mask:0xf",
+        dtype=np.uint32,
+    )
+    np.testing.assert_array_equal(got_wshl, np.append(u_in[1:], np.uint32(777)))
+
+    got_wshl_bc = run_dpp_asm(
+        "\tv_mov_b32 v3, 777\n"
+        "\tv_mov_b32_dpp v3, v2 wave_shl:1 row_mask:0xf bank_mask:0xf bound_ctrl:1",
+        dtype=np.uint32,
+    )
+    np.testing.assert_array_equal(got_wshl_bc, np.append(u_in[1:], np.uint32(0)))
+
+    got_wshr = run_dpp_asm(
+        "\tv_mov_b32 v3, 888\n\tv_mov_b32_dpp v3, v2 wave_shr:1 row_mask:0xf bank_mask:0xf",
+        dtype=np.uint32,
+    )
+    np.testing.assert_array_equal(got_wshr, np.insert(u_in[:-1], 0, np.uint32(888)))
+
+    got_wrol = run_dpp_asm(
+        "\tv_mov_b32_dpp v3, v2 wave_rol:1 row_mask:0xf bank_mask:0xf",
+        dtype=np.uint32,
+    )
+    np.testing.assert_array_equal(got_wrol, np.roll(u_in, -1))
+
+    got_wror = run_dpp_asm(
+        "\tv_mov_b32_dpp v3, v2 wave_ror:1 row_mask:0xf bank_mask:0xf",
+        dtype=np.uint32,
+    )
+    np.testing.assert_array_equal(got_wror, np.roll(u_in, 1))
+
+    got_newbcast = run_dpp_asm(
+        "\tv_add_u32_dpp v3, v2, v2 row_newbcast:7 row_mask:0xf bank_mask:0xf",
+        dtype=np.uint32,
+    )
+    want_newbcast = u_in + u_in[(lanes // 16) * 16 + 7]
+    np.testing.assert_array_equal(got_newbcast, want_newbcast)
+
+    got_fmac = run_dpp_asm("""\
+\tv_mov_b32 v3, 10.0
+\tv_fmac_f32_dpp v3, -v2, v2 row_mirror row_mask:0xf bank_mask:0xf""")
+    mirror_idx = (lanes // 16) * 16 + (15 - (lanes % 16))
+    np.testing.assert_allclose(got_fmac, 10.0 + (-x_f32[mirror_idx]) * x_f32, rtol=0, atol=0)
+
+    # 4. High-level DSL `across(..., 64)` and `scan(..., 64)` on gfx942:
+    def make_wave64_collectives():
+        from thin import KernelDef
+        from thin.dsl import Args, O, across, ptr, scan
+
+        def body(b, k):
+            V = b.v  # noqa: N806
+            src, out_red, out_scan = k.load()
+            off = V.u32(k.tid * 4)
+            x = V.f32()
+            b.emit(O.global_load(x, off, src))
+            b.wait(x, "x")
+            r = V.f32(across(x, "add", 64))
+            s = V.f32(scan(x, "add", 64))
+            b.emit(O.global_store(off, r, out_red))
+            b.emit(O.global_store(off, s, out_scan))
+
+        return KernelDef(
+            "wave64_collectives",
+            Args(src=ptr, out_red=ptr, out_scan=ptr),
+            body,
+            wgsize=64,
+            max_grid=(1,),
+        )
+
+    with targeting("gfx942"):
+        ck = thin.compile(make_wave64_collectives)
+        out_red = np.zeros(64, dtype=np.float32)
+        out_scan = np.zeros(64, dtype=np.float32)
+        ck.bind((1,), {"src": x_f32, "out_red": out_red, "out_scan": out_scan}).emulate()
+        want_red = np.full(64, x_f32.sum(), dtype=np.float32)
+        np.testing.assert_allclose(out_red, want_red, rtol=0, atol=0)
+        np.testing.assert_allclose(out_scan, np.cumsum(x_f32), rtol=0, atol=0)
+
+
+def test_gfx942_packed_f32_ops_and_provenance():
+    """CDNA3 `v_pk_fma_f32`, `v_pk_mul_f32`, `v_pk_add_f32`, and `v_pk_mov_b32` in `thin.emu`."""
+    import numpy as np
+
+    from thin.emu import Cluster, Memory, gemm
+    from thin.target import targeting
+
+    rng = np.random.default_rng(94208)
+    s0 = rng.uniform(-2.0, 2.0, size=(64, 2)).astype(np.float32)
+    s1 = rng.uniform(-2.0, 2.0, size=(64, 2)).astype(np.float32)
+    s2 = rng.uniform(-1.0, 1.0, size=(64, 2)).astype(np.float32)
+    # Inject -0.0 and NaN in specific lanes to verify DX10 clamp edge cases:
+    s0[0, 0] = np.float32(-0.0)
+    s1[0, 0] = np.float32(0.0)
+    s2[0, 0] = np.float32(-0.0)
+    s0[1, 1] = np.float32("nan")
+
+    pk_fma_mod = "op_sel:[1,0,1] op_sel_hi:[0,1,0] neg_lo:[1,0,0] neg_hi:[0,1,1] clamp"
+    asm = f"""\
+\ts_load_dwordx4 s[4:7], s[0:1], 0x0
+\ts_load_dwordx4 s[8:11], s[0:1], 0x10
+\ts_waitcnt lgkmcnt(0)
+\tv_lshlrev_b32 v1, 3, v0
+\tglobal_load_dwordx2 v[2:3], v1, s[4:5]
+\tglobal_load_dwordx2 v[4:5], v1, s[6:7]
+\tglobal_load_dwordx2 v[6:7], v1, s[8:9]
+\ts_waitcnt vmcnt(0)
+\t// 0) default v_pk_fma_f32 (op_sel:[0,0,0] op_sel_hi:[1,1,1])
+\tv_pk_fma_f32 v[8:9], v[2:3], v[4:5], v[6:7]
+\t// 1) mixed selectors + neg_lo + neg_hi + clamp
+\tv_pk_fma_f32 v[10:11], v[2:3], v[4:5], v[6:7] {pk_fma_mod}
+\t// 2) v_pk_mul_f32 with broadcast s0[0] via op_sel_hi:[0,1] and neg_hi:[0,1]
+\tv_pk_mul_f32 v[12:13], v[2:3], v[4:5] op_sel:[0,1] op_sel_hi:[0,1] neg_hi:[0,1]
+\t// 3) v_pk_add_f32 with inline float 1.0 in src1 (`op_sel_hi:[1,0]` -> hi!) + clamp
+\tv_pk_add_f32 v[14:15], v[2:3], 1.0 op_sel_hi:[1,0] neg_lo:[1,0] clamp
+\t// 4) v_pk_mov_b32: copy (`op_sel:[0,1]`) then in-place swap (`op_sel:[1,0]`)
+\tv_pk_mov_b32 v[16:17], v[2:3], v[2:3] op_sel:[0,1] op_sel_hi:[0,0]
+\tv_pk_mov_b32 v[16:17], v[16:17], v[16:17] op_sel:[1,0]
+\t// 5) v_pk_mov_b32 cross-merge: D.lo = S0[0] = v2, D.hi = S1[1] = v5
+\tv_pk_mov_b32 v[18:19], v[2:3], v[4:5] op_sel:[0,1]
+\tv_lshlrev_b32 v20, 6, v0
+\tglobal_store_dwordx2 v20, v[8:9], s[10:11] offset:0
+\tglobal_store_dwordx2 v20, v[10:11], s[10:11] offset:8
+\tglobal_store_dwordx2 v20, v[12:13], s[10:11] offset:16
+\tglobal_store_dwordx2 v20, v[14:15], s[10:11] offset:24
+\tglobal_store_dwordx2 v20, v[16:17], s[10:11] offset:32
+\tglobal_store_dwordx2 v20, v[18:19], s[10:11] offset:40
+\ts_endpgm
+"""
+    mem = Memory()
+    b0, b1, b2 = mem.alloc("s0", s0.nbytes), mem.alloc("s1", s1.nbytes), mem.alloc("s2", s2.nbytes)
+    b0.write(0, s0.tobytes())
+    b1.write(0, s1.tobytes())
+    b2.write(0, s2.tobytes())
+    out = mem.alloc("out", 64 * 64, tagged=False)
+    ka = mem.alloc("ka", 32, tagged=False)
+    ka.write(0, np.array([b0.base, b1.base, b2.base, out.base], dtype=np.uint64).tobytes())
+
+    with targeting("gfx942"):
+        Cluster(
+            asm,
+            {"wgsize": 64, "vgpr": 24, "agpr": 0, "user_sgprs": 2},
+            mem,
+            [ka],
+            grid=(1,),
+        ).run()
+
+    got = np.frombuffer(bytes(out.data), dtype=np.float32).reshape(64, 8, 2)
+
+    def ref_clamp(x: np.ndarray) -> np.ndarray:
+        y = np.where(np.isnan(x) | (x <= 0.0), np.float32(0.0), np.minimum(x, np.float32(1.0)))
+        # Ensure +0.0 sign bit == 0 (DX10 clamp turns -0.0 and NaN into +0.0):
+        bits = y.view(np.uint32).copy()
+        bits[y == 0.0] = 0
+        return bits.view(np.float32)
+
+    def ref_fma(a: np.ndarray, b: np.ndarray, c: np.ndarray) -> np.ndarray:
+        return (a.astype(np.float64) * b.astype(np.float64) + c.astype(np.float64)).astype(
+            np.float32
+        )
+
+    # 0) default v_pk_fma_f32 (check finite lanes + NaN lane 1 hi)
+    want0 = ref_fma(s0, s1, s2)
+    assert np.isnan(got[1, 0, 1])
+    mask_fin = ~np.isnan(want0)
+    np.testing.assert_allclose(got[:, 0, :][mask_fin], want0[mask_fin], rtol=0, atol=1e-7)
+
+    # 1) mixed selectors + neg + clamp
+    lo1 = ref_clamp(ref_fma(-s0[:, 1], s1[:, 0], s2[:, 1]))
+    hi1 = ref_clamp(ref_fma(s0[:, 0], -s1[:, 1], -s2[:, 0]))
+    np.testing.assert_allclose(got[:, 1, 0], lo1, rtol=0, atol=1e-7)
+    np.testing.assert_allclose(got[:, 1, 1], hi1, rtol=0, atol=1e-7)
+
+    # 2) v_pk_mul_f32
+    lo2 = s0[:, 0] * s1[:, 1]
+    hi2 = s0[:, 0] * (-s1[:, 1])
+    np.testing.assert_array_equal(got[:, 2, 0].view(np.uint32), lo2.view(np.uint32))
+    np.testing.assert_array_equal(got[:, 2, 1].view(np.uint32), hi2.view(np.uint32))
+
+    # 3) v_pk_add_f32 with inline 1.0 + clamp (-(-0.0)+1.0=1.0; NaN+1.0 -> +0.0!)
+    lo3 = ref_clamp((-s0[:, 0]) + np.float32(1.0))
+    hi3 = ref_clamp(s0[:, 1] + np.float32(1.0))
+    np.testing.assert_array_equal(got[:, 3, 0].view(np.uint32), lo3.view(np.uint32))
+    np.testing.assert_array_equal(got[:, 3, 1].view(np.uint32), hi3.view(np.uint32))
+    assert got[1, 3, 1].view(np.uint32) == 0
+
+    # 4) v_pk_mov_b32 in-place swap: <s0[1], s0[0]> bitwise exact (including NaN bits!)
+    np.testing.assert_array_equal(got[:, 4, 0].view(np.uint32), s0[:, 1].view(np.uint32))
+    np.testing.assert_array_equal(got[:, 4, 1].view(np.uint32), s0[:, 0].view(np.uint32))
+
+    # 5) v_pk_mov_b32 cross-merge: <s0[0], s1[1]>
+    np.testing.assert_array_equal(got[:, 5, 0].view(np.uint32), s0[:, 0].view(np.uint32))
+    np.testing.assert_array_equal(got[:, 5, 1].view(np.uint32), s1[:, 1].view(np.uint32))
+
+    # 6) Provenance tags flow through `v_pk_mov_b32` + `v_pk_mul_f32` / `v_pk_fma_f32`:
+    asm_epilogue = """\
+\ts_load_dwordx4 s[4:7], s[0:1], 0x0
+\ts_load_dwordx2 s[8:9], s[0:1], 0x10
+\ts_waitcnt lgkmcnt(0)
+\tv_and_b32 v1, 15, v0
+\tv_lshrrev_b32 v2, 4, v0
+\tv_lshlrev_b32 v3, 5, v1
+\tv_lshl_add_u32 v3, v2, 3, v3
+\tglobal_load_dwordx2 v[16:17], v3, s[4:5]
+\tglobal_load_dwordx2 v[20:21], v3, s[6:7]
+\ts_waitcnt vmcnt(0)
+\tv_mfma_f32_16x16x16_f16 a[0:3], v[16:17], v[20:21], 0
+\tv_accvgpr_read_b32 v24, a0
+\tv_accvgpr_read_b32 v25, a1
+\tv_accvgpr_read_b32 v26, a2
+\tv_accvgpr_read_b32 v27, a3
+\tv_pk_mov_b32 v[28:29], v[24:25], v[24:25] op_sel:[0,1]
+\tv_pk_mul_f32 v[28:29], v[28:29], 2.0 op_sel_hi:[1,0]
+\tv_pk_mov_b32 v[30:31], v[26:27], v[26:27] op_sel:[0,1]
+\tv_pk_fma_f32 v[30:31], v[30:31], 2.0, 0 op_sel_hi:[1,0,0]
+\tv_lshlrev_b32 v4, 8, v2
+\tv_lshl_add_u32 v4, v1, 2, v4
+\tglobal_store_dword v4, v28, s[8:9] offset:0
+\tglobal_store_dword v4, v29, s[8:9] offset:64
+\tglobal_store_dword v4, v30, s[8:9] offset:128
+\tglobal_store_dword v4, v31, s[8:9] offset:192
+\ts_endpgm
+"""
+    mem_ep = Memory()
+    ba = mem_ep.alloc("A", 16 * 32)
+    bb = mem_ep.alloc("B", 16 * 32)
+    bd = mem_ep.alloc("D", 16 * 64)
+    ka_ep = mem_ep.alloc("ka", 24, tagged=False)
+    ka_ep.write(0, np.array([ba.base, bb.base, bd.base], dtype=np.uint64).tobytes())
+    prob = gemm.Problem(
+        {
+            "A": gemm.rowmajor("A", 32, elem_bytes=2),
+            "B": gemm.rowmajor("B", 32, elem_bytes=2),
+            "D": gemm.rowmajor_d(64, elem_bytes=4),
+        },
+        K=16,
+        d_rows=np.arange(16),
+        d_cols=np.arange(16),
+        fail_fast=False,
+    )
+    with targeting("gfx942"):
+        Cluster(
+            asm_epilogue,
+            {"wgsize": 64, "vgpr": 40, "agpr": 8, "user_sgprs": 2},
+            mem_ep,
+            [ka_ep],
+            grid=(1,),
+            hooks=gemm.GemmHooks(prob, mem_ep),
+        ).run()
+    assert prob.errors == []
+    assert len(prob.stores) == 256
+
+
 def test_gfx942_cdna3_scalar_exec_partial_and_setreg_hazards() -> None:
     """CDNA3 Table 11 / GCNHazardRecognizer wait states on VCC, RWLane, EXEC, PartialDst, setreg."""
     import thin
