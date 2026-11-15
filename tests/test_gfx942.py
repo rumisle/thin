@@ -1576,10 +1576,13 @@ def test_gfx942_lds_dma_multiwave_safety_hazards_and_gemm_provenance() -> None:
         mat_b_col = np.ascontiguousarray(mat_b_kn.T)
         mat_c = np.zeros((16, 16), dtype=np.float32)
 
-        kern_gemm.bind(
-            (1,),
-            {"a": mat_a.reshape(-1), "b": mat_b_col.reshape(-1), "c": mat_c.reshape(-1)},
-        ).emulate()
+        from thin.runtime.emulated import BankConflicts
+
+        with pytest.warns(BankConflicts, match="gfx942 bank model"):
+            kern_gemm.bind(
+                (1,),
+                {"a": mat_a.reshape(-1), "b": mat_b_col.reshape(-1), "c": mat_c.reshape(-1)},
+            ).emulate()
         ref = mat_a.astype(np.float32) @ mat_b_kn.astype(np.float32)
         np.testing.assert_allclose(mat_c, ref, rtol=1e-3, atol=1e-3)
 
@@ -1635,6 +1638,190 @@ def test_gfx942_lds_dma_multiwave_safety_hazards_and_gemm_provenance() -> None:
 
         with pytest.raises((Refused, ValueError), match="has no global-to-LDS DMA"):
             thin.compile(make_rdna4_dma)
+
+
+def test_gfx942_lds_bank_conflict_model_and_ds_2addr() -> None:
+    """CDNA3 32-bank LDS model tracks b32/b64/b96/b128, asymmetric b128 read/write, and 2addr."""
+    import warnings
+
+    import thin
+    from thin.emu import Cluster, Memory
+    from thin.runtime.emulated import BankConflicts
+    from thin.target import targeting
+
+    def run_ds_snippet(asm_body: str, lds_bytes: int = 16384) -> dict[int, tuple[int, int, int]]:
+        mem = Memory()
+        ka = mem.alloc("ka", 8, tagged=False)
+        c = Cluster(
+            asm_body + "\n\ts_endpgm\n",
+            {"wgsize": 64, "vgpr": 32, "agpr": 0, "lds": lds_bytes, "user_sgprs": 2},
+            mem,
+            [ka],
+            grid=(1,),
+        )
+        machines = c.run()
+        return machines[0].banks
+
+    with targeting("gfx942"):
+        # 1. b32: linear stride 4 (0 conflicts), broadcast 0 (0 conflicts),
+        #    stride 128 (32-way conflict: 64 cycles, 62 conflicts), padded stride 132 (0 conflicts).
+        banks_b32 = run_ds_snippet(
+            """\
+\tv_lshlrev_b32 v1, 2, v0
+\tds_write_b32 v1, v0
+\ts_waitcnt lgkmcnt(0)
+\tds_read_b32 v2, v1
+\tv_mov_b32 v3, 0
+\tds_read_b32 v4, v3
+\tv_lshlrev_b32 v5, 7, v0
+\tds_write_b32 v5, v0
+\ts_waitcnt lgkmcnt(0)
+\tds_read_b32 v6, v5
+\tv_mul_lo_u32 v7, v0, 132
+\tds_write_b32 v7, v0
+\ts_waitcnt lgkmcnt(0)
+\tds_read_b32 v8, v7"""
+        )
+        vals_b32 = list(banks_b32.values())
+        assert vals_b32 == [
+            [1, 2, 0],  # linear4 write
+            [1, 2, 0],  # linear4 read
+            [1, 2, 0],  # broadcast read
+            [1, 64, 62],  # stride128 write (32-way per half-wave)
+            [1, 64, 62],  # stride128 read
+            [1, 2, 0],  # padded stride132 write
+            [1, 2, 0],  # padded stride132 read
+        ]
+
+        # 2. b96 (12B/lane): linear 12*lane -> (8, 0); stride 128 -> (64, 56).
+        banks_b96 = run_ds_snippet(
+            """\
+\tv_mul_lo_u32 v1, v0, 12
+\tds_write_b96 v1, v[8:10]
+\ts_waitcnt lgkmcnt(0)
+\tds_read_b96 v[12:14], v1
+\tv_lshlrev_b32 v2, 7, v0
+\tds_write_b96 v2, v[8:10]"""
+        )
+        assert list(banks_b96.values()) == [[1, 8, 0], [1, 8, 0], [1, 64, 56]]
+
+        # 3. Asymmetric `ds_write_b128` vs `ds_read_b128` on MFMA 16x16 layout:
+        #    addr[lane] = (lane & 15) * 32 + (lane >> 4) * 16:
+        #    - `ds_write_b128` (sequential 0..7 phases) has a 2-way conflict (16, 8).
+        #    - `ds_read_b128` (CDNA3 interleaved 0:3+20:23) is conflict-free (8, 0)!
+        banks_asym = run_ds_snippet(
+            """\
+\tv_and_b32 v1, 15, v0
+\tv_lshrrev_b32 v2, 4, v0
+\tv_lshlrev_b32 v1, 5, v1
+\tv_lshlrev_b32 v2, 4, v2
+\tv_add_u32 v3, v1, v2
+\tds_write_b128 v3, v[8:11]
+\ts_waitcnt lgkmcnt(0)
+\tds_read_b128 v[12:15], v3"""
+        )
+        assert list(banks_asym.values()) == [
+            [1, 16, 8],  # ds_write_b128: 2-way conflict
+            [1, 8, 0],  # ds_read_b128: conflict-free on CDNA3!
+        ]
+
+        # 4. Unswizzled vs XOR-swizzled [16, 64] fp16 (row stride 128B) with `ds_read_b128` in DSL:
+        def make_b128_tile(swizzled: bool):
+            from thin import KernelDef
+            from thin.dsl import Args, O, Xor, ptr
+
+            def body(b, k):
+                V = b.v  # noqa: N806
+                src, out = k.load()
+                sw = Xor(by=0, into=1, mask=7) if swizzled else None
+                tile = b.lds().region("tile", (16, 8, 4), elem="u32", swizzle=sw)
+                lane = V.u32(k.tid, name="lane")
+                # Linear write: 8 chunks of 16B per row -> 64 lanes write rows 0..7, then rows 8..15
+                r0 = lane >> 3
+                c0 = lane & 7
+                v_in = V.u32(n=4)
+                b.emit(O.global_load(v_in, V.u32(lane * 16), src))
+                b.wait(v_in, "in0")
+                b.emit(O.ds_write(tile.at(r0, c0, 0), v_in))
+                b.emit(O.ds_write(tile.at(r0 + 8, c0, 0), v_in))
+                b.wait(tile, "tile written")
+
+                # MFMA-style read: row = lane & 15, col_chunk = lane >> 4 (0..3)
+                row = lane & 15
+                col = lane >> 4
+                frag = V.u32(n=4)
+                b.emit(O.ds_read(frag, tile.at(row, col, 0)))
+                b.wait(frag, "frag read")
+                b.emit(O.global_store(V.u32(lane * 16), frag, out))
+
+            return KernelDef(
+                f"b128_sw_{int(swizzled)}",
+                Args(src=ptr, out=ptr),
+                body,
+                wgsize=64,
+                max_grid=(1,),
+            )
+
+        k_unsw = thin.compile(make_b128_tile, swizzled=False)
+        k_sw = thin.compile(make_b128_tile, swizzled=True)
+        src_t = np.arange(256, dtype=np.uint32)
+        out_unsw = np.zeros(256, dtype=np.uint32)
+        out_sw = np.zeros(256, dtype=np.uint32)
+
+        with pytest.warns(BankConflicts, match="gfx942 bank model"):
+            k_unsw.bind((1,), {"src": src_t, "out": out_unsw}).emulate()
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", BankConflicts)
+            k_sw.bind((1,), {"src": src_t, "out": out_sw}).emulate()
+
+        # Both produce the exact same logical MFMA fragment values!
+        np.testing.assert_array_equal(out_sw, out_unsw)
+
+        # 5. `ds_write2_b32`/`ds_read2_b32` and `ds_write2st64_b64`/`ds_read2st64_b64`:
+        mem2 = Memory()
+        out2 = mem2.alloc("out", 64 * 16)
+        ka2 = mem2.alloc("ka", 8, tagged=False)
+        ka2.write(0, np.array([out2.base], dtype=np.uint64).tobytes())
+        asm_2addr = """\
+\ts_load_dwordx2 s[4:5], s[0:1], 0x0
+\ts_waitcnt lgkmcnt(0)
+\tv_lshlrev_b32 v1, 2, v0
+\tv_add_u32 v2, 100, v0
+\tv_add_u32 v3, 200, v0
+\tds_write2_b32 v1, v2, v3 offset0:0 offset1:64
+\ts_waitcnt lgkmcnt(0)
+\tds_read2_b32 v[4:5], v1 offset0:64 offset1:0
+\ts_waitcnt lgkmcnt(0)
+\tv_lshlrev_b32 v6, 3, v0
+\tv_mov_b32 v8, v0
+\tv_mov_b32 v9, 0x11110000
+\tv_mov_b32 v10, v0
+\tv_mov_b32 v11, 0x22220000
+\tds_write2st64_b64 v6, v[8:9], v[10:11] offset0:1 offset1:2
+\ts_waitcnt lgkmcnt(0)
+\tds_read2st64_b64 v[12:15], v6 offset0:2 offset1:1
+\ts_waitcnt lgkmcnt(0)
+\tv_lshlrev_b32 v7, 4, v0
+\tglobal_store_dwordx2 v7, v[4:5], s[4:5] offset:0
+\tglobal_store_dwordx2 v7, v[12:13], s[4:5] offset:8
+\ts_endpgm
+"""
+        m2 = Cluster(
+            asm_2addr,
+            {"wgsize": 64, "vgpr": 24, "agpr": 0, "lds": 4096, "user_sgprs": 2},
+            mem2,
+            [ka2],
+            grid=(1,),
+        ).run()[0]
+        got2 = np.frombuffer(bytes(out2.data), dtype=np.uint32).reshape(64, 4)
+        lanes = np.arange(64, dtype=np.uint32)
+        np.testing.assert_array_equal(got2[:, 0], 200 + lanes)
+        np.testing.assert_array_equal(got2[:, 1], 100 + lanes)
+        np.testing.assert_array_equal(got2[:, 2], lanes)
+        np.testing.assert_array_equal(got2[:, 3], np.full(64, 0x22220000, dtype=np.uint32))
+        # All 4 2addr instructions executed 2 sub-accesses each with 0 conflicts!
+        assert all(v[2] == 0 for v in m2.banks.values())
 
 
 def test_gfx942_cdna3_scalar_exec_partial_and_setreg_hazards() -> None:

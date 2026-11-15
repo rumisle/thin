@@ -825,6 +825,33 @@ impl Hooks for Gfx942 {
         })
     }
 
+    /// CDNA 3 LDS bank model (32 physical banks x 4 bytes/bank = 128 B/cycle):
+    /// - `1 | 2 | 4` bytes (`b8`/`b16`/`b32`): 2 half-wave phases (`lanes 0..31`, `32..63`).
+    /// - `8` bytes (`b64`): 4 quarter-wave phases of 16 lanes (`0..15`, `16..31`, `32..47`, `48..63`).
+    /// - `12` bytes (`b96`): 8 eighth-wave phases of 8 lanes (`l / 8`).
+    /// - `16` bytes (`b128`):
+    ///   - writes (`ds_write_b128`): 8 sequential 8-lane phases (`l / 8`).
+    ///   - reads (`ds_read_b128`): CDNA 3 crossbar-interleaved 8-lane quad pairs per half-wave:
+    ///     `(0:3 + 20:23)`, `(4:7 + 16:19)`, `(8:11 + 28:31)`, `(12:15 + 24:27)` (and `+32`).
+    fn lds_banks(&self, read: bool, bytes: u32) -> Option<(u64, Vec<u32>)> {
+        let phase: Vec<u32> = match bytes {
+            1 | 2 | 4 => (0..64).map(|l| l / 32).collect(),
+            8 => (0..64).map(|l| l / 16).collect(),
+            12 => (0..64).map(|l| l / 8).collect(),
+            16 if !read => (0..64).map(|l| l / 8).collect(),
+            16 => (0..64)
+                .map(|l| {
+                    let half = l / 32;
+                    let q = (l % 32) / 4;
+                    let sub = if q < 4 { q } else { q ^ 5 };
+                    half * 4 + sub
+                })
+                .collect(),
+            _ => return None,
+        };
+        Some((32, phase))
+    }
+
     fn icache_invalidate(&self) -> Option<thin_target::IcacheInvalidate> {
         Some(thin_target::IcacheInvalidate {
             instruction: "s_icache_inv",

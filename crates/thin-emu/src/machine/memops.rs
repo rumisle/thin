@@ -1263,6 +1263,85 @@ pub fn ds(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, canon: &str) -> Result<bool
             w.vwrite(&ops[0], 0, &out, x.tagged.then_some(t.as_slice()), exec)?;
             w.seq[2] += 1;
         }
+        ["ds", "load", "2addr", rest @ ..] => {
+            let stride64 = rest.first() == Some(&"stride64");
+            let last = rest.last().copied().unwrap_or("");
+            let Some((n, _)) = width(last) else {
+                return Ok(false);
+            };
+            if !matches!(n, 4 | 8) {
+                return Ok(false);
+            }
+            let scale = u64::from(n) * if stride64 { 64 } else { 1 };
+            let off0 = (int_field(ins, "offset0", 0) as u64) * scale;
+            let off1 = (int_field(ins, "offset1", 0) as u64) * scale;
+            let a = w.vread(&ops[1], 0)?;
+            let mut addrs0 = vec![0u64; wn];
+            let mut addrs1 = vec![0u64; wn];
+            for l in active(exec, wn) {
+                addrs0[l] = u64::from(a.v[l]) + off0;
+                addrs1[l] = u64::from(a.v[l]) + off1;
+                for sub in [addrs0[l], addrs1[l]] {
+                    if sub + u64::from(n) > size {
+                        return Err(fault(format!(
+                            "wave {} {}: LDS read out of range (max {})",
+                            w.wid, ins.text, size
+                        )));
+                    }
+                }
+            }
+            count_banks(e, true, n, &addrs0, exec, wn);
+            count_banks(e, true, n, &addrs1, exec, wn);
+            let bytes: Vec<u32> = active(exec, wn)
+                .flat_map(|l| {
+                    let (a0, a1) = (addrs0[l], addrs1[l]);
+                    (0..u64::from(n))
+                        .map(move |k| (a0 + k) as u32)
+                        .chain((0..u64::from(n)).map(move |k| (a1 + k) as u32))
+                })
+                .collect();
+            let racers = e
+                .lds
+                .check_read(w.wid, e.epoch, pc, &bytes, e.texts, &ins.text)?;
+            if !racers.is_empty() {
+                let list: Vec<String> = racers.iter().map(ToString::to_string).collect();
+                return Err(fault(format!(
+                    "wave {} {}: reads LDS bytes written by wave(s) [{}] since the last barrier",
+                    w.wid,
+                    ins.text,
+                    list.join(", ")
+                )));
+            }
+            let sub_dwords = (n / 4) as usize;
+            let total_dwords = sub_dwords * 2;
+            let mut vals = vec![[0u32; MAX_W]; total_dwords];
+            let mut tags = vec![vec![[0 as Tag; 4]; wn]; total_dwords];
+            let mut tagged = false;
+            for l in active(exec, wn) {
+                for (pair_idx, base_addr) in [addrs0[l], addrs1[l]].into_iter().enumerate() {
+                    for k in 0..n as usize {
+                        let j = base_addr as usize + k;
+                        let dw = pair_idx * sub_dwords + k / 4;
+                        vals[dw][l] |= u32::from(e.lds.data[j]) << (8 * (k % 4));
+                        tags[dw][l][k % 4] = e.lds.tags[j];
+                        tagged |= e.lds.tags[j] != 0;
+                    }
+                }
+            }
+            for d in 0..total_dwords {
+                w.vwrite(
+                    &ops[0],
+                    d as u32,
+                    &vals[d],
+                    tagged.then_some(tags[d].as_slice()),
+                    exec,
+                )?;
+            }
+            let seq = w.seq[2];
+            w.seq[2] += 1;
+            e.reports.stats.ds_read_bytes += bytes.len() as u64;
+            e.lds.record_read(w.wid, e.epoch, pc, seq, bytes);
+        }
         ["ds", "load", rest @ ..] => {
             let last = rest.last().copied().unwrap_or("");
             let Some((n, signed)) = width(last) else {
@@ -1328,6 +1407,70 @@ pub fn ds(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, canon: &str) -> Result<bool
             w.seq[2] += 1;
             e.reports.stats.ds_read_bytes += bytes.len() as u64;
             e.lds.record_read(w.wid, e.epoch, pc, seq, bytes);
+        }
+        ["ds", "store", "2addr", rest @ ..] => {
+            let stride64 = rest.first() == Some(&"stride64");
+            let last = rest.last().copied().unwrap_or("");
+            let Some((n, _)) = width(last) else {
+                return Ok(false);
+            };
+            if !matches!(n, 4 | 8) {
+                return Ok(false);
+            }
+            let scale = u64::from(n) * if stride64 { 64 } else { 1 };
+            let off0 = (int_field(ins, "offset0", 0) as u64) * scale;
+            let off1 = (int_field(ins, "offset1", 0) as u64) * scale;
+            let a = w.vread(&ops[0], 0)?;
+            let sub_dwords = (n / 4) as usize;
+            let mut srcs0 = Vec::with_capacity(sub_dwords);
+            let mut srcs1 = Vec::with_capacity(sub_dwords);
+            for d in 0..sub_dwords {
+                srcs0.push(w.vread(&ops[1], d as u32)?);
+                srcs1.push(w.vread(&ops[2], d as u32)?);
+            }
+            let mut addrs0 = vec![0u64; wn];
+            let mut addrs1 = vec![0u64; wn];
+            for l in active(exec, wn) {
+                addrs0[l] = u64::from(a.v[l]) + off0;
+                addrs1[l] = u64::from(a.v[l]) + off1;
+                for sub in [addrs0[l], addrs1[l]] {
+                    if sub + u64::from(n) > size {
+                        return Err(fault(format!(
+                            "wave {} {}: LDS write out of range (max {}, LDS {})",
+                            w.wid,
+                            ins.text,
+                            sub + u64::from(n),
+                            size
+                        )));
+                    }
+                }
+            }
+            count_banks(e, false, n, &addrs0, exec, wn);
+            count_banks(e, false, n, &addrs1, exec, wn);
+            let bytes: Vec<u32> = active(exec, wn)
+                .flat_map(|l| {
+                    let (a0, a1) = (addrs0[l], addrs1[l]);
+                    (0..u64::from(n))
+                        .map(move |k| (a0 + k) as u32)
+                        .chain((0..u64::from(n)).map(move |k| (a1 + k) as u32))
+                })
+                .collect();
+            e.lds
+                .check_write(w.wid, e.epoch, pc, &bytes, false, e.texts, &ins.text)?;
+            for l in active(exec, wn) {
+                for (base_addr, srcs) in [(addrs0[l], &srcs0), (addrs1[l], &srcs1)] {
+                    for k in 0..n as usize {
+                        let j = base_addr as usize + k;
+                        e.lds.data[j] = (srcs[k / 4].v[l] >> (8 * (k % 4))) as u8;
+                        e.lds.tags[j] = srcs[k / 4].tag(l)[k % 4];
+                    }
+                }
+            }
+            let seq = w.seq[2];
+            w.seq[2] += 1;
+            e.reports.stats.lds_write_bytes += bytes.len() as u64;
+            w.progress += 1;
+            e.lds.record_write(w.wid, e.epoch, pc, seq, bytes, false);
         }
         // DS_STORE_B8_D16_HI / DS_STORE_B16_D16_HI:
         // MEM[ADDR] = DATA[23:16] / DATA[31:16], the data from byte 2.
@@ -1472,7 +1615,7 @@ fn count_banks(e: &mut Exec<'_>, read: bool, n: u32, addrs: &[u64], exec: u64, w
     };
     let rule = super::banks::BankRule { banks, phase };
     let act: Vec<bool> = (0..wn).map(|l| exec >> l & 1 != 0).collect();
-    let (cycles, conflicts) = super::banks::bank_count(&rule, addrs, &act);
+    let (cycles, conflicts) = super::banks::bank_count_bytes(&rule, n, addrs, &act);
     let entry = e.reports.banks.entry(e.pc).or_insert([0; 3]);
     entry[0] += 1;
     entry[1] += cycles;

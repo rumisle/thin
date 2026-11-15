@@ -742,3 +742,56 @@ fn cdna3_lds_dma_encoding_flags_and_m0_hazard_match_llvm_mc() {
         assert!(f.implicit_uses.contains(&m0_num), "{op} reads m0");
     }
 }
+
+#[test]
+fn cdna3_lds_banks_hook_models_32_banks_and_interleaved_b128_reads() {
+    let t = thin_targets::get(ARCH).unwrap();
+    let h = t.hooks();
+    assert!(h.lds_banks(true, 0).is_none());
+    assert!(h.lds_banks(true, 32).is_none());
+
+    for &b in &[1u32, 2, 4] {
+        for read in [false, true] {
+            let (banks, phase) = h.lds_banks(read, b).unwrap();
+            assert_eq!(banks, 32);
+            assert_eq!(phase.len(), 64);
+            assert!(phase[..32].iter().all(|&p| p == 0));
+            assert!(phase[32..].iter().all(|&p| p == 1));
+        }
+    }
+
+    for read in [false, true] {
+        let (banks, phase) = h.lds_banks(read, 8).unwrap();
+        assert_eq!(banks, 32);
+        for q in 0..4usize {
+            assert!(phase[q * 16..(q + 1) * 16].iter().all(|&p| p == q as u32));
+        }
+    }
+
+    let (banks_w128, phase_w128) = h.lds_banks(false, 16).unwrap();
+    assert_eq!(banks_w128, 32);
+    for g in 0..8usize {
+        assert!(phase_w128[g * 8..(g + 1) * 8]
+            .iter()
+            .all(|&p| p == g as u32));
+    }
+
+    // Verify exact AMD CDNA3 ds_read_b128 interleaved quad pairs:
+    let (banks_r128, phase_r128) = h.lds_banks(true, 16).unwrap();
+    assert_eq!(banks_r128, 32);
+    let expected_groups: [(usize, usize, usize, usize); 8] = [
+        (0, 4, 20, 24),
+        (4, 8, 16, 20),
+        (8, 12, 28, 32),
+        (12, 16, 24, 28),
+        (32, 36, 52, 56),
+        (36, 40, 48, 52),
+        (40, 44, 60, 64),
+        (44, 48, 56, 60),
+    ];
+    for (p, (a0, a1, b0, b1)) in expected_groups.into_iter().enumerate() {
+        let lanes: Vec<usize> = (0..64).filter(|&l| phase_r128[l] == p as u32).collect();
+        let want: Vec<usize> = (a0..a1).chain(b0..b1).collect();
+        assert_eq!(lanes, want, "ds_read_b128 phase {p}");
+    }
+}
