@@ -653,3 +653,101 @@ fn fnuz_fp8_conversions_follow_target_hook() {
     // OCP:  [-0.0, 240.0, 248.0, +inf] -> [0x80, 0x77, 0x78, 0x7F]; bf8 [+inf, -0.0] -> [0x7C, 0x80].
     assert_eq!(run(facts()), (0x7F78_7780, (-0.0f32).to_bits(), 0x807C));
 }
+
+#[test]
+fn wave64_all_matrix_forms_execute_in_agpr_and_vgpr() {
+    use thin_emu::machine::program::read_program;
+    let w64_target = thin_targets::names()
+        .iter()
+        .map(|n| thin_targets::get(n).unwrap())
+        .find(|t| t.definition().wave == 64)
+        .expect("a wave64 target");
+    let f = Facts::of(w64_target);
+    assert_eq!(f.matrix.len(), 46);
+
+    let reg = |file: char, first: u32, n: u32| -> String {
+        if n == 1 {
+            format!("{file}{first}")
+        } else {
+            format!("{file}[{first}:{}]", first + n - 1)
+        }
+    };
+
+    for (idx, (mnemonic, form)) in f.matrix.iter().enumerate() {
+        let use_agpr = idx % 2 == 0;
+        let cd_file = if use_agpr { 'a' } else { 'v' };
+        let dst = reg(cd_file, 0, form.dwords('d'));
+        let src0 = reg('v', 32, form.dwords('a'));
+        let src1 = reg('a', 32, form.dwords('b'));
+        let src2 = if form.sparse {
+            reg('v', 48, 1)
+        } else {
+            dst.clone()
+        };
+        let asm = format!("\t{mnemonic} {dst}, {src0}, {src1}, {src2}\n\ts_endpgm\n");
+        let prog = read_program(&asm, w64_target).expect(&asm);
+        let mut m = Machine::new(prog, f.clone(), 64, 64, 0).unwrap();
+        let mut mem = Memory::default();
+        let mut tables = Tables::default();
+        let unit_word: u32 = match form.a {
+            thin_target::Elem::F16 => 0x3C00_3C00,
+            thin_target::Elem::Bf16 => 0x3F80_3F80,
+            thin_target::Elem::F32 | thin_target::Elem::Xf32 => 1.0f32.to_bits(),
+            thin_target::Elem::F64 => 0,
+            thin_target::Elem::I8 => 0x0201_0201,
+            thin_target::Elem::Fp8Fnuz => 0x4040_4040,
+            thin_target::Elem::Bf8Fnuz => 0x4040_4040,
+            _ => 1,
+        };
+        let unit_b: u32 = match form.b {
+            thin_target::Elem::Fp8Fnuz | thin_target::Elem::Bf8Fnuz => 0x4040_4040,
+            _ => unit_word,
+        };
+        let (mut ws, _) = m
+            .run_wg(
+                &mut mem,
+                &mut tables,
+                0,
+                (0, 0),
+                1,
+                0,
+                Some(&mut |w| {
+                    w.v.fill(0);
+                    w.a.fill(0);
+                    for d in 0..form.dwords('a') as usize {
+                        let start = (32 + d) * 64;
+                        let val = if form.a == thin_target::Elem::F64 && d % 2 == 1 {
+                            0x3FF0_0000
+                        } else {
+                            unit_word
+                        };
+                        w.v[start..start + 64].fill(val);
+                    }
+                    for d in 0..form.dwords('b') as usize {
+                        let start = (32 + d) * 64;
+                        let val = if form.b == thin_target::Elem::F64 && d % 2 == 1 {
+                            0x4000_0000
+                        } else {
+                            unit_b
+                        };
+                        w.a[start..start + 64].fill(val);
+                    }
+                    if form.sparse {
+                        w.v[48 * 64..49 * 64].fill(0xDDDD_DDDD); // nibbles 0b11_01 -> idx0=1, idx1=3
+                    }
+                }),
+            )
+            .unwrap_or_else(|e| panic!("{mnemonic} failed: {e:?}"));
+        assert_eq!(m.reports.stats.matrix, 1);
+        let w = ws.remove(0);
+        let out_slice = if use_agpr {
+            &w.a[..form.dwords('d') as usize * 64]
+        } else {
+            &w.v[..form.dwords('d') as usize * 64]
+        };
+        assert!(
+            out_slice.iter().any(|&x| x != 0),
+            "{mnemonic} produced all-zero output"
+        );
+    }
+}

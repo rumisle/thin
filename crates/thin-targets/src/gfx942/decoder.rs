@@ -1382,7 +1382,12 @@ impl Cx<'_, '_> {
             self.ins.modify("abid", MVal::Int(abid as i32));
         }
         if blgp != 0 {
-            self.ins.modify("blgp", MVal::Int(blgp as i32));
+            if self.info.mnemonic.starts_with("v_mfma_f64_") {
+                let val = self.bits(BLGP, "neg", blgp, 3, 0b111)?;
+                self.ins.modify("neg", val);
+            } else {
+                self.ins.modify("blgp", MVal::Int(blgp as i32));
+            }
         }
         Ok(())
     }

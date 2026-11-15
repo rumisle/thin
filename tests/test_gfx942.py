@@ -465,3 +465,380 @@ def test_gfx942_fnuz_fp8_and_bf8_conversions_end_to_end():
     bnan = low1 == 0x80
     assert np.all(up_bf8.view(np.uint32)[bnan] == 0xFFC00000)
     assert np.array_equal(up_bf8[~bnan], want_up_bf8[~bnan])
+
+
+def _pack_cdna3_input(mat: np.ndarray, bits: int, *, sparse: bool = False) -> np.ndarray:
+    """Packs `[blocks, outer, k_in]` raw element integers into `[64, dwords]` uint32 per lane."""
+    blocks, outer, k_in = mat.shape
+    elems_contig = k_in // (64 // (outer * blocks))
+    dwords = max(1, (elems_contig * bits) // 32)
+    out = np.zeros((64, dwords), dtype=np.uint32)
+    mask = (1 << bits) - 1
+    for b in range(blocks):
+        for i in range(outer):
+            for k in range(k_in):
+                local = k % elems_contig
+                lane = b * outer + (k // elems_contig) * (outer * blocks) + i
+                tot_bits = local * bits
+                dw = tot_bits // 32
+                bit_lo = tot_bits % 32
+                val = int(mat[b, i, k]) & mask
+                if bits == 64:
+                    out[lane, dw] = val & 0xFFFFFFFF
+                    out[lane, dw + 1] = (val >> 32) & 0xFFFFFFFF
+                else:
+                    out[lane, dw] |= val << bit_lo
+    return out
+
+
+def _unpack_cdna3_output(lanes: np.ndarray, blocks: int, m: int, n: int, d_bits: int) -> np.ndarray:
+    """Unpacks `[64, dwords]` uint32 per lane into `[blocks, m, n]` raw integer elements."""
+    multirows_per_reg = 64 // n
+    multirow_h = 1 if d_bits == 64 else 4
+    chunk = (n * m) // multirow_h
+    blocks_per_reg = (64 + chunk - 1) // chunk
+    out = np.zeros((blocks, m, n), dtype=np.uint64 if d_bits == 64 else np.uint32)
+    for b in range(blocks):
+        for i in range(m):
+            for j in range(n):
+                local = (
+                    b * ((m * n) // 64)
+                    + (i // (multirow_h * multirows_per_reg)) * multirow_h
+                    + (i % multirow_h)
+                )
+                lane = (
+                    (b % blocks_per_reg) * n
+                    + ((i // multirow_h) % multirows_per_reg) * blocks_per_reg * n
+                    + j
+                )
+                if d_bits == 64:
+                    out[b, i, j] = int(lanes[lane, 2 * local]) | (
+                        int(lanes[lane, 2 * local + 1]) << 32
+                    )
+                else:
+                    out[b, i, j] = lanes[lane, local]
+    return out
+
+
+def _run_mfma_asm(
+    mnemonic: str,
+    a_lanes: np.ndarray,
+    b_lanes: np.ndarray,
+    c_lanes: np.ndarray | str,
+    d_dwords: int,
+    *,
+    mods: str = "",
+    use_agpr: bool = True,
+    sparse: bool = False,
+) -> np.ndarray:
+    """Executes one wave64 MFMA/SMFMAC instruction on gfx942; returns `[64, d_dwords]` uint32."""
+    from thin.emu import Cluster, Memory
+    from thin.target import targeting
+
+    na = a_lanes.shape[1]
+    nb = b_lanes.shape[1]
+    lines = [
+        "\ts_load_dwordx8 s[4:11], s[0:1], 0x0",
+        "\ts_waitcnt lgkmcnt(0)",
+    ]
+    # Load A into v[16:16+na-1]
+    lines.append("\tv_lshlrev_b32 v1, 2, v0")
+    lines.append(f"\tv_mul_lo_u32 v2, v0, {na * 4}")
+    for d in range(na):
+        lines.append(f"\tglobal_load_dword v{16 + d}, v2, s[4:5] offset:{d * 4}")
+    lines.append(f"\tv_mul_lo_u32 v3, v0, {nb * 4}")
+    for d in range(nb):
+        lines.append(f"\tglobal_load_dword v{48 + d}, v3, s[6:7] offset:{d * 4}")
+
+    c_is_buf = isinstance(c_lanes, np.ndarray)
+    if sparse:
+        assert c_is_buf
+        # Initialize D (in a[0:...] or v[80:...]) to 10.0 per element, and load sparse idx into v79
+        lines.append("\tglobal_load_dword v79, v1, s[8:9]")
+        lines.append("\ts_waitcnt vmcnt(0)")
+        init_bits = hex(np.float32(10.0).view(np.uint32).item())
+        for d in range(d_dwords):
+            if use_agpr:
+                lines.append(f"\tv_accvgpr_write_b32 a{d}, {init_bits}")
+            else:
+                lines.append(f"\tv_mov_b32 v{80 + d}, {init_bits}")
+        src2_op = "v79"
+    elif c_is_buf:
+        nc = c_lanes.shape[1]
+        lines.append(f"\tv_mul_lo_u32 v4, v0, {nc * 4}")
+        for d in range(nc):
+            lines.append(f"\tglobal_load_dword v{80 + d}, v4, s[8:9] offset:{d * 4}")
+        lines.append("\ts_waitcnt vmcnt(0)")
+        if use_agpr:
+            for d in range(nc):
+                lines.append(f"\tv_accvgpr_write_b32 a{d}, v{80 + d}")
+            src2_op = "a0" if nc == 1 else f"a[0:{nc - 1}]"
+        else:
+            src2_op = "v80" if nc == 1 else f"v[80:{80 + nc - 1}]"
+    else:
+        lines.append("\ts_waitcnt vmcnt(0)")
+        src2_op = str(c_lanes)
+
+    dst_op = (
+        ("a0" if d_dwords == 1 else f"a[0:{d_dwords - 1}]")
+        if use_agpr
+        else ("v80" if d_dwords == 1 else f"v[80:{80 + d_dwords - 1}]")
+    )
+    a_op = "v16" if na == 1 else f"v[16:{16 + na - 1}]"
+    b_op = "v48" if nb == 1 else f"v[48:{48 + nb - 1}]"
+    mod_suffix = f" {mods}" if mods else ""
+    lines.append(f"\t{mnemonic} {dst_op}, {a_op}, {b_op}, {src2_op}{mod_suffix}")
+
+    lines.append(f"\tv_mul_lo_u32 v5, v0, {d_dwords * 4}")
+    for d in range(d_dwords):
+        if use_agpr:
+            lines.append(f"\tv_accvgpr_read_b32 v6, a{d}")
+            lines.append(f"\tglobal_store_dword v5, v6, s[10:11] offset:{d * 4}")
+        else:
+            lines.append(f"\tglobal_store_dword v5, v{80 + d}, s[10:11] offset:{d * 4}")
+    lines.append("\ts_endpgm\n")
+    asm = "\n".join(lines)
+
+    mem = Memory()
+    buf_a = mem.alloc("a", max(4, a_lanes.nbytes), tagged=False)
+    buf_b = mem.alloc("b", max(4, b_lanes.nbytes), tagged=False)
+    buf_c = mem.alloc("c", max(4, c_lanes.nbytes if c_is_buf else 256), tagged=False)
+    buf_d = mem.alloc("d", 64 * d_dwords * 4, tagged=False)
+    buf_a.write(0, np.ascontiguousarray(a_lanes, dtype=np.uint32).tobytes())
+    buf_b.write(0, np.ascontiguousarray(b_lanes, dtype=np.uint32).tobytes())
+    if c_is_buf:
+        buf_c.write(0, np.ascontiguousarray(c_lanes, dtype=np.uint32).tobytes())
+    ka = mem.alloc("ka", 32, tagged=False)
+    ka.write(
+        0,
+        np.array([buf_a.base, buf_b.base, buf_c.base, buf_d.base], dtype=np.uint64).tobytes(),
+    )
+    with targeting("gfx942"):
+        Cluster(
+            asm,
+            {"wgsize": 64, "vgpr": 128, "agpr": 32, "user_sgprs": 2},
+            mem,
+            [ka],
+            grid=(1,),
+        ).run()
+    return np.frombuffer(buf_d.read(0, 64 * d_dwords * 4), dtype=np.uint32).reshape(64, d_dwords)
+
+
+def test_gfx942_mfma_dense_numerical_and_layout_parity():
+    from thin import formats
+
+    rng = np.random.default_rng(300)
+
+    # 1. 32x32x8_f16 -> 16 dwords of f32 per lane
+    a_f16 = rng.integers(-4, 5, (1, 32, 8)).astype(np.float16)
+    b_f16 = rng.integers(-4, 5, (1, 8, 32)).astype(np.float16)
+    c_f32 = rng.integers(-10, 11, (1, 32, 32)).astype(np.float32)
+    a_lanes = _pack_cdna3_input(a_f16.view(np.uint16), 16)
+    b_lanes = _pack_cdna3_input(np.swapaxes(b_f16, 1, 2).view(np.uint16), 16)
+    c_lanes = _pack_cdna3_input(
+        np.zeros((1, 32, 16), dtype=np.uint32), 32
+    )  # build C directly via output layout inverse:
+    # Pack C in output layout (row_groups = 64//32 = 2, sub_rows = 4):
+    c_lanes = np.zeros((64, 16), dtype=np.uint32)
+    c_u32 = c_f32.view(np.uint32)
+    for i in range(32):
+        for j in range(32):
+            rg = (i // 4) % 2
+            major = (i // 4) // 2
+            lane = rg * 32 + j
+            dw = major * 4 + (i % 4)
+            c_lanes[lane, dw] = c_u32[0, i, j]
+    d_lanes = _run_mfma_asm("v_mfma_f32_32x32x8_f16", a_lanes, b_lanes, c_lanes, 16, use_agpr=True)
+    got = _unpack_cdna3_output(d_lanes, 1, 32, 32, 32).view(np.float32)[0]
+    want = a_f16[0].astype(np.float32) @ b_f16[0].astype(np.float32) + c_f32[0]
+    assert np.array_equal(got, want)
+
+    # 2. 16x16x16_bf16 in VGPRs with inline literal C = 1.0
+    a_bf = (rng.integers(-5, 6, (1, 16, 16)).astype(np.float32).view(np.uint32) >> 16).astype(
+        np.uint16
+    )
+    b_bf = (rng.integers(-5, 6, (1, 16, 16)).astype(np.float32).view(np.uint32) >> 16).astype(
+        np.uint16
+    )
+    d_lanes = _run_mfma_asm(
+        "v_mfma_f32_16x16x16_bf16",
+        _pack_cdna3_input(a_bf, 16),
+        _pack_cdna3_input(np.swapaxes(b_bf, 1, 2), 16),
+        "1.0",
+        4,
+        use_agpr=False,
+    )
+    got_bf = _unpack_cdna3_output(d_lanes, 1, 16, 16, 32).view(np.float32)[0]
+    a_ref = (a_bf.astype(np.uint32) << 16).view(np.float32)[0]
+    b_ref = (b_bf.astype(np.uint32) << 16).view(np.float32)[0]
+    assert np.array_equal(got_bf, a_ref @ b_ref + 1.0)
+
+    # 3. 16x16x32_fp8_bf8 (FNUZ e4m3fnuz * e5m2fnuz, plus 0x80 NaN -> 0xFFC00000)
+    f8 = formats.DTYPES["e4m3fnuz"]
+    b8 = formats.DTYPES["e5m2fnuz"]
+    a_fp8 = formats.encode(
+        rng.integers(-6, 7, (1, 16, 32)).astype(np.float32) * 0.5, f8, saturate=False
+    )
+    b_bf8 = formats.encode(
+        rng.integers(-6, 7, (1, 32, 16)).astype(np.float32) * 0.5, b8, saturate=False
+    )
+    a_fp8[0, 3, 7] = 0x80  # inject FNUZ NaN into row 3
+    d_lanes = _run_mfma_asm(
+        "v_mfma_f32_16x16x32_fp8_bf8",
+        _pack_cdna3_input(a_fp8, 8),
+        _pack_cdna3_input(np.swapaxes(b_bf8, 1, 2), 8),
+        "0",
+        4,
+    )
+    got_u32 = _unpack_cdna3_output(d_lanes, 1, 16, 16, 32)[0]
+    assert np.all(got_u32[3, :] == 0xFFC00000)
+    want_fp8 = formats.decode(a_fp8[0], f8) @ formats.decode(b_bf8[0], b8)
+    mask = np.ones((16, 16), dtype=bool)
+    mask[3, :] = False
+    assert np.array_equal(got_u32.view(np.float32)[mask], want_fp8[mask])
+
+    # 4. 16x16x8_xf32: low 13 mantissa bits of non-NaN FP32 inputs are truncated (`& 0xFFFFE000`)
+    a_raw = np.full((1, 16, 8), 0x3F801FFF, dtype=np.uint32)  # 1.0 + low-13-bit noise -> 1.0
+    b_raw = np.full((1, 8, 16), 0x40001FFF, dtype=np.uint32)  # 2.0 + low-13-bit noise -> 2.0
+    d_lanes = _run_mfma_asm(
+        "v_mfma_f32_16x16x8_xf32",
+        _pack_cdna3_input(a_raw, 32),
+        _pack_cdna3_input(np.swapaxes(b_raw, 1, 2), 32),
+        "0",
+        4,
+    )
+    got_xf32 = _unpack_cdna3_output(d_lanes, 1, 16, 16, 32).view(np.float32)[0]
+    assert np.all(got_xf32 == 16.0)
+
+    # 5. 16x16x4_f64 with `neg:[1,0,1]` and `1.0` inline C: D = (-A) @ B + (-1.0)
+    a_f64 = rng.integers(-5, 6, (1, 16, 4)).astype(np.float64) * 0.25
+    b_f64 = rng.integers(-5, 6, (1, 4, 16)).astype(np.float64) * 0.5
+    d_lanes = _run_mfma_asm(
+        "v_mfma_f64_16x16x4_f64",
+        _pack_cdna3_input(a_f64.view(np.uint64), 64),
+        _pack_cdna3_input(np.swapaxes(b_f64, 1, 2).view(np.uint64), 64),
+        "1.0",
+        8,
+        mods="neg:[1,0,1]",
+    )
+    got_f64 = _unpack_cdna3_output(d_lanes, 1, 16, 16, 64).view(np.float64)[0]
+    assert np.array_equal(got_f64, (-a_f64[0]) @ b_f64[0] - 1.0)
+
+    # 6. 16x16x32_i8: signed int8 -> int32 exact accumulation
+    a_i8 = rng.integers(-128, 128, (1, 16, 32), dtype=np.int8)
+    b_i8 = rng.integers(-128, 128, (1, 32, 16), dtype=np.int8)
+    d_lanes = _run_mfma_asm(
+        "v_mfma_i32_16x16x32_i8",
+        _pack_cdna3_input(a_i8.view(np.uint8), 8),
+        _pack_cdna3_input(np.swapaxes(b_i8, 1, 2).view(np.uint8), 8),
+        "-7",
+        4,
+    )
+    got_i32 = _unpack_cdna3_output(d_lanes, 1, 16, 16, 32).view(np.int32)[0]
+    assert np.array_equal(got_i32, a_i8[0].astype(np.int32) @ b_i8[0].astype(np.int32) - 7)
+
+
+def test_gfx942_mfma_broadcast_modifiers_and_smfmac_sparse():
+    rng = np.random.default_rng(9420)
+
+    # 1a. Multi-block `16x16x4_4b_f16` (16 dwords D) with `cbsz:2 abid:1`: all 4 blocks use A[1]
+    a_4b = rng.integers(-3, 4, (4, 16, 4)).astype(np.float16)
+    b_4b = rng.integers(-3, 4, (4, 4, 16)).astype(np.float16)
+    d_lanes = _run_mfma_asm(
+        "v_mfma_f32_16x16x4_4b_f16",
+        _pack_cdna3_input(a_4b.view(np.uint16), 16),
+        _pack_cdna3_input(np.swapaxes(b_4b, 1, 2).view(np.uint16), 16),
+        "0",
+        16,
+        mods="cbsz:2 abid:1",
+    )
+    got_4b = _unpack_cdna3_output(d_lanes, 4, 16, 16, 32).view(np.float32)
+    for blk in range(4):
+        want_blk = a_4b[1].astype(np.float32) @ b_4b[blk].astype(np.float32)
+        assert np.array_equal(got_4b[blk], want_blk)
+
+    # 1b. Multi-block `4x4x4_16b_f16` (4 dwords D across 16 blocks) with `cbsz:4 abid:9`
+    a_16b = rng.integers(-3, 4, (16, 4, 4)).astype(np.float16)
+    b_16b = rng.integers(-3, 4, (16, 4, 4)).astype(np.float16)
+    d_16b = _run_mfma_asm(
+        "v_mfma_f32_4x4x4_16b_f16",
+        _pack_cdna3_input(a_16b.view(np.uint16), 16),
+        _pack_cdna3_input(np.swapaxes(b_16b, 1, 2).view(np.uint16), 16),
+        "0",
+        4,
+        mods="cbsz:4 abid:9",
+    )
+    got_16b = _unpack_cdna3_output(d_16b, 16, 4, 4, 32).view(np.float32)
+    for blk in range(16):
+        want_blk = a_16b[9].astype(np.float32) @ b_16b[blk].astype(np.float32)
+        assert np.array_equal(got_16b[blk], want_blk)
+
+    # 2. `blgp:1..7` on `v_mfma_f32_16x16x4_f32`: permutes/broadcasts B lanes before GEMM
+    a_f32 = rng.integers(-3, 4, (1, 16, 4)).astype(np.float32)
+    b_f32 = rng.integers(-3, 4, (1, 4, 16)).astype(np.float32)
+    a_pack = _pack_cdna3_input(a_f32.view(np.uint32), 32)
+    b_pack = _pack_cdna3_input(np.swapaxes(b_f32, 1, 2).view(np.uint32), 32)
+    for blgp in range(1, 8):
+        d_lanes = _run_mfma_asm(
+            "v_mfma_f32_16x16x4_f32", a_pack, b_pack, "0", 4, mods=f"blgp:{blgp}"
+        )
+        got = _unpack_cdna3_output(d_lanes, 1, 16, 16, 32).view(np.float32)[0]
+        # Reconstruct effective B after blgp lane remap:
+        src_lanes = [
+            lane
+            if blgp == 0
+            else (lane % 32)
+            if blgp == 1
+            else (lane % 32) + 32
+            if blgp == 2
+            else (lane + 16) % 64
+            if blgp == 3
+            else (lane % 16) + 16 * (blgp - 4)
+            for lane in range(64)
+        ]
+        b_swz = b_pack[src_lanes]
+        b_eff = np.zeros((4, 16), dtype=np.float32)
+        for j in range(16):
+            for k in range(4):
+                b_eff[k, j] = b_swz[k * 16 + j, :1].view(np.float32)[0]
+        assert np.array_equal(got, a_f32[0] @ b_eff)
+
+    # 3. 4:2 sparse `v_smfmac_f32_16x16x32_f16` with `cbsz:0 abid:0` and `cbsz:0 abid:2`
+    a_comp = rng.integers(-4, 5, (1, 16, 16)).astype(np.float16)  # compressed K/2 = 16
+    b_dense = rng.integers(-4, 5, (1, 32, 16)).astype(np.float16)
+    a_sp_lanes = _pack_cdna3_input(a_comp.view(np.uint16), 16, sparse=True)
+    b_sp_lanes = _pack_cdna3_input(np.swapaxes(b_dense, 1, 2).view(np.uint16), 16)
+
+    # Random valid 4:2 index nibbles per (row i, group g in 0..8) for abid=2 (bits 16..31)
+    idx_pairs = np.zeros((16, 8, 2), dtype=np.int32)
+    idx_lanes = np.zeros((64, 1), dtype=np.uint32)
+    pairs = [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
+    for i in range(16):
+        for g in range(8):
+            p0, p1 = pairs[int(rng.integers(0, len(pairs)))]
+            idx_pairs[i, g] = (p0, p1)
+            nib = (p0 & 3) | ((p1 & 3) << 2)
+            # 16x16x32_f16 has 4 lane groups -> 2 nibbles/lane; abid=2 shifts by 4 nibbles.
+            lane = (g // 2) * 16 + i
+            nib_pos = 4 + (g % 2)
+            idx_lanes[lane, 0] |= nib << (nib_pos * 4)
+
+    d_lanes = _run_mfma_asm(
+        "v_smfmac_f32_16x16x32_f16",
+        a_sp_lanes,
+        b_sp_lanes,
+        idx_lanes,
+        4,
+        mods="cbsz:0 abid:2",
+        sparse=True,
+    )
+    got_sp = _unpack_cdna3_output(d_lanes, 1, 16, 16, 32).view(np.float32)[0]
+    a_expanded = np.zeros((16, 32), dtype=np.float32)
+    for i in range(16):
+        for g in range(8):
+            p0, p1 = idx_pairs[i, g]
+            if p0 < p1:
+                a_expanded[i, 4 * g + p0] = float(a_comp[0, i, 2 * g])
+            a_expanded[i, 4 * g + p1] = float(a_comp[0, i, 2 * g + 1])
+    want_sp = a_expanded @ b_dense[0].astype(np.float32) + 10.0
+    assert np.array_equal(got_sp, want_sp)

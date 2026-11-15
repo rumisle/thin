@@ -9,9 +9,9 @@ use std::collections::{BTreeSet, HashSet};
 use std::sync::OnceLock;
 
 use thin_target::{
-    Block, Chip, ClockRead, Counter, Definition, Encoded, Error, Field, FieldKind, File, Flags,
-    Footer, FormRules, Hazards, Hooks, LibHooks, Mem, Operands, Resources, Row, Syntax, Target,
-    WaitInsn, WaitText,
+    Block, Chip, ClockRead, Counter, Definition, Elem, Encoded, Error, Field, FieldKind, File,
+    Flags, Footer, FormRules, Hazards, Hooks, LibHooks, MatrixForm, Mem, Operands, Resources, Row,
+    Summation, Syntax, Target, WaitInsn, WaitText,
 };
 
 use crate::tables::{self, IsaTables};
@@ -389,6 +389,9 @@ fn fields(spelling: &str, encoding: &str, nsrc: usize) -> Result<Vec<Field>, Err
         "VOP3P_MFMA" if spelling.starts_with("v_smfmac_") => {
             vec![int("cbsz", 3, false)?, int("abid", 4, false)?]
         }
+        "VOP3P_MFMA" if spelling.starts_with("v_mfma_f64_") => {
+            vec![int("cbsz", 3, false)?, int("abid", 4, false)?, bits("neg")?]
+        }
         "VOP3P_MFMA" => vec![
             int("cbsz", 3, false)?,
             int("abid", 4, false)?,
@@ -480,7 +483,147 @@ fn no_widths(_: &str, _: usize) -> Vec<u32> {
     Vec::new()
 }
 
-static MATRIX: [&str; 2] = ["v_mfma_", "v_smfmac_"];
+static MATRIX: [&str; 46] = [
+    "v_mfma_f32_16x16x16_bf16",
+    "v_mfma_f32_16x16x16_f16",
+    "v_mfma_f32_16x16x1_4b_f32",
+    "v_mfma_f32_16x16x32_bf8_bf8",
+    "v_mfma_f32_16x16x32_bf8_fp8",
+    "v_mfma_f32_16x16x32_fp8_bf8",
+    "v_mfma_f32_16x16x32_fp8_fp8",
+    "v_mfma_f32_16x16x4_4b_bf16",
+    "v_mfma_f32_16x16x4_4b_f16",
+    "v_mfma_f32_16x16x4_f32",
+    "v_mfma_f32_16x16x8_xf32",
+    "v_mfma_f32_32x32x16_bf8_bf8",
+    "v_mfma_f32_32x32x16_bf8_fp8",
+    "v_mfma_f32_32x32x16_fp8_bf8",
+    "v_mfma_f32_32x32x16_fp8_fp8",
+    "v_mfma_f32_32x32x1_2b_f32",
+    "v_mfma_f32_32x32x2_f32",
+    "v_mfma_f32_32x32x4_2b_bf16",
+    "v_mfma_f32_32x32x4_2b_f16",
+    "v_mfma_f32_32x32x4_xf32",
+    "v_mfma_f32_32x32x8_bf16",
+    "v_mfma_f32_32x32x8_f16",
+    "v_mfma_f32_4x4x1_16b_f32",
+    "v_mfma_f32_4x4x4_16b_bf16",
+    "v_mfma_f32_4x4x4_16b_f16",
+    "v_mfma_f64_16x16x4_f64",
+    "v_mfma_f64_4x4x4_4b_f64",
+    "v_mfma_i32_16x16x32_i8",
+    "v_mfma_i32_16x16x4_4b_i8",
+    "v_mfma_i32_32x32x16_i8",
+    "v_mfma_i32_32x32x4_2b_i8",
+    "v_mfma_i32_4x4x4_16b_i8",
+    "v_smfmac_f32_16x16x32_bf16",
+    "v_smfmac_f32_16x16x32_f16",
+    "v_smfmac_f32_16x16x64_bf8_bf8",
+    "v_smfmac_f32_16x16x64_bf8_fp8",
+    "v_smfmac_f32_16x16x64_fp8_bf8",
+    "v_smfmac_f32_16x16x64_fp8_fp8",
+    "v_smfmac_f32_32x32x16_bf16",
+    "v_smfmac_f32_32x32x16_f16",
+    "v_smfmac_f32_32x32x32_bf8_bf8",
+    "v_smfmac_f32_32x32x32_bf8_fp8",
+    "v_smfmac_f32_32x32x32_fp8_bf8",
+    "v_smfmac_f32_32x32x32_fp8_fp8",
+    "v_smfmac_i32_16x16x64_i8",
+    "v_smfmac_i32_32x32x32_i8",
+];
+
+/// Authoritative CDNA 3 matrix form table covering all 32 dense `v_mfma_*` and
+/// 14 4:2 sparse `v_smfmac_*` instructions (`passes = cycles / 4`).
+pub(crate) fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
+    use Elem::{Bf16, Bf8Fnuz, Fp8Fnuz, Xf32, F16, F32, F64, I32, I8};
+    if let Some(rest) = mnemonic.strip_prefix("v_mfma_") {
+        let (d, a, b, m, n, k, blocks, passes, cbsz_abid, blgp) = match rest {
+            "f32_16x16x16_bf16" => (F32, Bf16, Bf16, 16, 16, 16, 1, 4, false, false),
+            "f32_16x16x16_f16" => (F32, F16, F16, 16, 16, 16, 1, 4, false, false),
+            "f32_16x16x1_4b_f32" => (F32, F32, F32, 16, 16, 1, 4, 8, true, true),
+            "f32_16x16x32_bf8_bf8" => (F32, Bf8Fnuz, Bf8Fnuz, 16, 16, 32, 1, 4, false, false),
+            "f32_16x16x32_bf8_fp8" => (F32, Bf8Fnuz, Fp8Fnuz, 16, 16, 32, 1, 4, false, false),
+            "f32_16x16x32_fp8_bf8" => (F32, Fp8Fnuz, Bf8Fnuz, 16, 16, 32, 1, 4, false, false),
+            "f32_16x16x32_fp8_fp8" => (F32, Fp8Fnuz, Fp8Fnuz, 16, 16, 32, 1, 4, false, false),
+            "f32_16x16x4_4b_bf16" => (F32, Bf16, Bf16, 16, 16, 4, 4, 8, true, true),
+            "f32_16x16x4_4b_f16" => (F32, F16, F16, 16, 16, 4, 4, 8, true, true),
+            "f32_16x16x4_f32" => (F32, F32, F32, 16, 16, 4, 1, 8, false, true),
+            "f32_16x16x8_xf32" => (F32, Xf32, Xf32, 16, 16, 8, 1, 4, false, false),
+            "f32_32x32x16_bf8_bf8" => (F32, Bf8Fnuz, Bf8Fnuz, 32, 32, 16, 1, 8, false, false),
+            "f32_32x32x16_bf8_fp8" => (F32, Bf8Fnuz, Fp8Fnuz, 32, 32, 16, 1, 8, false, false),
+            "f32_32x32x16_fp8_bf8" => (F32, Fp8Fnuz, Bf8Fnuz, 32, 32, 16, 1, 8, false, false),
+            "f32_32x32x16_fp8_fp8" => (F32, Fp8Fnuz, Fp8Fnuz, 32, 32, 16, 1, 8, false, false),
+            "f32_32x32x1_2b_f32" => (F32, F32, F32, 32, 32, 1, 2, 16, true, true),
+            "f32_32x32x2_f32" => (F32, F32, F32, 32, 32, 2, 1, 16, false, true),
+            "f32_32x32x4_2b_bf16" => (F32, Bf16, Bf16, 32, 32, 4, 2, 16, true, true),
+            "f32_32x32x4_2b_f16" => (F32, F16, F16, 32, 32, 4, 2, 16, true, true),
+            "f32_32x32x4_xf32" => (F32, Xf32, Xf32, 32, 32, 4, 1, 8, false, false),
+            "f32_32x32x8_bf16" => (F32, Bf16, Bf16, 32, 32, 8, 1, 8, false, false),
+            "f32_32x32x8_f16" => (F32, F16, F16, 32, 32, 8, 1, 8, false, false),
+            "f32_4x4x1_16b_f32" => (F32, F32, F32, 4, 4, 1, 16, 2, true, true),
+            "f32_4x4x4_16b_bf16" => (F32, Bf16, Bf16, 4, 4, 4, 16, 2, true, true),
+            "f32_4x4x4_16b_f16" => (F32, F16, F16, 4, 4, 4, 16, 2, true, true),
+            "f64_16x16x4_f64" => (F64, F64, F64, 16, 16, 4, 1, 8, false, true),
+            "f64_4x4x4_4b_f64" => (F64, F64, F64, 4, 4, 4, 4, 4, false, true),
+            "i32_16x16x32_i8" => (I32, I8, I8, 16, 16, 32, 1, 4, false, false),
+            "i32_16x16x4_4b_i8" => (I32, I8, I8, 16, 16, 4, 4, 8, true, true),
+            "i32_32x32x16_i8" => (I32, I8, I8, 32, 32, 16, 1, 8, false, false),
+            "i32_32x32x4_2b_i8" => (I32, I8, I8, 32, 32, 4, 2, 16, true, true),
+            "i32_4x4x4_16b_i8" => (I32, I8, I8, 4, 4, 4, 16, 2, true, true),
+            _ => return None,
+        };
+        return Some(MatrixForm {
+            a,
+            b,
+            d,
+            m,
+            n,
+            k,
+            blocks,
+            wave: 64,
+            passes,
+            sparse: false,
+            cbsz_abid,
+            blgp,
+            sum: Summation::Ordered,
+            provisional: true,
+        });
+    }
+    let rest = mnemonic.strip_prefix("v_smfmac_")?;
+    let (d, a, b, m, n, k, passes) = match rest {
+        "f32_16x16x32_bf16" => (F32, Bf16, Bf16, 16, 16, 32, 4),
+        "f32_16x16x32_f16" => (F32, F16, F16, 16, 16, 32, 4),
+        "f32_16x16x64_bf8_bf8" => (F32, Bf8Fnuz, Bf8Fnuz, 16, 16, 64, 4),
+        "f32_16x16x64_bf8_fp8" => (F32, Bf8Fnuz, Fp8Fnuz, 16, 16, 64, 4),
+        "f32_16x16x64_fp8_bf8" => (F32, Fp8Fnuz, Bf8Fnuz, 16, 16, 64, 4),
+        "f32_16x16x64_fp8_fp8" => (F32, Fp8Fnuz, Fp8Fnuz, 16, 16, 64, 4),
+        "f32_32x32x16_bf16" => (F32, Bf16, Bf16, 32, 32, 16, 8),
+        "f32_32x32x16_f16" => (F32, F16, F16, 32, 32, 16, 8),
+        "f32_32x32x32_bf8_bf8" => (F32, Bf8Fnuz, Bf8Fnuz, 32, 32, 32, 8),
+        "f32_32x32x32_bf8_fp8" => (F32, Bf8Fnuz, Fp8Fnuz, 32, 32, 32, 8),
+        "f32_32x32x32_fp8_bf8" => (F32, Fp8Fnuz, Bf8Fnuz, 32, 32, 32, 8),
+        "f32_32x32x32_fp8_fp8" => (F32, Fp8Fnuz, Fp8Fnuz, 32, 32, 32, 8),
+        "i32_16x16x64_i8" => (I32, I8, I8, 16, 16, 64, 4),
+        "i32_32x32x32_i8" => (I32, I8, I8, 32, 32, 32, 8),
+        _ => return None,
+    };
+    Some(MatrixForm {
+        a,
+        b,
+        d,
+        m,
+        n,
+        k,
+        blocks: 1,
+        wave: 64,
+        passes,
+        sparse: true,
+        cbsz_abid: true,
+        blgp: false,
+        sum: Summation::Ordered,
+        provisional: true,
+    })
+}
 static SMEM: [&str; 9] = [
     "s_load",
     "s_store",
@@ -646,6 +789,10 @@ impl Hooks for Gfx942 {
 
     fn fnuz_fp8(&self) -> bool {
         true
+    }
+
+    fn matrix_form(&self, mnemonic: &str) -> Option<MatrixForm> {
+        mfma_form(mnemonic)
     }
 
     /// CDNA 3 scope rule (`code = sc0 | (sc1 << 1)`, verified against `llc -mcpu=gfx942`):

@@ -1028,7 +1028,24 @@ fn mfma(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
         }
         word.put("abid", abid as u64)?;
     }
-    if let Some(blgp) = int_modifier(line, "blgp")? {
+    if mnemonic.starts_with("v_mfma_f64_") {
+        if int_modifier(line, "blgp")?.is_some() {
+            return Err("blgp: not valid on f64 MFMA (use neg:[s0,s1,s2])".into());
+        }
+        if let Some(given) = line.modifiers.take("neg") {
+            let ModValue::List(bits) = given else {
+                return Err("neg: expected a list of 3 bits".into());
+            };
+            if bits.is_empty() || bits.len() > 3 || bits.iter().any(|b| !(0..=1).contains(b)) {
+                return Err("neg: expected 1..3 binary bits".into());
+            }
+            let mask = bits
+                .iter()
+                .enumerate()
+                .fold(0u64, |v, (j, b)| v | (*b as u64) << j);
+            word.put("blgp", mask)?;
+        }
+    } else if let Some(blgp) = int_modifier(line, "blgp")? {
         if smfmac || !(0..8).contains(&blgp) {
             return Err(format!("blgp {blgp}: not valid here"));
         }

@@ -25,7 +25,10 @@ fn element(dwords: &[u32], ty: Elem, e: usize, signed: bool) -> f64 {
         Elem::F16 => f16_value(raw),
         Elem::Bf16 => f64::from(f32_of(raw << 16)),
         Elem::F32 => f64::from(f32_of(raw)),
+        Elem::Xf32 => f64::from(f32_of(raw & 0xFFFF_E000)),
+        Elem::F64 => 0.0,
         Elem::I32 => f64::from(raw as i32),
+        Elem::I8 => f64::from(raw as u8 as i8),
         Elem::Iu8 | Elem::Iu4 => {
             if signed && raw >> (bits - 1) & 1 != 0 {
                 f64::from(raw) - f64::from(1u32 << bits)
@@ -35,6 +38,8 @@ fn element(dwords: &[u32], ty: Elem, e: usize, signed: bool) -> f64 {
         }
         Elem::Fp8 => Small::E4M3.value(raw),
         Elem::Bf8 => Small::E5M2.value(raw),
+        Elem::Fp8Fnuz => Small::E4M3Fnuz.value(raw),
+        Elem::Bf8Fnuz => Small::E5M2Fnuz.value(raw),
     }
 }
 
@@ -284,6 +289,9 @@ fn gpu_nan(av: &[f64], bv: &[f64], c_bits: u32, d: Elem, byte: bool) -> u32 {
 /// `v_wmma_*` in value mode: the target's summation model; a NaN result by
 /// [`gpu_nan`].
 pub fn wmma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> {
+    if form.wave == 64 {
+        return super::mfma::mfma(w, ins, form);
+    }
     if w.w != 32 {
         return Err(limit(format!(
             "{}: a matrix form of 32 lanes on a {}-lane wave",

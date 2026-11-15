@@ -433,3 +433,52 @@ fn cdna3_descriptor_matches_llvm_mc_with_and_without_agprs() {
         }
     }
 }
+
+#[test]
+fn cdna3_all_46_matrix_forms_match_isa_dwords_and_f64_neg_roundtrips() {
+    let t = thin_targets::get(ARCH).unwrap();
+    let matrix_forms: Vec<_> = t
+        .forms()
+        .iter()
+        .filter(|f| f.flags.has(thin_target::Flags::MATRIX))
+        .collect();
+    assert_eq!(matrix_forms.len(), 46);
+    for f in matrix_forms {
+        let mf = t
+            .hooks()
+            .matrix_form(&f.name)
+            .unwrap_or_else(|| panic!("missing MatrixForm for {}", f.name));
+        assert_eq!(mf.wave, 64);
+        assert_eq!(mf.sparse, f.name.starts_with("v_smfmac_"));
+        assert_eq!(f.slots.len(), 4);
+        assert_eq!(mf.dwords('d'), f.slots[0].dwords, "{} dst", f.name);
+        assert_eq!(mf.dwords('a'), f.slots[1].dwords, "{} src0", f.name);
+        assert_eq!(mf.dwords('b'), f.slots[2].dwords, "{} src1", f.name);
+        assert_eq!(mf.dwords('c'), f.slots[3].dwords, "{} src2", f.name);
+    }
+
+    let neg_lines = [
+        "v_mfma_f64_16x16x4_f64 a[0:7], v[0:1], v[2:3], a[0:7] neg:[1,0,1]",
+        "v_mfma_f64_4x4x4_4b_f64 v[0:1], a[0:1], v[2:3], 1.0 neg:[0,1,1]",
+    ];
+    if llvm_mc_available() {
+        let want = llvm_mc_bytes(&neg_lines);
+        for (line, expected) in neg_lines.iter().zip(want) {
+            let Encoded::Bytes(bytes) = t.hooks().encode(line).expect(line) else {
+                panic!("expected Bytes encoding");
+            };
+            assert_eq!(bytes, expected, "encode mismatch on `{line}`");
+            let decoded = thin_targets::decode(ARCH, &bytes).expect("decode");
+            assert_eq!(decoded.len(), 1);
+            let reencoded =
+                thin_targets::encode_one(ARCH, &decoded[0]).expect("re-encode decoded f64 MFMA");
+            assert_eq!(reencoded, expected, "roundtrip mismatch on `{line}`");
+        }
+    }
+    assert!(
+        t.hooks()
+            .encode("v_mfma_f64_16x16x4_f64 a[0:7], v[0:1], v[2:3], a[0:7] blgp:1")
+            .is_err(),
+        "f64 MFMA should reject blgp modifier"
+    );
+}

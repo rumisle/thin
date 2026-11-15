@@ -17,6 +17,7 @@ pub mod flight;
 pub mod lds;
 pub mod memops;
 pub mod memory;
+pub mod mfma;
 pub mod numbers;
 pub mod pc;
 pub mod pending;

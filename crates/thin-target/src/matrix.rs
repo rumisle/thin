@@ -10,16 +10,26 @@ pub enum Elem {
     Bf16,
     /// IEEE binary32.
     F32,
+    /// CDNA3 XF32 (binary32 input with mantissa truncated to 10 bits).
+    Xf32,
+    /// IEEE binary64.
+    F64,
     /// A 32-bit integer.
     I32,
+    /// A signed 8-bit integer.
+    I8,
     /// An 8-bit integer, unsigned or signed by the op's modifiers.
     Iu8,
     /// A 4-bit integer, unsigned or signed by the op's modifiers.
     Iu4,
-    /// The 8-bit float with 4 exponent bits (e4m3).
+    /// The OCP 8-bit float with 4 exponent bits (`e4m3fn`).
     Fp8,
-    /// The 8-bit float with 5 exponent bits (e5m2).
+    /// The OCP 8-bit float with 5 exponent bits (`e5m2`).
     Bf8,
+    /// The CDNA3 FNUZ 8-bit float with 4 exponent bits (`e4m3fnuz`).
+    Fp8Fnuz,
+    /// The CDNA3 FNUZ 8-bit float with 5 exponent bits (`e5m2fnuz`).
+    Bf8Fnuz,
 }
 
 impl Elem {
@@ -27,15 +37,35 @@ impl Elem {
     pub fn bits(self) -> u32 {
         match self {
             Elem::F16 | Elem::Bf16 => 16,
-            Elem::F32 | Elem::I32 => 32,
-            Elem::Iu8 | Elem::Fp8 | Elem::Bf8 => 8,
+            Elem::F32 | Elem::Xf32 | Elem::I32 => 32,
+            Elem::F64 => 64,
+            Elem::I8 | Elem::Iu8 | Elem::Fp8 | Elem::Bf8 | Elem::Fp8Fnuz | Elem::Bf8Fnuz => 8,
             Elem::Iu4 => 4,
         }
     }
 
     /// Whether it is an integer type.
     pub fn integer(self) -> bool {
-        matches!(self, Elem::I32 | Elem::Iu8 | Elem::Iu4)
+        matches!(self, Elem::I32 | Elem::I8 | Elem::Iu8 | Elem::Iu4)
+    }
+
+    /// Its canonical short name.
+    pub fn name(self) -> &'static str {
+        match self {
+            Elem::F16 => "f16",
+            Elem::Bf16 => "bf16",
+            Elem::F32 => "f32",
+            Elem::Xf32 => "xf32",
+            Elem::F64 => "f64",
+            Elem::I32 => "i32",
+            Elem::I8 => "i8",
+            Elem::Iu8 => "iu8",
+            Elem::Iu4 => "iu4",
+            Elem::Fp8 => "e4m3fn",
+            Elem::Bf8 => "e5m2",
+            Elem::Fp8Fnuz => "e4m3fnuz",
+            Elem::Bf8Fnuz => "e5m2fnuz",
+        }
     }
 }
 
@@ -44,7 +74,7 @@ impl Elem {
 pub enum Summation {
     /// Products exact in binary64, summed in k order with one rounding
     /// per add in binary64, then C, rounded once to D's type; integer
-    /// forms exact, wrapped to 32 bits.
+    /// forms exact, wrapped to 32 bits; f64 forms fused per k in binary64.
     Ordered,
     /// The measured grouped model: products in groups of
     /// `group_half` (f16, bf16 inputs) or `group_byte` (fp8, bf8) consecutive
@@ -63,11 +93,8 @@ pub enum Summation {
     },
 }
 
-/// One matrix form: D (16×16) = A (16×K) · B (K×16) + C, with the
-/// lane layout of a 32-lane wave in two halves: lane
-/// l = r + 16h holds row r of A and column r of B, element e of half h
-/// being k = (K/2)·h + e; C and D's lane l holds column r, element e
-/// being row 8h + e.
+/// One hardware matrix-multiply-accumulate instruction form (`blocks` blocks of
+/// `D (m×n) = A (m×k) · B (k×n) + C` across a `wave`-lane wavefront).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MatrixForm {
     /// A's element type.
@@ -76,8 +103,24 @@ pub struct MatrixForm {
     pub b: Elem,
     /// C's and D's element type.
     pub d: Elem,
-    /// The reduction depth K.
+    /// Output rows M per block.
+    pub m: u32,
+    /// Output columns N per block.
+    pub n: u32,
+    /// The reduction depth K (uncompressed K for 4:2 sparse forms).
     pub k: u32,
+    /// Independent matrix blocks across the wave (1 for single-block).
+    pub blocks: u32,
+    /// Wavefront lane count of this form (32 or 64).
+    pub wave: u32,
+    /// Matrix-unit execution passes (1 pass = 4 shader cycles on CDNA3).
+    pub passes: u32,
+    /// Whether A uses 4:2 structured sparsity (`vdst` is C+D, `src2` holds indices).
+    pub sparse: bool,
+    /// Whether `cbsz` and `abid` modifiers are supported.
+    pub cbsz_abid: bool,
+    /// Whether `blgp` (or `neg` on CDNA3 f64) is supported.
+    pub blgp: bool,
     /// The summation model.
     pub sum: Summation,
     /// Whether the model is provisional (not measured on hardware).
@@ -85,12 +128,17 @@ pub struct MatrixForm {
 }
 
 impl MatrixForm {
-    /// Dwords per lane of A (`a`), B or C/D.
+    /// Dwords per lane of A (`'a'`), B (`'b'`), sparse index (`'k'`), or C/D.
     pub fn dwords(&self, operand: char) -> u32 {
         match operand {
-            'a' => self.k / 2 * self.a.bits() / 32,
-            'b' => self.k / 2 * self.b.bits() / 32,
-            _ => 8 * self.d.bits() / 32,
+            'a' => {
+                let k_stored = if self.sparse { self.k / 2 } else { self.k };
+                (self.m * self.blocks * k_stored * self.a.bits()) / (self.wave * 32)
+            }
+            'b' => (self.n * self.blocks * self.k * self.b.bits()) / (self.wave * 32),
+            'k' => u32::from(self.sparse),
+            'c' if self.sparse => 1,
+            _ => (self.m * self.n * self.blocks * self.d.bits()) / (self.wave * 32),
         }
     }
 }

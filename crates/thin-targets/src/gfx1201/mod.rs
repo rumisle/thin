@@ -597,7 +597,15 @@ fn wmma_form(mnemonic: &str) -> Option<MatrixForm> {
         a,
         b,
         d,
+        m: 16,
+        n: 16,
         k,
+        blocks: 1,
+        wave: 32,
+        passes: 1,
+        sparse: false,
+        cbsz_abid: false,
+        blgp: false,
         // Measured on an RX 9070 XT for fp8 and bf8
         // inputs. f16 and bf16 inputs with an f32 or bf16 D run through the
         // emulator's dot unit instead (thin_emu machine::dot, measured: every
