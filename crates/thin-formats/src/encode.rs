@@ -37,6 +37,8 @@ pub(crate) struct Rounding {
     nan: u32,
     /// Whether a NaN keeps the input's sign.
     nan_signed: bool,
+    /// Whether zero keeps the input's sign (`false` for FNUZ unsigned zero).
+    zero_signed: bool,
     /// The position of the sign bit, exp + man.
     sign_shift: u32,
 }
@@ -64,17 +66,21 @@ impl Plan {
             }
             return Ok(Plan::Copy);
         }
+        let sign_shift = enc.exp + enc.man;
         let (overflow, nan) = if enc.has_no_specials() {
             special_patterns(name, enc, options)?
         } else {
+            let sign_bit = 1 << sign_shift;
             let all_exponent = ((1 << enc.exp) - 1) << enc.man;
             let overflow = match (options.saturate, enc.nan) {
                 (true, _) => enc.max_bits(),
                 (false, NanKind::Ieee) => all_exponent,
+                (false, NanKind::NegZero) => sign_bit,
                 (false, _) => enc.ones(),
             };
             let nan = match enc.nan {
                 NanKind::Ieee => all_exponent | 1 << (enc.man - 1),
+                NanKind::NegZero => sign_bit,
                 _ => enc.ones(),
             };
             (overflow, nan)
@@ -85,8 +91,9 @@ impl Plan {
             max_bits: enc.max_bits(),
             overflow,
             nan,
-            nan_signed: enc.nan != NanKind::Ieee,
-            sign_shift: enc.exp + enc.man,
+            nan_signed: !matches!(enc.nan, NanKind::Ieee | NanKind::NegZero),
+            zero_signed: enc.nan != NanKind::NegZero,
+            sign_shift,
         }))
     }
 
@@ -156,7 +163,13 @@ impl Rounding {
         let half = 1 << (sh - 1);
         let bits = base + u32::from(rem > half || (rem == half && base & 1 == 1));
         let overflow = bits > self.max_bits || a == 0x7F80_0000;
-        let finite = if overflow { self.overflow } else { bits } | sign;
+        let mag = if overflow { self.overflow } else { bits };
+        let finite = mag
+            | if mag != 0 || self.zero_signed {
+                sign
+            } else {
+                0
+            };
         let nan = self.nan | if self.nan_signed { sign } else { 0 };
         if a > 0x7F80_0000 {
             nan
@@ -262,6 +275,34 @@ mod tests {
         assert_eq!(one(-0.0, "e4m3fn", SAT).unwrap(), 0x80);
         assert_eq!(one(-1e-30, "e4m3fn", SAT).unwrap(), 0x80);
         assert_eq!(one(-1e-45, "bf16", NO_SAT).unwrap(), 0x8000);
+        assert_eq!(one(-0.0, "e4m3fnuz", SAT).unwrap(), 0x00);
+        assert_eq!(one(-0.0, "e4m3fnuz", NO_SAT).unwrap(), 0x00);
+        assert_eq!(one(-1e-30, "e4m3fnuz", SAT).unwrap(), 0x00);
+        assert_eq!(one(-0.0, "e5m2fnuz", NO_SAT).unwrap(), 0x00);
+        assert_eq!(one(-1e-30, "e5m2fnuz", NO_SAT).unwrap(), 0x00);
+    }
+
+    #[test]
+    fn fnuz_overflow_and_nan() {
+        let nan = f32::from_bits(0xFFC0_0001);
+        assert_eq!(one(240.0, "e4m3fnuz", NO_SAT).unwrap(), 0x7F);
+        assert_eq!(one(-240.0, "e4m3fnuz", NO_SAT).unwrap(), 0xFF);
+        assert_eq!(one(247.0, "e4m3fnuz", NO_SAT).unwrap(), 0x7F);
+        assert_eq!(one(248.0, "e4m3fnuz", NO_SAT).unwrap(), 0x80);
+        assert_eq!(one(-248.0, "e4m3fnuz", NO_SAT).unwrap(), 0x80);
+        assert_eq!(one(248.0, "e4m3fnuz", SAT).unwrap(), 0x7F);
+        assert_eq!(one(-248.0, "e4m3fnuz", SAT).unwrap(), 0xFF);
+        assert_eq!(one(f32::INFINITY, "e4m3fnuz", SAT).unwrap(), 0x7F);
+        assert_eq!(one(f32::NEG_INFINITY, "e4m3fnuz", SAT).unwrap(), 0xFF);
+        assert_eq!(one(f32::INFINITY, "e4m3fnuz", NO_SAT).unwrap(), 0x80);
+        assert_eq!(one(f32::NEG_INFINITY, "e4m3fnuz", NO_SAT).unwrap(), 0x80);
+        assert_eq!(one(nan, "e4m3fnuz", SAT).unwrap(), 0x80);
+        assert_eq!(one(nan, "e4m3fnuz", NO_SAT).unwrap(), 0x80);
+        assert_eq!(one(57344.0, "e5m2fnuz", NO_SAT).unwrap(), 0x7F);
+        assert_eq!(one(-57344.0, "e5m2fnuz", NO_SAT).unwrap(), 0xFF);
+        assert_eq!(one(61440.0, "e5m2fnuz", NO_SAT).unwrap(), 0x80);
+        assert_eq!(one(-61440.0, "e5m2fnuz", SAT).unwrap(), 0xFF);
+        assert_eq!(one(nan, "e5m2fnuz", NO_SAT).unwrap(), 0x80);
     }
 
     #[test]

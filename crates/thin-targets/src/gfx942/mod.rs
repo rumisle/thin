@@ -395,7 +395,12 @@ fn fields(spelling: &str, encoding: &str, nsrc: usize) -> Result<Vec<Field>, Err
             int("blgp", 3, false)?,
         ],
         "ENC_VOP3" if encoder::opsel_bits(spelling) != 0 => vec![
-            Field::new("op_sel", FieldKind::Bits, nsrc as u32 + 1, false)?,
+            Field::new(
+                "op_sel",
+                FieldKind::Bits,
+                encoder::opsel_len(spelling, nsrc) as u32,
+                false,
+            )?,
             flag("clamp")?,
             int("omod", 2, false)?,
         ],
@@ -637,6 +642,10 @@ impl Hooks for Gfx942 {
 
     fn interface_resources(&self, block: &Block) -> Result<Resources, Error> {
         code_object::interface_resources(block)
+    }
+
+    fn fnuz_fp8(&self) -> bool {
+        true
     }
 
     /// CDNA 3 scope rule (`code = sc0 | (sc1 << 1)`, verified against `llc -mcpu=gfx942`):

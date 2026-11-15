@@ -1149,12 +1149,13 @@ impl Cx<'_, '_> {
             .iter()
             .filter(|&&f| self.info.opd[f].is_some())
             .count();
+        let len = super::encoder::opsel_len(self.info.mnemonic, nsrc);
         let mut items = [0u8; 4];
-        for (j, item) in items.iter_mut().enumerate().take(nsrc + 1) {
-            let bit = if j == nsrc { 3 } else { j };
+        for (j, item) in items.iter_mut().enumerate().take(len) {
+            let bit = if j + 1 == len && len < 4 { 3 } else { j };
             *item = ((v >> bit) & 1) as u8;
         }
-        self.ins.modify("op_sel", MVal::List(items, nsrc as u8 + 1));
+        self.ins.modify("op_sel", MVal::List(items, len as u8));
         Ok(())
     }
 

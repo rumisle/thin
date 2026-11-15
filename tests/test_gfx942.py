@@ -79,9 +79,7 @@ def _gen_party():
         o = b.v.u32(k.wave * 4, name="o")
         b.emit(O.global_store(o, b.v.u32(g.g1, name="g1"), out))
 
-    return KernelDef(
-        "gfx942_party", Args(out=ptr, **decl.args()), body, wgsize=128, max_grid=(1,)
-    )
+    return KernelDef("gfx942_party", Args(out=ptr, **decl.args()), body, wgsize=128, max_grid=(1,))
 
 
 def _gen_mfma():
@@ -342,3 +340,128 @@ def test_gfx942_mfma_agpr_dsl_hazards_descriptor_and_device_mismatch():
             program(dev, k.co, k.asm, k.name)
     finally:
         dev.close()
+
+
+def _gen_fnuz_cvt():
+    from thin import KernelDef
+    from thin.dsl import Args, O, ptr
+
+    def body(b, k):
+        V = b.v  # noqa: N806
+        inp, packed_fp8, packed_bf8, up_fp8, up_bf8 = k.load(
+            "inp", "packed_fp8", "packed_bf8", "up_fp8", "up_bf8"
+        )
+        off16 = V.u32(k.tid * 16, name="off16")
+        off4 = V.u32(k.tid * 4, name="off4")
+        off8 = V.u32(k.tid * 8, name="off8")
+        x = V.f32(n=4, name="x")
+        b.emit(O.global_load(x, off16, inp))
+        b.wait(x, "f32 inputs")
+
+        pf = V.u32(0, name="pf")
+        b.emit(O.op("v_cvt_pk_fp8_f32", pf, x[0], x[1]))
+        b.emit(O.op("v_cvt_pk_fp8_f32", pf, x[2], x[3], op_sel=[0, 0, 1]))
+        b.emit(O.global_store(off4, pf, packed_fp8))
+
+        pb = V.u32(0, name="pb")
+        b.emit(O.op("v_cvt_pk_bf8_f32", pb, x[0], x[1]))
+        b.emit(O.op("v_cvt_pk_bf8_f32", pb, x[2], x[3], op_sel=[0, 0, 1]))
+        b.emit(O.global_store(off4, pb, packed_bf8))
+
+        uf = V.f32(n=2, name="uf")
+        b.emit(O.op("v_cvt_pk_f32_fp8", uf, pf))
+        b.emit(O.global_store(off8, uf, up_fp8))
+
+        ub = V.f32(name="ub")
+        b.emit(O.op("v_cvt_f32_bf8", ub, pb))
+        b.emit(O.global_store(off4, ub, up_bf8))
+
+    return KernelDef(
+        "gfx942_fnuz_cvt",
+        Args(inp=ptr, packed_fp8=ptr, packed_bf8=ptr, up_fp8=ptr, up_bf8=ptr),
+        body,
+        wgsize=64,
+        max_grid=(1,),
+    )
+
+
+def test_gfx942_fnuz_fp8_and_bf8_conversions_end_to_end():
+    import thin
+    from thin import formats
+    from thin.target import targeting
+
+    with targeting("gfx942"):
+        k = thin.compile(_gen_fnuz_cvt)
+
+    specials = np.array(
+        [
+            0.0,
+            -0.0,
+            -1e-30,
+            2**-10,
+            -(2**-10),
+            2**-17,
+            1.0,
+            -1.5,
+            240.0,
+            -240.0,
+            248.0,
+            -248.0,
+            57344.0,
+            -57344.0,
+            61440.0,
+            np.inf,
+            -np.inf,
+            np.nan,
+        ],
+        dtype=np.float32,
+    )
+    rng = np.random.default_rng(942)
+    rest = rng.uniform(-300.0, 300.0, 256 - len(specials)).astype(np.float32)
+    inp = np.concatenate([specials, rest])
+    packed_fp8 = np.zeros(64, dtype=np.uint32)
+    packed_bf8 = np.zeros(64, dtype=np.uint32)
+    up_fp8 = np.zeros(128, dtype=np.float32)
+    up_bf8 = np.zeros(64, dtype=np.float32)
+
+    k.bind(
+        (1,),
+        {
+            "inp": inp,
+            "packed_fp8": packed_fp8,
+            "packed_bf8": packed_bf8,
+            "up_fp8": up_fp8,
+            "up_bf8": up_bf8,
+        },
+    ).emulate()
+
+    f8 = formats.DTYPES["e4m3fnuz"]
+    b8 = formats.DTYPES["e5m2fnuz"]
+    want_fp8 = formats.encode(inp, f8, saturate=False).view(np.uint32)
+    want_bf8 = formats.encode(inp, b8, saturate=False).view(np.uint32)
+    assert packed_fp8.tolist() == want_fp8.tolist()
+    assert packed_bf8.tolist() == want_bf8.tolist()
+
+    # Check CDNA3 FNUZ specifics: -0.0 -> 0x00, 240.0 -> 0x7F, 248.0 / +-inf / nan -> 0x80.
+    raw_fp8 = packed_fp8.view(np.uint8)
+    assert raw_fp8[1] == 0x00
+    assert raw_fp8[2] == 0x00
+    assert raw_fp8[8] == 0x7F
+    assert raw_fp8[9] == 0xFF
+    assert raw_fp8[10] == 0x80
+    assert raw_fp8[15] == 0x80
+    assert raw_fp8[16] == 0x80
+    assert raw_fp8[17] == 0x80
+
+    # Unpack of low 2 bytes per lane matches formats.decode, with 0x80 -> DNAN32 (0xFFC00000).
+    low2 = packed_fp8.view(np.uint8).reshape(64, 4)[:, :2].reshape(-1)
+    want_up_fp8 = formats.decode(low2, f8)
+    nan_mask = low2 == 0x80
+    assert np.all(up_fp8.view(np.uint32)[nan_mask] == 0xFFC00000)
+    assert np.array_equal(up_fp8[~nan_mask], want_up_fp8[~nan_mask])
+
+    low1 = packed_bf8.view(np.uint8).reshape(64, 4)[:, 0]
+    want_up_bf8 = formats.decode(low1, b8)
+    bnan = low1 == 0x80
+    assert np.all(up_bf8.view(np.uint32)[bnan] == 0xFFC00000)
+    assert np.array_equal(up_bf8[~bnan], want_up_bf8[~bnan])

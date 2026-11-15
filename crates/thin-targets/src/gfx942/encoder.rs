@@ -738,8 +738,8 @@ pub(super) const OPSEL_OPS: [(&str, u32); 28] = [
     ("v_cvt_pk_fp8_f32", 0b1011),
     ("v_cvt_pknorm_i16_f16", 0b1011),
     ("v_cvt_pknorm_u16_f16", 0b1011),
-    ("v_cvt_sr_bf8_f32", 0b1011),
-    ("v_cvt_sr_fp8_f32", 0b1011),
+    ("v_cvt_sr_bf8_f32", 0b1111),
+    ("v_cvt_sr_fp8_f32", 0b1111),
     ("v_div_fixup_f16", 0b1111),
     ("v_fma_f16", 0b1111),
     ("v_mad_f16", 0b1111),
@@ -768,6 +768,14 @@ pub(super) fn opsel_bits(name: &str) -> u32 {
         .map_or(0, |o| o.1)
 }
 
+pub(super) fn opsel_len(name: &str, nsrc: usize) -> usize {
+    if matches!(name, "v_cvt_sr_fp8_f32" | "v_cvt_sr_bf8_f32") {
+        4
+    } else {
+        nsrc + 1
+    }
+}
+
 fn vop3_opsel(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -> Refusal {
     let allowed = opsel_bits(name);
     if allowed == 0 {
@@ -777,14 +785,15 @@ fn vop3_opsel(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -> Refusal 
         return Ok(());
     };
     let nsrc = fields(op, &["src0", "src1", "src2"]).len();
+    let len = opsel_len(name, nsrc);
     let ModValue::List(bits) = given else {
-        return Err(format!("op_sel: a list of {} bits", nsrc + 1));
+        return Err(format!("op_sel: a list of {len} bits"));
     };
-    if bits.len() != nsrc + 1 || bits.iter().any(|b| !(0..=1).contains(b)) {
-        return Err(format!("op_sel: a list of {} bits", nsrc + 1));
+    if bits.len() != len || bits.iter().any(|b| !(0..=1).contains(b)) {
+        return Err(format!("op_sel: a list of {len} bits"));
     }
     let value = bits.iter().enumerate().fold(0u32, |v, (j, b)| {
-        let bit = if j == nsrc { 3 } else { j };
+        let bit = if j + 1 == len && len < 4 { 3 } else { j };
         v | (*b as u32) << bit
     });
     if value & !allowed != 0 {

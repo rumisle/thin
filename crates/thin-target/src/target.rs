@@ -173,6 +173,11 @@ pub trait Hooks: Syntax + Send + Sync {
     fn icache_invalidate(&self) -> Option<crate::IcacheInvalidate> {
         None
     }
+    /// Whether FP8 (`fp8` / `bf8`) instructions use FNUZ (`e4m3fnuz` / `e5m2fnuz`)
+    /// rather than OCP (`e4m3fn` / `e5m2`).
+    fn fnuz_fp8(&self) -> bool {
+        false
+    }
 }
 
 /// What a target module supplies, from which the target is built.

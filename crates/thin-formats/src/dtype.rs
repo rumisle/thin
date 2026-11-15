@@ -9,6 +9,8 @@ pub enum NanKind {
     Ieee,
     /// Only the all-ones magnitude, of either sign.
     AllOnes,
+    /// Only the sign-bit-only pattern (0x80 for 8-bit); 0x00 is unsigned zero.
+    NegZero,
     /// The encoding has no NaN.
     None,
 }
@@ -31,9 +33,14 @@ pub struct Encoding {
 }
 
 impl Encoding {
-    /// The exponent bias, 2^(exp−1) − 1.
+    /// The exponent bias: 2^(exp−1) for FNUZ (`NegZero`), 2^(exp−1) − 1 otherwise.
     pub const fn bias(&self) -> i32 {
-        (1 << (self.exp - 1)) - 1
+        let half = 1 << (self.exp - 1);
+        if matches!(self.nan, NanKind::NegZero) {
+            half
+        } else {
+            half - 1
+        }
     }
 
     /// The magnitude pattern with every exponent and mantissa bit set.
@@ -48,7 +55,7 @@ impl Encoding {
             NanKind::Ieee => ones - (1 << self.man),
             _ if self.inf => ones - (1 << self.man),
             NanKind::AllOnes => ones - 1,
-            NanKind::None => ones,
+            NanKind::NegZero | NanKind::None => ones,
         }
     }
 
@@ -149,7 +156,7 @@ const fn signed(exp: u32, man: u32, inf: bool, nan: NanKind) -> Encoding {
 }
 
 /// Every dtype, in the order of table.
-pub static DTYPES: [Dtype; 13] = [
+pub static DTYPES: [Dtype; 15] = [
     float(
         "f32",
         32,
@@ -189,6 +196,22 @@ pub static DTYPES: [Dtype; 13] = [
         "float8_e5m2",
         (12, 8),
         signed(5, 2, true, NanKind::Ieee),
+    ),
+    float(
+        "e4m3fnuz",
+        8,
+        "uint8",
+        "float8_e4m3fnuz",
+        (11, 8),
+        signed(4, 3, false, NanKind::NegZero),
+    ),
+    float(
+        "e5m2fnuz",
+        8,
+        "uint8",
+        "float8_e5m2fnuz",
+        (13, 8),
+        signed(5, 2, false, NanKind::NegZero),
     ),
     float(
         "e2m1",
@@ -257,8 +280,14 @@ mod tests {
     #[test]
     fn max_follows_max_bits() {
         assert_eq!(enc("e4m3fn").max(), 448.0);
+        assert_eq!(enc("e4m3fnuz").max(), 240.0);
+        assert_eq!(enc("e4m3fnuz").bias(), 8);
+        assert_eq!(enc("e4m3fnuz").max_bits(), 0x7F);
         assert_eq!(enc("e2m1").max(), 6.0);
         assert_eq!(enc("e5m2").max(), 57344.0);
+        assert_eq!(enc("e5m2fnuz").max(), 57344.0);
+        assert_eq!(enc("e5m2fnuz").bias(), 16);
+        assert_eq!(enc("e5m2fnuz").max_bits(), 0x7F);
         assert_eq!(enc("f32").max(), f64::from(f32::MAX));
         assert_eq!(enc("f16").max(), 65504.0);
         assert_eq!(enc("e8m0").max(), 2f64.powi(127));

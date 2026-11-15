@@ -90,7 +90,7 @@ class Encoding:
     """Whether it has +-inf."""
 
     nan: str
-    """The NaN kind: ``"IEEE"``, ``"ALL_ONES"`` or ``"none"``."""
+    """The NaN kind: ``"IEEE"``, ``"ALL_ONES"``, ``"NEG_ZERO"`` or ``"none"``."""
 
     signed: bool
     """Whether it has a sign bit."""
@@ -99,7 +99,7 @@ class Encoding:
     """Whether exponent field 0 holds subnormals."""
 
     bias: int
-    """2^(exp-1) - 1."""
+    """Exponent bias: 2^(exp-1) for FNUZ, 2^(exp-1) - 1 otherwise."""
 
     max_bits: int
     """The magnitude pattern of the largest finite value."""

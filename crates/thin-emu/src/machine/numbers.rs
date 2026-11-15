@@ -240,6 +240,10 @@ pub enum Small {
     E4M3,
     /// e5m2: IEEE-like.
     E5M2,
+    /// e4m3fnuz: CDNA3 FNUZ (bias 8, max 240, 0x00 zero, 0x80 NaN, no infinity).
+    E4M3Fnuz,
+    /// e5m2fnuz: CDNA3 FNUZ (bias 16, max 57344, 0x00 zero, 0x80 NaN, no infinity).
+    E5M2Fnuz,
     /// e2m1: no NaN, no infinity.
     E2M1,
     /// e2m3.
@@ -249,11 +253,13 @@ pub enum Small {
 }
 
 impl Small {
-    /// The format of a name (`e4m3`, `e5m2`, `e2m1`, `e2m3`, `e3m2`).
+    /// The format of a name (`e4m3`, `e5m2`, `e4m3fnuz`, `e5m2fnuz`, `e2m1`, `e2m3`, `e3m2`).
     pub fn named(s: &str) -> Option<Small> {
         Some(match s {
             "e4m3" => Small::E4M3,
             "e5m2" => Small::E5M2,
+            "e4m3fnuz" => Small::E4M3Fnuz,
+            "e5m2fnuz" => Small::E5M2Fnuz,
             "e2m1" => Small::E2M1,
             "e2m3" => Small::E2M3,
             "e3m2" => Small::E3M2,
@@ -266,6 +272,8 @@ impl Small {
         match self {
             Small::E4M3 => (3, -6, 7, 448.0, 4),
             Small::E5M2 => (2, -14, 15, 57344.0, 5),
+            Small::E4M3Fnuz => (3, -7, 8, 240.0, 4),
+            Small::E5M2Fnuz => (2, -15, 16, 57344.0, 5),
             Small::E2M1 => (1, 0, 1, 6.0, 2),
             Small::E2M3 => (3, 0, 1, 7.5, 2),
             Small::E3M2 => (2, -2, 3, 28.0, 3),
@@ -282,6 +290,7 @@ impl Small {
         let (exp, man) = ((mag >> mb) as i32, f64::from(mag & ((1 << mb) - 1)));
         match self {
             Small::E4M3 if mag == 0x7F => return f64::NAN,
+            Small::E4M3Fnuz | Small::E5M2Fnuz if code == 0x80 => return f64::NAN,
             Small::E5M2 if exp == 31 => {
                 return if man == 0.0 {
                     sign * f64::INFINITY
@@ -326,6 +335,7 @@ pub fn floor_log2(a: f64) -> i32 {
 pub fn down(x: f64, scale: u32, fmt: Small) -> u32 {
     let (mb, emin, bias, max, eb) = fmt.params();
     let e = scale_e(scale);
+    let fnuz = matches!(fmt, Small::E4M3Fnuz | Small::E5M2Fnuz);
     let sign = if x.is_sign_negative() {
         1 << (mb + eb)
     } else {
@@ -335,6 +345,7 @@ pub fn down(x: f64, scale: u32, fmt: Small) -> u32 {
         return match fmt {
             Small::E4M3 => 0xFF,
             Small::E5M2 => 0xFE,
+            Small::E4M3Fnuz | Small::E5M2Fnuz => 0x80,
             _ => sign | fmt.largest(),
         };
     }
@@ -347,20 +358,26 @@ pub fn down(x: f64, scale: u32, fmt: Small) -> u32 {
         let step = 2f64.powi(lead.max(emin) - mb);
         (a / step).round_ties_even() * step
     };
-    let code = if r > max {
-        match fmt {
-            Small::E4M3 => 0x7F,
-            Small::E5M2 => 0x7C,
-            _ => fmt.largest(),
-        }
-    } else if r < 2f64.powi(emin) {
+    if r > max {
+        return match fmt {
+            Small::E4M3 => 0x7F | sign,
+            Small::E5M2 => 0x7C | sign,
+            Small::E4M3Fnuz | Small::E5M2Fnuz => 0x80,
+            _ => fmt.largest() | sign,
+        };
+    }
+    let code = if r < 2f64.powi(emin) {
         (r / 2f64.powi(emin - mb)) as u32
     } else {
         let ex = floor_log2(r);
         let man = ((r / 2f64.powi(ex) - 1.0) * 2f64.powi(mb)) as u32;
         (((ex + bias) as u32) << mb) | man
     };
-    code | sign
+    if code == 0 && fnuz {
+        0
+    } else {
+        code | sign
+    }
 }
 
 /// The exact value of a code times its scale, NaN as NaN.

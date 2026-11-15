@@ -33,6 +33,7 @@ fn decode_one(p: u32, dtype: &Dtype, enc: &Encoding) -> u32 {
         }
         NanKind::Ieee if all_ones_exponent => return sign | QUIET_NAN,
         NanKind::AllOnes if magnitude == enc.ones() => return sign | QUIET_NAN,
+        NanKind::NegZero if sign != 0 && magnitude == 0 => return QUIET_NAN,
         _ => {}
     }
     if exponent != 0 {
@@ -134,6 +135,15 @@ mod tests {
         assert_eq!(one(0x7D, "e5m2").unwrap(), 0x7FC0_0000);
         assert_eq!(one(0xFC, "e5m2").unwrap(), 0xFF80_0000);
         assert_eq!(one(0xFF, "e8m0").unwrap(), 0x7FC0_0000);
+        assert_eq!(one(0x80, "e4m3fnuz").unwrap(), 0x7FC0_0000);
+        assert_eq!(one(0x80, "e5m2fnuz").unwrap(), 0x7FC0_0000);
+        assert_eq!(one(0x00, "e4m3fnuz").unwrap(), 0x0000_0000);
+        assert_eq!(one(0x7F, "e4m3fnuz").unwrap(), 240f32.to_bits());
+        assert_eq!(one(0xFF, "e4m3fnuz").unwrap(), (-240f32).to_bits());
+        assert_eq!(one(0x01, "e4m3fnuz").unwrap(), 2f32.powi(-10).to_bits());
+        assert_eq!(one(0x7F, "e5m2fnuz").unwrap(), 57344f32.to_bits());
+        assert_eq!(one(0xFF, "e5m2fnuz").unwrap(), (-57344f32).to_bits());
+        assert_eq!(one(0x01, "e5m2fnuz").unwrap(), 2f32.powi(-17).to_bits());
     }
 
     #[test]

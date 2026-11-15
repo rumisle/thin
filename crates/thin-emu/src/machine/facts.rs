@@ -53,6 +53,8 @@ pub struct Facts {
     pub ns: usize,
     /// Whether there is an `a` file.
     pub has_a: bool,
+    /// Whether `fp8` / `bf8` ops use FNUZ (`e4m3fnuz` / `e5m2fnuz`).
+    pub fnuz_fp8: bool,
     /// The counter vector-memory stores count on: their own, or the
     /// loads' when one counter counts both.
     pub store_counter: usize,
@@ -197,6 +199,7 @@ impl Facts {
             w: def.wave as usize,
             ns: ns as usize,
             has_a: target.file('a').is_some(),
+            fnuz_fp8: hooks.fnuz_fp8(),
             store_counter,
             waits,
             barrier,

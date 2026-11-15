@@ -1034,7 +1034,7 @@ fn valu_inner(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result
             cmpx(wv, ins, c)?;
         }
         c if c.starts_with("v.cvt.") => {
-            return super::cvt::cvt(wv, ins, c);
+            return super::cvt::cvt(wv, ins, c, e.facts.fnuz_fp8);
         }
         c => {
             let Some(name) = c.strip_prefix("v.").and_then(|r| r.strip_suffix(".f32")) else {

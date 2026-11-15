@@ -603,7 +603,7 @@
     "case_": "an unknown dtype",
     "call": "r = facts(Out(\"bf8\", 2))",
     "refused": "ValueError",
-    "message": "dtype 'bf8': one of ['bf16', 'e2m1', 'e2m3', 'e3m2', 'e4m3fn', 'e5m2', 'e8m0', 'f16', 'f32', 'i8', 'u32', 'u64', 'u8']"
+    "message": "dtype 'bf8': one of ['bf16', 'e2m1', 'e2m3', 'e3m2', 'e4m3fn', 'e4m3fnuz', 'e5m2', 'e5m2fnuz', 'e8m0', 'f16', 'f32', 'i8', 'u32', 'u64', 'u8']"
    },
    {
     "case_": "the shape as one list",

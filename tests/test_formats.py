@@ -168,9 +168,83 @@ E4M3, E2M1, BF16, F16 = (DTYPES[n] for n in ("e4m3fn", "e2m1", "bf16", "f16"))
 def test_dtype_records():
     assert repr(BF16) == "bf16" and BF16.torch == "bfloat16" and BF16.dlpack == (4, 16)
     assert (E4M3.encoding.max, E2M1.encoding.max) == (448.0, 6.0)
+    f8 = DTYPES["e4m3fnuz"]
+    b8 = DTYPES["e5m2fnuz"]
+    assert (f8.torch, f8.dlpack, f8.encoding.nan, f8.encoding.inf) == (
+        "float8_e4m3fnuz",
+        (11, 8),
+        "NEG_ZERO",
+        False,
+    )
+    assert (f8.encoding.bias, f8.encoding.max_bits, f8.encoding.max) == (8, 0x7F, 240.0)
+    assert (b8.torch, b8.dlpack, b8.encoding.nan, b8.encoding.inf) == (
+        "float8_e5m2fnuz",
+        (13, 8),
+        "NEG_ZERO",
+        False,
+    )
+    assert (b8.encoding.bias, b8.encoding.max_bits, b8.encoding.max) == (16, 0x7F, 57344.0)
     assert DTYPES["u8"].encoding is None
     with pytest.raises(AttributeError):
         BF16.name = "x"
+
+
+def test_fnuz_encode_and_decode():
+    f8, b8 = DTYPES["e4m3fnuz"], DTYPES["e5m2fnuz"]
+    xs = np.array(
+        [
+            0.0,
+            -0.0,
+            -1e-30,
+            2**-10,
+            -(2**-10),
+            1.0,
+            240.0,
+            -240.0,
+            248.0,
+            -248.0,
+            np.inf,
+            -np.inf,
+            np.nan,
+        ],
+        dtype=np.float32,
+    )
+    nosat = formats.encode(xs, f8, saturate=False).tolist()
+    sat = formats.encode(xs, f8, saturate=True).tolist()
+    assert nosat == [0x00, 0x00, 0x00, 0x01, 0x81, 0x40, 0x7F, 0xFF, 0x80, 0x80, 0x80, 0x80, 0x80]
+    assert sat == [0x00, 0x00, 0x00, 0x01, 0x81, 0x40, 0x7F, 0xFF, 0x7F, 0xFF, 0x7F, 0xFF, 0x80]
+    dec = formats.decode(np.array([0x00, 0x80, 0x01, 0x7F, 0xFF], dtype=np.uint8), f8)
+    assert dec.view(np.uint32)[1] == 0x7FC00000
+    assert dec[[0, 2, 3, 4]].tolist() == [0.0, 2**-10, 240.0, -240.0]
+
+    bxs = np.array(
+        [0.0, -0.0, -1e-30, 2**-17, 57344.0, -57344.0, 61440.0, -np.inf, np.nan], np.float32
+    )
+    assert formats.encode(bxs, b8, saturate=False).tolist() == [
+        0x00,
+        0x00,
+        0x00,
+        0x01,
+        0x7F,
+        0xFF,
+        0x80,
+        0x80,
+        0x80,
+    ]
+    assert formats.encode(bxs, b8, saturate=True).tolist() == [
+        0x00,
+        0x00,
+        0x00,
+        0x01,
+        0x7F,
+        0xFF,
+        0x7F,
+        0xFF,
+        0x80,
+    ]
+    bdec = formats.decode(np.array([0x00, 0x80, 0x01, 0x7F, 0xFF], dtype=np.uint8), b8)
+    assert bdec.view(np.uint32)[1] == 0x7FC00000
+    assert bdec[[0, 2, 3, 4]].tolist() == [0.0, 2**-17, 57344.0, -57344.0]
 
 
 @pytest.mark.parametrize(
@@ -404,7 +478,13 @@ def test_torch_encode_equals_numpy(torch, device):
     noise = rng.integers(0, 1 << 32, 1 << 16, dtype=np.uint64).astype(np.uint32).view(np.float32)
     x = np.concatenate([f32(doc["inputs_f32_hex"]), noise])[: 1 << 16].reshape(256, 256)
     tensor = torch.from_numpy(x).to(device)
-    for case in doc["cases"]:
+    for case in [
+        *doc["cases"],
+        {"dtype": "e4m3fnuz", "kwargs": {"saturate": False}},
+        {"dtype": "e4m3fnuz", "kwargs": {"saturate": True}},
+        {"dtype": "e5m2fnuz", "kwargs": {"saturate": False}},
+        {"dtype": "e5m2fnuz", "kwargs": {"saturate": True}},
+    ]:
         dtype = DTYPES[case["dtype"]]
         want = formats.encode(x, dtype, **case["kwargs"])
         got = formats.encode(tensor, dtype, **case["kwargs"])
@@ -424,7 +504,19 @@ def test_torch_encode_takes_narrow_floats(torch, device, source):
 
 @pytest.mark.parametrize("device", _devices())
 def test_torch_decode_equals_numpy(torch, device):
-    for name in ("e4m3fn", "e5m2", "e2m1", "e2m3", "e3m2", "e8m0", "bf16", "f16", "f32"):
+    for name in (
+        "e4m3fn",
+        "e5m2",
+        "e4m3fnuz",
+        "e5m2fnuz",
+        "e2m1",
+        "e2m3",
+        "e3m2",
+        "e8m0",
+        "bf16",
+        "f16",
+        "f32",
+    ):
         dtype = DTYPES[name]
         patterns = np.arange(min(1 << dtype.width, 1 << 16), dtype=np.uint32)
         bits = patterns.astype(dtype.numpy) if dtype.width < 32 else patterns.view(np.float32)

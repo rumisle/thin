@@ -44,6 +44,7 @@ fn dtypes() -> Vec<DtypeRow> {
         let nan = match e.nan {
             N::Ieee => "IEEE",
             N::AllOnes => "ALL_ONES",
+            N::NegZero => "NEG_ZERO",
             N::None => "none",
         };
         let facts = (e.bias(), e.max_bits(), e.max());

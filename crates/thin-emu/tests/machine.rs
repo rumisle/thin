@@ -596,3 +596,60 @@ fn a_hog_runs_l2_0_first_and_ends_when_nothing_else_can_dispatch() {
     let plain = ticket_order(&[1], 1, 16, 8, Options::default());
     assert_eq!(plain, (0..16).map(|x| tag(0, 0, x)).collect::<Vec<_>>());
 }
+
+#[test]
+fn fnuz_fp8_conversions_follow_target_hook() {
+    let fnuz_target = thin_targets::names()
+        .iter()
+        .map(|n| thin_targets::get(n).unwrap())
+        .find(|t| t.hooks().fnuz_fp8())
+        .expect("a target with fnuz_fp8");
+    let fnuz_facts = Facts::of(fnuz_target);
+    assert!(fnuz_facts.fnuz_fp8);
+    assert!(!facts().fnuz_fp8);
+
+    let run = |f: Facts| {
+        let p = program(
+            vec![
+                mk("v.cvt.pk.fp8.f32", "valu", &["v0", "v1", "v2"], &[]),
+                mk(
+                    "v.cvt.pk.fp8.f32",
+                    "valu",
+                    &["v0", "v3", "v4"],
+                    &[("op_sel", Field::List(vec![0, 0, 1]))],
+                ),
+                mk("v.cvt.f32.fp8", "valu", &["v5", "v0"], &[]),
+                mk("v.cvt.pk.bf8.f32", "valu", &["v6", "v7", "v8"], &[]),
+            ],
+            &[],
+        );
+        let mut m = Machine::new(p, f, 16, 0, 0).unwrap();
+        let mut mem = Memory::default();
+        let mut tables = Tables::default();
+        let (mut ws, _) = m
+            .run_wg(
+                &mut mem,
+                &mut tables,
+                0,
+                (0, 0),
+                1,
+                0,
+                Some(&mut |w| {
+                    w.v[w.w] = (-0.0f32).to_bits(); // v1 lane 0: -0.0
+                    w.v[2 * w.w] = 240.0f32.to_bits(); // v2 lane 0: 240.0
+                    w.v[3 * w.w] = 248.0f32.to_bits(); // v3 lane 0: 248.0 (overflow on FNUZ)
+                    w.v[4 * w.w] = f32::INFINITY.to_bits(); // v4 lane 0: +inf
+                    w.v[7 * w.w] = f32::INFINITY.to_bits(); // v7 lane 0: +inf
+                    w.v[8 * w.w] = (-0.0f32).to_bits(); // v8 lane 0: -0.0
+                }),
+            )
+            .unwrap();
+        let w = ws.remove(0);
+        (w.v[0], w.v[5 * w.w], w.v[6 * w.w] & 0xFFFF)
+    };
+
+    // FNUZ: [-0.0, 240.0, 248.0, +inf] -> [0x00, 0x7F, 0x80, 0x80]; bf8 [+inf, -0.0] -> [0x80, 0x00].
+    assert_eq!(run(fnuz_facts), (0x8080_7F00, 0.0f32.to_bits(), 0x0080));
+    // OCP:  [-0.0, 240.0, 248.0, +inf] -> [0x80, 0x77, 0x78, 0x7F]; bf8 [+inf, -0.0] -> [0x7C, 0x80].
+    assert_eq!(run(facts()), (0x7F78_7780, (-0.0f32).to_bits(), 0x807C));
+}

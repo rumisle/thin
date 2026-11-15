@@ -9,10 +9,12 @@ use crate::{EmuError, Ins};
 /// The scale exponent 1.0 has.
 const ONE: u32 = 0x3F80_0000;
 
-fn small(name: &str) -> Option<Small> {
-    Some(match name {
-        "fp8" => Small::E4M3,
-        "bf8" => Small::E5M2,
+fn small(name: &str, fnuz: bool) -> Option<Small> {
+    Some(match (name, fnuz) {
+        ("fp8", false) => Small::E4M3,
+        ("bf8", false) => Small::E5M2,
+        ("fp8", true) => Small::E4M3Fnuz,
+        ("bf8", true) => Small::E5M2Fnuz,
         _ => return None,
     })
 }
@@ -27,7 +29,7 @@ fn put_byte(d: u32, k: usize, b: u32) -> u32 {
 
 /// Runs a conversion; `Ok(false)` when `canon` is not one.
 #[allow(clippy::too_many_lines)]
-pub fn cvt(wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, EmuError> {
+pub fn cvt(wv: &mut Wave, ins: &Ins, canon: &str, fnuz: bool) -> Result<bool, EmuError> {
     let w = wv.w;
     let ops = &ins.operands;
     let exec = wv.exec;
@@ -105,7 +107,7 @@ pub fn cvt(wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, EmuError> {
             wv.vwrite(&ops[0], 0, &out, tagged.then_some(t.as_slice()), exec)?;
         }
         "f32.fp8" | "f32.bf8" => {
-            let fmt = small(&name[4..]).unwrap_or(Small::E4M3);
+            let fmt = small(&name[4..], fnuz).unwrap_or(Small::E4M3);
             let x = wv.vread(arg(1)?, 0)?;
             let mut t = vec![[0; 4]; w];
             for l in 0..w {
@@ -115,7 +117,7 @@ pub fn cvt(wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, EmuError> {
             wv.vwrite(&ops[0], 0, &out, x.tagged.then_some(t.as_slice()), exec)?;
         }
         "pk.f32.fp8" | "pk.f32.bf8" => {
-            let fmt = small(&name[7..]).unwrap_or(Small::E4M3);
+            let fmt = small(&name[7..], fnuz).unwrap_or(Small::E4M3);
             let x = wv.vread(arg(1)?, 0)?;
             for d in 0..2 {
                 let mut t = vec![[0; 4]; w];
@@ -133,7 +135,7 @@ pub fn cvt(wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, EmuError> {
             }
         }
         "pk.fp8.f32" | "pk.bf8.f32" => {
-            let fmt = small(&name[3..6]).unwrap_or(Small::E4M3);
+            let fmt = small(&name[3..6], fnuz).unwrap_or(Small::E4M3);
             let (x, y, old) = (
                 wv.vread(arg(1)?, 0)?,
                 wv.vread(arg(2)?, 0)?,
