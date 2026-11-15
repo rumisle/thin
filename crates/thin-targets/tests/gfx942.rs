@@ -330,37 +330,235 @@ fn cdna3_hazard_rules_insert_required_wait_states() {
     let t = thin_targets::get(ARCH).unwrap();
     let model = thin_targets::hazards(ARCH).unwrap();
 
-    // 1. v_accvgpr_write_b32 -> MFMA reading same AGPR requires 2 wait states (s_nop 1)
-    // 2. 4-pass MFMA -> v_accvgpr_read_b32 reading written AGPR requires 18 wait states (s_nop 17)
-    let mfma_lines = [
-        "v_accvgpr_write_b32 a0, 0",
-        "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
-        "v_accvgpr_read_b32 v6, a0",
-    ];
-    let snap =
-        thin_test_support::asm::snapshot(t, thin_test_support::asm::read(t, &mfma_lines).unwrap());
-    let needs = thin_passes::hazards::needs(&snap, model);
-    assert_eq!(needs[0].states, 0);
-    assert_eq!(needs[1].states, 2);
-    assert_eq!(needs[2].states, 18);
+    let states_of = |lines: &[&str]| -> Vec<u32> {
+        let snap =
+            thin_test_support::asm::snapshot(t, thin_test_support::asm::read(t, lines).unwrap());
+        thin_passes::hazards::needs(&snap, model)
+            .into_iter()
+            .map(|n| n.states)
+            .collect()
+    };
 
-    // 3. SALU writing M0 -> DS reading M0 (`ds_add_u32` / `global_load_lds_dword`) requires 1 state
-    let m0_lines = ["s_mov_b32 m0, 0", "global_load_lds_dword v0, s[0:1]"];
-    let snap_m0 =
-        thin_test_support::asm::snapshot(t, thin_test_support::asm::read(t, &m0_lines).unwrap());
-    let needs_m0 = thin_passes::hazards::needs(&snap_m0, model);
-    assert_eq!(needs_m0[1].states, 1);
+    // 1. VALU -> MFMA requires 2 wait states (s_nop 1);
+    //    4-pass XDL (`16x16x16_f16`) -> VALU requires `4 + 3 = 7` wait states (`s_nop 6`).
+    assert_eq!(
+        states_of(&[
+            "v_accvgpr_write_b32 a0, 0",
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+        ]),
+        [0, 2, 7]
+    );
 
-    // 4. VALU writing SGPR (`v_readfirstlane_b32` / `v_cmp_*_e64`) -> VMEM reading SADDR requires 5 states
-    let saddr_lines = [
-        "v_readfirstlane_b32 s4, v0",
-        "v_readfirstlane_b32 s5, v1",
-        "global_load_dword v2, v0, s[4:5]",
+    // 2. Pass-count scaling across XDL (2/4/8/16-pass -> p+3), SMFMA (2/8/16-pass -> p+2),
+    //    SMFMAC (4/8-pass -> p+3), and DGEMM (4/8-pass -> 6/11 for VALU, 9/18 for VMEM/DS).
+    let raw_valu_cases: &[(&str, &str, u32)] = &[
+        // XDL: 2 -> 5, 4 -> 7, 8 -> 11, 16 -> 19
+        (
+            "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+            5,
+        ),
+        (
+            "v_mfma_f32_16x16x32_fp8_fp8 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+            7,
+        ),
+        (
+            "v_mfma_f32_32x32x8_f16 a[0:15], v[2:3], v[4:5], a[0:15]",
+            "v_accvgpr_read_b32 v6, a0",
+            11,
+        ),
+        (
+            "v_mfma_f32_32x32x4_2b_f16 a[0:31], v[2:3], v[4:5], a[0:31]",
+            "v_accvgpr_read_b32 v6, a0",
+            19,
+        ),
+        // Sparse XDL (SMFMAC): 4 -> 7, 8 -> 11
+        (
+            "v_smfmac_f32_16x16x32_f16 a[0:3], v[2:3], v[4:7], v8",
+            "v_accvgpr_read_b32 v6, a0",
+            7,
+        ),
+        (
+            "v_smfmac_f32_32x32x16_bf16 a[0:15], v[2:3], v[4:7], v8",
+            "v_accvgpr_read_b32 v6, a0",
+            11,
+        ),
+        // SMFMA (`f32` SGEMM): 2 -> 4, 8 -> 10, 16 -> 18
+        (
+            "v_mfma_f32_4x4x1_16b_f32 a[0:3], v2, v3, a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+            4,
+        ),
+        (
+            "v_mfma_f32_16x16x4_f32 a[0:3], v2, v3, a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+            10,
+        ),
+        (
+            "v_mfma_f32_32x32x2_f32 a[0:15], v2, v3, a[0:15]",
+            "v_accvgpr_read_b32 v6, a0",
+            18,
+        ),
+        // DGEMM (`f64`): VALU = 6 / 11, VMEM/DS = 9 / 18, `v_fma_f64` = 2
+        (
+            "v_mfma_f64_4x4x4_4b_f64 a[0:1], v[2:3], v[4:5], a[0:1]",
+            "v_accvgpr_read_b32 v6, a0",
+            6,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "v_accvgpr_read_b32 v6, a0",
+            11,
+        ),
+        (
+            "v_mfma_f64_4x4x4_4b_f64 a[0:1], v[2:3], v[4:5], a[0:1]",
+            "global_store_dwordx2 v0, a[0:1], s[0:1]",
+            9,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "global_store_dwordx4 v0, a[0:3], s[0:1]",
+            18,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "v_fma_f64 v[8:9], v[10:11], v[12:13], v[14:15]",
+            2,
+        ),
     ];
-    let snap_saddr =
-        thin_test_support::asm::snapshot(t, thin_test_support::asm::read(t, &saddr_lines).unwrap());
-    let needs_saddr = thin_passes::hazards::needs(&snap_saddr, model);
-    assert_eq!(needs_saddr[2].states, 5);
+    for &(prod, cons, expected) in raw_valu_cases {
+        assert_eq!(states_of(&[prod, cons]), [0, expected], "{prod} -> {cons}");
+    }
+
+    // 3. Accumulator (`SrcC`) forwarding vs cross-opcode / partial-overlap / 2-pass / SrcA-B / WAR / WAW:
+    // Same-op full-reg accumulation on >=4-pass XDL, SMFMAC, SMFMA, and 8-pass DGEMM needs 0 states.
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[6:7], v[8:9], a[0:3]",
+        ]),
+        [0, 0]
+    );
+    assert_eq!(
+        states_of(&[
+            "v_smfmac_f32_16x16x32_f16 a[0:3], v[2:3], v[4:7], v8",
+            "v_smfmac_f32_16x16x32_f16 a[0:3], v[10:11], v[12:15], v9",
+        ]),
+        [0, 0]
+    );
+    // 2-pass (`4x4`) same-op full SrcC requires 2 states; `4x4_f64` requires 4 states.
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[6:7], v[8:9], a[0:3]",
+        ]),
+        [0, 2]
+    );
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f64_4x4x4_4b_f64 a[0:1], v[2:3], v[4:5], a[0:1]",
+            "v_mfma_f64_4x4x4_4b_f64 a[0:1], v[6:7], v[8:9], a[0:1]",
+        ]),
+        [0, 4]
+    );
+    // Cross-opcode XDL -> XDL SrcC (`p + 1`) and partial-overlap `32x32 -> 16x16` SrcC (`8 + 1 = 9`).
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_mfma_f32_16x16x16_bf16 a[0:3], v[6:7], v[8:9], a[0:3]",
+        ]),
+        [0, 5]
+    );
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_32x32x8_f16 a[0:15], v[2:3], v[4:5], a[0:15]",
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[6:7], v[8:9], a[0:3]",
+        ]),
+        [0, 9]
+    );
+    // Reading MFMA VGPR dst as SMFMAC sparse index (`ops[3]`) is a non-SrcC read (`4 + 3 = 7`).
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_16x16x16_f16 v[8:11], v[2:3], v[4:5], v[8:11]",
+            "v_smfmac_f32_16x16x32_f16 a[0:3], v[2:3], v[4:7], v8",
+        ]),
+        [0, 7]
+    );
+    // Late SrcC read WAR (`p - 1` on XDL = 3 for 4-pass, 7 for 8-pass; 0 on SMFMA/DGEMM).
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[8:11]",
+            "v_accvgpr_write_b32 a8, v0",
+        ]),
+        [0, 3]
+    );
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_32x32x8_f16 a[0:15], v[2:3], v[4:5], a[16:31]",
+            "v_accvgpr_write_b32 a16, v0",
+        ]),
+        [0, 7]
+    );
+    assert_eq!(
+        states_of(&[
+            "v_mfma_f32_16x16x4_f32 a[0:3], v2, v3, a[8:11]",
+            "v_accvgpr_write_b32 a8, v0",
+        ]),
+        [0, 0]
+    );
+
+    // 4. `apply` chunks >16 wait states into hardware-legal `s_nop 15` + remainder (`16 + 3 = 19`).
+    let snap19 = thin_test_support::asm::snapshot(
+        t,
+        thin_test_support::asm::read(
+            t,
+            &[
+                "v_mfma_f32_32x32x4_2b_f16 a[0:31], v[2:3], v[4:5], a[0:31]",
+                "v_accvgpr_read_b32 v6, a0",
+                "s_endpgm",
+            ],
+        )
+        .unwrap(),
+    );
+    let placed: Vec<_> =
+        thin_passes::hazards::apply(&snap19, &thin_passes::hazards::needs(&snap19, model))
+            .into_iter()
+            .map(|p| p.0)
+            .collect();
+    let spelled: Vec<_> = placed
+        .iter()
+        .map(|i| thin_test_support::asm::spell(&snap19, i))
+        .collect();
+    assert_eq!(
+        spelled,
+        [
+            "v_mfma_f32_32x32x4_2b_f16 a[0:31], v[2:3], v[4:5], a[0:31]",
+            "s_nop 15",
+            "s_nop 2",
+            "v_accvgpr_read_b32 v6, a0",
+            "s_endpgm",
+        ]
+    );
+    let placed_snap = thin_test_support::asm::snapshot(t, placed);
+    assert!(thin_passes::hazards::clear(&placed_snap, model).is_ok());
+
+    // 5. SALU writing M0 -> DS/VMEM reading M0 (`global_load_lds_dword`) requires 1 state.
+    assert_eq!(
+        states_of(&["s_mov_b32 m0, 0", "global_load_lds_dword v0, s[0:1]"]),
+        [0, 1]
+    );
+
+    // 6. VALU writing SGPR (`v_readfirstlane_b32`) -> VMEM reading SADDR requires 5 states.
+    assert_eq!(
+        states_of(&[
+            "v_readfirstlane_b32 s4, v0",
+            "v_readfirstlane_b32 s5, v1",
+            "global_load_dword v2, v0, s[4:5]",
+        ]),
+        [0, 0, 5]
+    );
 }
 
 #[test]

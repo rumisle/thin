@@ -1227,6 +1227,217 @@ def test_gfx942_dsl_high_level_mfma_agpr_and_vgpr(tmp_path):
         thin.use_store(before_s)
 
 
+def test_gfx942_pass_aware_mfma_hazards() -> None:
+    """Compiled gfx942 kernels insert exact pass-count-aware MFMA wait states matching llc."""
+    import thin
+    from thin.target import targeting
+
+    before_s = thin.use_store(None)
+    try:
+        with targeting("gfx942"):
+
+            def make_hazard_probe(form: str, src_words: int):
+                from thin import KernelDef
+                from thin.dsl import Args, O, ptr
+
+                def body(b, k):
+                    V = b.v  # noqa: N806
+                    a_ptr, b_ptr, out_ptr = k.load()
+                    lane = V.u32(k.tid, name="lane")
+                    a0 = V.u32(n=src_words) if src_words > 1 else V.u32()
+                    b0 = V.u32(n=src_words) if src_words > 1 else V.u32()
+                    a1 = V.u32(n=src_words) if src_words > 1 else V.u32()
+                    b1 = V.u32(n=src_words) if src_words > 1 else V.u32()
+                    b.emit(O.global_load(a0, V.u32(lane * (4 * src_words)), a_ptr))
+                    b.emit(O.global_load(b0, V.u32(lane * (4 * src_words)), b_ptr))
+                    b.emit(O.global_load(a1, V.u32(lane * (4 * src_words)), a_ptr, offset=256))
+                    b.emit(O.global_load(b1, V.u32(lane * (4 * src_words)), b_ptr, offset=256))
+                    b.wait(a0, b0, a1, b1, comment="ready")
+                    acc = b.mfma(form, a0, b0, 0, acc="a")
+                    b.mfma(form, a1, b1, acc, dst=acc)
+                    v_out = b.read_acc(acc)
+                    b.emit(O.global_store(V.u32(lane * 4), v_out[0], out_ptr))
+
+                return KernelDef(
+                    f"hz_{form}",
+                    Args(a=ptr, b=ptr, out=ptr),
+                    body,
+                    wgsize=64,
+                    max_grid=(1,),
+                )
+
+            def body_ins(asm: str) -> list[str]:
+                return [
+                    ln.strip().split("//")[0].split(";")[0].strip()
+                    for ln in asm.splitlines()
+                    if ln.startswith("\t") and not ln.strip().startswith((".", ";", "//"))
+                ]
+
+            def check_probe(form: str, src_words: int, expected_tail: list[str]) -> None:
+                kern = thin.compile(make_hazard_probe, form=form, src_words=src_words)
+                ins = body_ins(kern.asm)
+                mfmas = [i for i, ln in enumerate(ins) if ln.startswith(f"v_mfma_{form}")]
+                assert len(mfmas) == 2
+                # Same-op full-register accumulation takes 0 wait states
+                assert ins[mfmas[0] + 1 : mfmas[1]] == []
+                first_read = next(
+                    i
+                    for i in range(mfmas[1] + 1, len(ins))
+                    if ins[i].startswith("v_accvgpr_read_b32")
+                )
+                assert ins[mfmas[1] + 1 : first_read] == expected_tail
+
+            # 4-pass XDL -> `s_nop 6` (7 states); 8-pass XDL -> `s_nop 10` (11 states);
+            # 16-pass SMFMA -> chunked `s_nop 15` + `s_nop 1` (18 states)
+            check_probe("f32_16x16x16_f16", 2, ["s_nop 6"])
+            check_probe("f32_32x32x8_f16", 2, ["s_nop 10"])
+            check_probe("f32_32x32x2_f32", 1, ["s_nop 15", "s_nop 1"])
+    finally:
+        thin.use_store(before_s)
+
+
+def test_gfx942_cdna3_scalar_exec_partial_and_setreg_hazards() -> None:
+    """CDNA3 Table 11 / GCNHazardRecognizer wait states on VCC, RWLane, EXEC, PartialDst, setreg."""
+    import thin
+    from thin.target import targeting
+
+    def body_ins(asm: str) -> list[str]:
+        return [
+            ln.strip().split("//")[0].split(";")[0].strip()
+            for ln in asm.splitlines()
+            if ln.startswith("\t") and not ln.strip().startswith((".", ";", "//"))
+        ]
+
+    before = thin.use_store(None)
+    try:
+        with targeting("gfx942"):
+
+            def make_hazards():
+                from thin import KernelDef
+                from thin.dsl import Args, O, ptr
+                from thin.target import PHYS
+
+                vcc = PHYS["vcc"]
+                exec_reg = PHYS["exec"]
+                exec_lo = PHYS["exec_lo"]
+
+                def body(b, k):
+                    V, S = b.v, b.s  # noqa: N806
+                    p_in, p_out = k.load()
+                    off = V.u32(k.tid * 4, name="off")
+                    x = V.u32()
+                    y = V.u32()
+                    b.emit(O.global_load(x, off, p_in))
+                    b.emit(O.global_load(y, off, p_in, offset=256))
+                    b.wait(x, y, comment="inputs")
+
+                    # 1. v_add_co_u32 (writes VGPR + VCC) -> v_cndmask_b32: 2 states (`s_nop 1`)
+                    sum_v = V.u32()
+                    sel_v = V.u32()
+                    b.emit(O.op("v_add_co_u32", sum_v, vcc, x, y))
+                    b.emit(O.op("v_cndmask_b32", sel_v, x, sum_v, vcc))
+
+                    # 2. v_add_co_u32 (VCC) -> v_div_fmas_f32 (VCC): 4 states (`s_nop 3`)
+                    fx = V.f32()
+                    fy = V.f32()
+                    b.emit(O.op("v_cvt_f32_u32", fx, x))
+                    b.emit(O.op("v_cvt_f32_u32", fy, y))
+                    fmas_v = V.f32()
+                    b.emit(O.op("v_add_co_u32", sum_v, vcc, x, y))
+                    b.emit(O.op("v_div_fmas_f32", fmas_v, fx, fy, fx))
+
+                    # 3. VALU SGPR -> v_readlane / v_writelane lane-select: 4 states (`s_nop 3`)
+                    lsel = S.u32()
+                    got = S.u32()
+                    b.emit(O.op("v_readfirstlane_b32", lsel, x))
+                    b.emit(O.op("v_readlane_b32", got, y, lsel))
+                    b.emit(O.op("v_readfirstlane_b32", lsel, y))
+                    b.emit(O.op("v_writelane_b32", sel_v, 7, lsel))
+
+                    # 4. v_cmpx -> exec_lo (`s_nop 1`), readfirstlane (`s_nop 3`), DPP (`s_nop 4`)
+                    mb = V.u32(0)
+                    s_after = S.u32()
+                    dpp_v = V.u32(0)
+                    saved = S.u64()
+                    with b.raw_exec("cmpx hazard test"):
+                        b.emit(O.op("s_mov_b64", saved, exec_reg))
+                        b.emit(O.op("v_cmpx_ne_u32", vcc, x, -1))
+                        b.emit(O.op("v_mbcnt_lo_u32_b32", mb, exec_lo, 0))
+                        b.emit(O.op("v_cmpx_ne_u32", vcc, y, -1))
+                        b.emit(O.op("v_readfirstlane_b32", s_after, mb))
+                        b.emit(O.op("v_cmpx_ne_u32", vcc, x, -2))
+                        b.emit(
+                            O.op(
+                                "v_mov_b32_dpp",
+                                dpp_v,
+                                mb,
+                                dpp="row_shr:1",
+                                bound_ctrl=True,
+                            )
+                        )
+                        b.emit(O.op("s_mov_b64", exec_reg, saved))
+
+                    # 5. PartialDst (`v_cvt_pk_fp8_f32 op_sel:[0,0,1]`) -> next: `s_nop 0`
+                    pk = V.u32(0)
+                    b.emit(O.op("v_cvt_pk_fp8_f32", pk, fx, fy, op_sel=[0, 0, 1]))
+                    b.emit(O.op("v_cvt_pk_fp8_f32", pk, fy, fx))
+
+                    # 6. s_setreg_b32 -> s_getreg_b32 on MODE (0x0801): 2 states (`s_nop 1`)
+                    mode_s = S.u32()
+                    b.emit(O.op("s_getreg_b32", mode_s, 0x0801))
+                    b.emit(O.op("s_setreg_b32", 0x0801, mode_s))
+                    b.emit(O.op("s_getreg_b32", mode_s, 0x0801))
+
+                    out_v = V.u32(sel_v + pk + dpp_v + V.u32(got) + V.u32(s_after) + V.u32(mode_s))
+                    b.emit(O.global_store(off, out_v, p_out))
+                    b.emit(O.global_store(off, fmas_v, p_out, offset=256))
+
+                return KernelDef(
+                    "cdna3_misc_hazards",
+                    Args(p_in=ptr, p_out=ptr),
+                    body,
+                    wgsize=64,
+                    max_grid=(1,),
+                )
+
+            kern = thin.compile(make_hazards)
+            ins = body_ins(kern.asm)
+
+            def between(prefix_a: str, prefix_b: str, start: int = 0) -> tuple[int, list[str]]:
+                ia = next(i for i in range(start, len(ins)) if ins[i].startswith(prefix_a))
+                ib = next(i for i in range(ia + 1, len(ins)) if ins[i].startswith(prefix_b))
+                return ib, ins[ia + 1 : ib]
+
+            pos, mid = between("v_add_co_u32", "v_cndmask_b32", 0)
+            assert mid == ["s_nop 1"]
+
+            pos, mid = between("v_add_co_u32", "v_div_fmas_f32", pos)
+            assert mid == ["s_nop 3"]
+
+            pos, mid = between("v_readfirstlane_b32", "v_readlane_b32", pos)
+            assert mid == ["s_nop 3"]
+
+            pos, mid = between("v_readfirstlane_b32", "v_writelane_b32", pos)
+            assert mid == ["s_nop 3"]
+
+            pos, mid = between("v_cmpx_", "v_mbcnt_lo_u32_b32", pos)
+            assert mid == ["s_nop 1"]
+
+            pos, mid = between("v_cmpx_", "v_readfirstlane_b32", pos)
+            assert mid == ["s_nop 3"]
+
+            pos, mid = between("v_cmpx_", "v_mov_b32_dpp", pos)
+            assert mid == ["s_nop 4"]
+
+            pos, mid = between("v_cvt_pk_fp8_f32", "v_cvt_pk_fp8_f32", pos)
+            assert mid == ["s_nop 0"]
+
+            _, mid = between("s_setreg_b32", "s_getreg_b32", pos)
+            assert mid == ["s_nop 1"]
+    finally:
+        thin.use_store(before)
+
+
 def test_gfx942_dsl_mfma_validation_and_bounds() -> None:
     """DSL rejects C/D file mismatch and bad cbsz, and accepts valid sparse cbsz+abid."""
     import pytest

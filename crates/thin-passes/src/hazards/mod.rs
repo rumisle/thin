@@ -8,7 +8,7 @@ use std::sync::Arc;
 use thin_ir::{Attr, Diag, DiagClass, FieldId, FieldValue, Imm, Instr, Operand, Part, Snapshot};
 use thin_target::{Target, WaitCounts};
 
-pub use rules::{Dep, Engine, Rule, Side, States, Test};
+pub use rules::{Dep, DynamicStates, Engine, Rule, Side, States, Test};
 
 use crate::need::{delay_text, Need, Valu};
 
@@ -105,12 +105,17 @@ pub fn fill(t: &'static Target, i: &Instr, need: &Need) -> Vec<Arc<Instr>> {
     let mark = |i: Instr| placed(i, "hazard".into());
     if need.states > 0 {
         let nop = form(t, "s_nop", 1);
-        out.push(mark(Instr::new(
-            nop,
-            vec![Operand::Imm(Imm::int(need.states as i128 - 1))],
-            Vec::new(),
-            None,
-        )));
+        let mut rem = need.states;
+        while rem > 0 {
+            let chunk = rem.min(16);
+            out.push(mark(Instr::new(
+                nop,
+                vec![Operand::Imm(Imm::int(chunk as i128 - 1))],
+                Vec::new(),
+                None,
+            )));
+            rem -= chunk;
+        }
     }
     out.extend(wait_instrs(t, &need.waits).into_iter().map(mark));
     let spelled = |op: &str| {

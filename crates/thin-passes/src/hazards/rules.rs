@@ -57,11 +57,42 @@ pub enum Dep {
     WritesWideData,
 }
 
+/// Pair- and instruction-dependent wait-state callbacks for a [`Rule`].
+#[derive(Clone, Copy)]
+pub struct DynamicStates {
+    /// Upper bound on wait states this rule can return.
+    pub max: u32,
+    /// Wait states required between `(snapshot, prev, cur)`.
+    pub pair: fn(&Snapshot, &Instr, &Instr) -> u32,
+    /// Late-read wait states after `(snapshot, prev)` for register liveness.
+    pub late: fn(&Snapshot, &Instr) -> u32,
+}
+
+impl std::fmt::Debug for DynamicStates {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DynamicStates")
+            .field("max", &self.max)
+            .finish()
+    }
+}
+
+impl PartialEq for DynamicStates {
+    fn eq(&self, other: &Self) -> bool {
+        self.max == other.max
+            && std::ptr::fn_addr_eq(self.pair, other.pair)
+            && std::ptr::fn_addr_eq(self.late, other.late)
+    }
+}
+
+impl Eq for DynamicStates {}
+
 /// A rule's wait states.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum States {
     /// A constant.
     Const(u32),
+    /// Computed from the matched instructions up to `max`.
+    Dynamic(DynamicStates),
 }
 
 impl States {
@@ -69,6 +100,7 @@ impl States {
     fn most(&self) -> u32 {
         match self {
             States::Const(s) => *s,
+            States::Dynamic(d) => d.max,
         }
     }
 }
@@ -150,9 +182,14 @@ impl<'a> Engine<'a> {
             .collect()
     }
 
-    /// Operand 3 as a register: an instruction's SrcC.
+    /// Accumulator read (`SrcC`): operand 0 on a sparse matrix form (`rw`
+    /// destination), operand 3 otherwise.
     fn src_c<'i>(&self, i: &'i Instr) -> Option<&'i Reg> {
-        i.ops().get(3).and_then(Operand::reg)
+        let idx = match self.s.target().hooks().matrix_form(&i.form().op) {
+            Some(mf) if mf.sparse => 0,
+            _ => 3,
+        };
+        i.ops().get(idx).and_then(Operand::reg)
     }
 
     /// Whether the dependence holds between prev and cur.
@@ -191,9 +228,18 @@ impl<'a> Engine<'a> {
     }
 
     /// A rule's states for a matching pair.
-    fn states(states: &States) -> u32 {
+    fn pair_states(&self, states: &States, prev: &Instr, cur: &Instr) -> u32 {
         match states {
             States::Const(s) => *s,
+            States::Dynamic(d) => (d.pair)(self.s, prev, cur),
+        }
+    }
+
+    /// A rule's late-read states for `prev`.
+    fn late_states(&self, states: &States, prev: &Instr) -> u32 {
+        match states {
+            States::Const(s) => *s,
+            States::Dynamic(d) => (d.late)(self.s, prev),
         }
     }
 
@@ -202,7 +248,7 @@ impl<'a> Engine<'a> {
         (self.rules.iter())
             .filter(|r| self.admits(&r.prev, prev, true) && self.admits(&r.cur, cur, true))
             .filter(|r| self.depends(r.dep, prev, cur))
-            .map(|r| Engine::states(&r.states))
+            .map(|r| self.pair_states(&r.states, prev, cur))
             .max()
             .unwrap_or(0)
     }
@@ -230,7 +276,7 @@ impl<'a> Engine<'a> {
     pub fn late(&self, dep: Dep, prev: &Instr) -> u32 {
         (self.rules.iter())
             .filter(|r| r.dep == dep && self.admits(&r.prev, prev, false))
-            .map(|r| Engine::states(&r.states))
+            .map(|r| self.late_states(&r.states, prev))
             .max()
             .unwrap_or(0)
     }
