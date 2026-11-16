@@ -1,6 +1,7 @@
 # Examples
 
-Kernel generators, imported as `examples.vadd` with the checkout on the path.
+Kernel generators, imported as `examples.vadd` (or `examples.gfx942.gemm_bf16`
+for target-specific subpackages) with the checkout on the path.
 
 This folder has no `__init__.py` on purpose. A kernel's address hashes every
 importable package beside its generator's import root; were `examples` a
