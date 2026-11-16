@@ -1873,43 +1873,38 @@ def test_gfx942_dpp_controls_and_wave64_collectives():
 \tv_add_f32_dpp v3, v3, v3 row_bcast:31 row_mask:0xc bank_mask:0xf""")
     np.testing.assert_allclose(got_scan, np.cumsum(x_f32), rtol=0, atol=0)
 
-    # 2. Exact AMD ISA OOB semantics on `row_bcast:15` and `row_bcast:31` with `row_mask:0xf`:
-    #    - `row_bcast:15`: Row 0 OOB, Row 1 -> lane 15, Row 2 -> lane 31, Row 3 -> lane 47!
+    # 2. MI300X-measured semantics on `row_bcast:15` and `row_bcast:31` with `row_mask:0xf`:
+    #    - `row_bcast:15`: Row 0 passes through self (`src[l]`), Row 1 -> lane 15,
+    #      Row 2 -> lane 31, Row 3 -> lane 47 (never OOB, regardless of `bound_ctrl`).
     got_bc15_keep = run_dpp_asm("""\
 \tv_mov_b32 v3, -99.0
 \tv_mov_b32_dpp v3, v2 row_bcast:15 row_mask:0xf bank_mask:0xf""")
-    want_bc15_keep = np.concatenate(
+    want_bc15 = np.concatenate(
         [
-            np.full(16, -99.0, dtype=np.float32),
+            x_f32[:16],
             np.full(16, x_f32[15], dtype=np.float32),
             np.full(16, x_f32[31], dtype=np.float32),
             np.full(16, x_f32[47], dtype=np.float32),
         ]
     )
-    np.testing.assert_array_equal(got_bc15_keep, want_bc15_keep)
+    np.testing.assert_array_equal(got_bc15_keep, want_bc15)
 
-    got_bc15_zero = run_dpp_asm("""\
+    got_bc15_bc1 = run_dpp_asm("""\
 \tv_mov_b32 v3, -99.0
 \tv_mov_b32_dpp v3, v2 row_bcast:15 row_mask:0xf bank_mask:0xf bound_ctrl:1""")
-    want_bc15_zero = want_bc15_keep.copy()
-    want_bc15_zero[:16] = 0.0
-    np.testing.assert_array_equal(got_bc15_zero, want_bc15_zero)
+    np.testing.assert_array_equal(got_bc15_bc1, want_bc15)
 
-    #    - `row_bcast:31`: Rows 0 & 1 OOB, Rows 2 & 3 -> lane 31!
+    #    - `row_bcast:31`: Rows 0 & 1 pass through self (`src[l]`), Rows 2 & 3 -> lane 31!
     got_bc31_keep = run_dpp_asm("""\
 \tv_mov_b32 v3, -77.0
 \tv_mov_b32_dpp v3, v2 row_bcast:31 row_mask:0xf bank_mask:0xf""")
-    want_bc31_keep = np.concatenate(
-        [np.full(32, -77.0, dtype=np.float32), np.full(32, x_f32[31], dtype=np.float32)]
-    )
-    np.testing.assert_array_equal(got_bc31_keep, want_bc31_keep)
+    want_bc31 = np.concatenate([x_f32[:32], np.full(32, x_f32[31], dtype=np.float32)])
+    np.testing.assert_array_equal(got_bc31_keep, want_bc31)
 
-    got_bc31_zero = run_dpp_asm("""\
+    got_bc31_bc1 = run_dpp_asm("""\
 \tv_mov_b32 v3, -77.0
 \tv_mov_b32_dpp v3, v2 row_bcast:31 row_mask:0xf bank_mask:0xf bound_ctrl:1""")
-    want_bc31_zero = want_bc31_keep.copy()
-    want_bc31_zero[:32] = 0.0
-    np.testing.assert_array_equal(got_bc31_zero, want_bc31_zero)
+    np.testing.assert_array_equal(got_bc31_bc1, want_bc31)
 
     # 3. `wave_shl:1`, `wave_shr:1`, `wave_rol:1`, `wave_ror:1`, `row_newbcast:7`:
     u_in = lanes + 10

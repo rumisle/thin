@@ -1671,11 +1671,11 @@ fn pk_f32_op(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<
 }
 
 /// The DPP source lane of lane `l` in a `w`-lane wave, or `None` when out of
-/// bounds so `bound_ctrl` applies (AMD CDNA 3 / RDNA 4 DPP_CTRL tables:
-/// `row_bcast:15` reads `(l & 0x30) - 1` for `l > 15` else OOB; `row_bcast:31`
-/// reads lane `31` for `l > 31` else OOB; `wave_shl:1` / `wave_shr:1` shift
-/// across the wave with OOB at the boundary; `wave_rol:1` / `wave_ror:1`
-/// rotate across `w`).
+/// bounds so `bound_ctrl` applies (measured on MI300X `gfx942`:
+/// `row_bcast:15` reads `(l & 0x30) - 1` for `l > 15` and self `l` on row 0;
+/// `row_bcast:31` reads lane `31` for `l > 31` and self `l` on rows 0..1;
+/// `wave_shl:1` / `wave_shr:1` shift across the wave with OOB at the boundary;
+/// `wave_rol:1` / `wave_ror:1` rotate across `w`).
 fn dpp_source(ins: &Ins, l: usize, w: usize) -> Result<Option<usize>, EmuError> {
     let (row, col) = (l / 16, l % 16);
     if let Some(Field::List(q)) = ins.field("quad_perm") {
@@ -1708,8 +1708,8 @@ fn dpp_source(ins: &Ins, l: usize, w: usize) -> Result<Option<usize>, EmuError> 
     }
     if let Some(n) = ins.field("row_bcast") {
         return match field_int(n) {
-            15 => Ok((l > 15).then(|| (l & 0x30) - 1)),
-            31 => Ok((l > 31).then_some(31)),
+            15 => Ok(Some(if l >= 16 { (l & 0x30) - 1 } else { l })),
+            31 => Ok(Some(if l >= 32 { 31 } else { l })),
             _ => Err(limit("dpp control not emulated: row_bcast".into())),
         };
     }

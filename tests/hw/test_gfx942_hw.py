@@ -405,8 +405,8 @@ def gen_dpp_and_packed_f32():
 
         # 1) GFX9 DPP controls:
         #    [0]: 64-lane inclusive prefix sum via row_shr + row_bcast:15 + row_bcast:31
-        #    [1]: row_bcast:15 with row_mask:0xf & bound_ctrl:0 (OOB row 0 kept, row 2->31)
-        #    [2]: row_bcast:31 with row_mask:0xf & bound_ctrl:1 (OOB rows 0..1->0, 2..3->31)
+        #    [1]: row_bcast:15 with row_mask:0xf & bound_ctrl:0 (row 0 self, rows 1..3->15,31,47)
+        #    [2]: row_bcast:31 with row_mask:0xf & bound_ctrl:1 (rows 0..1 self, rows 2..3->31)
         #    [3]: wave_ror:1 -> wave_shl:1 (bound_ctrl:1) -> row_newbcast:7
         d_out = V.u32(n=4, name="d_out")
         b.emit(O.op("v_mov_b32", d_out[0], xy[0]))
