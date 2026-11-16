@@ -252,7 +252,7 @@ def test_cdna3_matrix_metadata_matches_official_calculator():
         assert mf.sparse is info["sparse"], mnem
         assert mf.cbsz_abid is info["cbsz_abid"], mnem
         assert mf.blgp is info["blgp"], mnem
-        assert mf.provisional is True, mnem
+        assert mf.provisional is False, mnem
         want_c = 1 if info["sparse"] else info["gprs"]["c"]
         assert dict(mf.dwords) == {
             "a": info["gprs"]["a"],
@@ -711,6 +711,9 @@ def test_cdna3_mfma_numerics_against_independent_mpmath_and_cpu_references():
     c_adv[2, 0, 0] = 0x7F800042
     a_adv[2, 0, 0] = 0x00000000
     b_adv[2, 0, 0] = 0x7F800000  # 0 * +Inf -> must produce DNAN32 (0xFFC00000), NOT quieted C!
+    a_adv[3, 0, 0] = 0x7F800013  # A sNaN payload -> quieted to 0x7FC00013 on MI300X SGEMM!
+    b_adv[3, 0, 0] = 0x3F800000
+    c_adv[3, 0, 0] = 0x00000000
 
     exact_prod_sum = _f32_to_mpf(0x47000001) * _f32_to_mpf(0x46FFFFFE) + _f32_to_mpf(0x5A800001)
     want_single_rne = _rne_bits(exact_prod_sum, 8, 23)
@@ -726,6 +729,7 @@ def test_cdna3_mfma_numerics_against_independent_mpmath_and_cpu_references():
     assert int(got_f32[0, 0, 0]) == 0x5A800001
     assert int(got_f32[1, 0, 0]) == (0x7F800042 | 0x00400000)
     assert int(got_f32[2, 0, 0]) == 0xFFC00000
+    assert int(got_f32[3, 0, 0]) == 0x7FC00013
 
     # 2) DGEMM `v_mfma_f64_4x4x4_4b_f64` against sequential exact 53-bit RNE `mpmath` FMA
     #    PLUS `C = NaN` at k=0 followed by `0 * Inf` at k=2!
@@ -762,13 +766,49 @@ def test_cdna3_mfma_numerics_against_independent_mpmath_and_cpu_references():
     assert int(got_f64[3, 0, 0]) == 0xFFF8_0000_0000_0000
     assert int(got_f64[3, 1, 1]) == (0x7FF0_0000_0000_0077 | 0x0008_0000_0000_0000)
 
-    # 3) XDLOP (`f16`, `bf16`, `xf32`, `fp8_bf8`): compare `thin.emu` against exact `mpmath` RNE
-    #    AND pass-grouped CPU `f32` reference to bound single-round vs per-pass-round delta:
-    for mnem, pass_grp in [
-        ("v_mfma_f32_16x16x16_f16", 4),
-        ("v_mfma_f32_16x16x16_bf16", 4),
-        ("v_mfma_f32_16x16x8_xf32", 2),
-        ("v_mfma_f32_16x16x32_fp8_bf8", 8),
+    # 3) XDLOP (`f16`, `bf16`, `xf32`, `fp8_bf8`): cross-check `thin.emu` bit-for-bit against an
+    #    independent `mpmath` implementation of the MI300X-measured 128-bit grouped XDLOP dot law,
+    #    and verify agreement within `1e-5` against infinite-precision `mpmath`:
+    def _mp_xdlop_dot(a_row, b_col, c_u32: int, grp: int) -> int:
+        if (c_u32 & 0x7FFF_FFFF) > 0x7F80_0000:
+            return 0xFFC0_0000
+        acc_u = c_u32
+        for s0 in range(0, len(a_row), grp):
+            prods = []
+            esums = []
+            for kk in range(s0, min(s0 + grp, len(a_row))):
+                xa = float(a_row[kk])
+                yb = float(b_col[kk])
+                if np.isnan(xa) or np.isnan(yb):
+                    return 0xFFC0_0000
+                p = mpmath.mpf(xa) * mpmath.mpf(yb)
+                prods.append(p)
+                if p != 0:
+                    ea = int(mpmath.floor(mpmath.log(abs(xa), 2)))
+                    eb = int(mpmath.floor(mpmath.log(abs(yb), 2)))
+                    esums.append(ea + eb)
+            if not esums:
+                continue
+            qe = max(esums) - 24
+            q_step = mpmath.power(2, qe)
+            s_int = sum(int(mpmath.mpf(p) / q_step) for p in prods if p != 0)
+            c_mp = _f32_to_mpf(acc_u)
+            if c_mp == 0:
+                tot = mpmath.mpf(s_int) * q_step
+            else:
+                scaled_c = c_mp / q_step
+                if scaled_c == mpmath.floor(scaled_c):
+                    tot = c_mp + mpmath.mpf(s_int) * q_step
+                else:
+                    tot = (mpmath.floor(scaled_c) + mpmath.mpf(s_int)) * q_step
+            acc_u = _rne_bits(tot, 8, 23)
+        return acc_u
+
+    for mnem, xdl_grp in [
+        ("v_mfma_f32_16x16x16_f16", 8),
+        ("v_mfma_f32_16x16x16_bf16", 8),
+        ("v_mfma_f32_16x16x8_xf32", 4),
+        ("v_mfma_f32_16x16x32_fp8_bf8", 16),
     ]:
         info = REF["instructions"][mnem]
         cls = REF["layout_classes"][info["layout_class"]]
@@ -811,6 +851,8 @@ def test_cdna3_mfma_numerics_against_independent_mpmath_and_cpu_references():
 
         cf = rng.standard_normal((1, m, n)).astype(np.float32)
         cc = cf.view(np.uint32).astype(np.uint64)
+        # Also verify XDLOP `C = payload NaN` returns canonical `0xFFC00000` (measured on MI300X):
+        cc[0, 0, 0] = 0x7F80_0037
 
         got_regs = _run_mfma_asm(
             mnem,
@@ -820,25 +862,23 @@ def test_cdna3_mfma_numerics_against_independent_mpmath_and_cpu_references():
         )
         got = _unpack_from_mc_map(got_regs, cls["d"], out_bits=32)[0]
 
-        # Exact infinite-precision dot rounded once to f32 RNE:
+        xdlop_ref = np.zeros((m, n), dtype=np.uint32)
         exact_bits = np.zeros((m, n), dtype=np.uint32)
-        # Pass-grouped CPU f32 accumulation (sums each pass_grp exactly, rounds per pass):
-        pass_acc = cf[0].copy()
-        for s0 in range(0, k, pass_grp):
-            step_sum = np.einsum(
-                "ik,kj->ij", av[0, :, s0 : s0 + pass_grp], bv[0, s0 : s0 + pass_grp, :]
-            )
-            pass_acc = (pass_acc.astype(np.float64) + step_sum).astype(np.float32)
-
         for i in range(m):
             for j in range(n):
-                tot = _f32_to_mpf(int(cc[0, i, j]))
-                for kk in range(k):
-                    tot += mpmath.mpf(float(av[0, i, kk])) * mpmath.mpf(float(bv[0, kk, j]))
-                exact_bits[i, j] = _rne_bits(tot, 8, 23)
+                xdlop_ref[i, j] = _mp_xdlop_dot(av[0, i, :], bv[0, :, j], int(cc[0, i, j]), xdl_grp)
+                if i == 0 and j == 0:
+                    exact_bits[i, j] = 0xFFC0_0000
+                else:
+                    tot = _f32_to_mpf(int(cc[0, i, j]))
+                    for kk in range(k):
+                        tot += mpmath.mpf(float(av[0, i, kk])) * mpmath.mpf(float(bv[0, kk, j]))
+                    exact_bits[i, j] = _rne_bits(tot, 8, 23)
 
-        # Ordered f64 sum + c matches infinite-precision RNE within <= 1 ULP everywhere:
-        ulp_exact = np.abs(got.astype(np.int64) - exact_bits.astype(np.int64))
-        assert int(ulp_exact.max()) <= 1, (mnem, int(ulp_exact.max()))
-        # Pass-grouped f32 rounding agrees within ~1e-6 relative/absolute tolerance:
-        np.testing.assert_allclose(got.view(np.float32), pass_acc, rtol=1e-5, atol=1e-5)
+        assert np.array_equal(got, xdlop_ref), mnem
+        assert int(got[0, 0]) == 0xFFC0_0000
+        finite = np.ones((m, n), dtype=bool)
+        finite[0, 0] = False
+        np.testing.assert_allclose(
+            got[finite].view(np.float32), exact_bits[finite].view(np.float32), rtol=1e-5, atol=1e-5
+        )

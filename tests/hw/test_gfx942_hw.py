@@ -867,3 +867,178 @@ def test_multi_xcd_sc1_atomics_and_coherence():
     # 64 WGs * 16 threads/bucket * mean(1..64)=32.5 -> each bucket == 16 * 64 * 65 / 2 = 33280
     assert ran["counts"].tolist() == [16 * 64 * 65 // 2] * 16
 
+
+# ---------------------------------------------------------------------------
+# Explicit microarchitectural probes measured on Instinct MI300X
+# ---------------------------------------------------------------------------
+
+
+def test_probe_xf32_mantissa_truncation():
+    """XF32 truncates bits [12:0] toward zero (`raw & 0xFFFF_E000`) and preserves subnormals."""
+    import thin
+
+    k = thin.compile(gen_mfma_dense, shape="f32_16x16x8_xf32", acc_file="a")
+    cases = [
+        (0x3F80_1000, 0x3F80_0000),  # even tie at bit 12 -> truncated
+        (0x3F80_3000, 0x3F80_2000),  # odd tie at bit 12 -> truncated (NOT RNE 0x3F804000)
+        (0x3F80_1001, 0x3F80_0000),  # strictly above tie -> truncated (NOT RNE 0x3F802000)
+        (0x3FFF_FFFF, 0x3FFF_E000),  # max mantissa below 2.0 -> truncated (NOT RNE 0x40000000)
+        (0x0040_0000, 0x0040_0000),  # f32 subnormal -> preserved
+    ]
+
+    a = np.zeros((64, 2), dtype=np.uint32)
+    b = np.zeros((64, 2), dtype=np.uint32)
+    c = np.zeros((64, 4), dtype=np.uint32)
+    for row, (in_bits, _) in enumerate(cases):
+        a[row, 0] = np.uint32(in_bits)
+        b[row, 0] = np.uint32(0x3F80_0000)
+
+    args = {
+        "a": a.reshape(-1),
+        "b": b.reshape(-1),
+        "c": c.reshape(-1),
+        "d": _poison(64 * 4),
+    }
+    emu, ran = _both(k, (1,), args, ["d"])
+    _same_bits(emu, ran)
+    out = ran["d"].reshape(64, 4)
+    for idx, (_, want) in enumerate(cases):
+        lane = (idx // 4) * 16 + idx
+        dw = idx % 4
+        assert int(out[lane, dw]) == want, (idx, hex(int(out[lane, dw])), hex(want))
+
+
+def test_probe_sgemm_k4_association_order():
+    """SGEMM `v_mfma_f32_16x16x4_f32` executes left-to-right `(((C + p0) + p1) + p2) + p3`."""
+    import itertools
+
+    import thin
+
+    k = thin.compile(gen_mfma_dense, shape="f32_16x16x4_f32", acc_file="a")
+    big = np.float32(2.0**30).view(np.uint32)
+    nbig = np.float32(-(2.0**30)).view(np.uint32)
+    one = np.float32(1.0).view(np.uint32)
+    zero = np.uint32(0)
+
+    # Place 16 permutations across diagonal entries (i, i) for i in 0..15:
+    perms = list(set(itertools.permutations([big, nbig, one, zero, zero])))[:16]
+    a = np.zeros(64, dtype=np.uint32)
+    b = np.zeros(64, dtype=np.uint32)
+    c = np.zeros((64, 4), dtype=np.uint32)
+    for idx, tup in enumerate(perms):
+        lane_c = (idx // 4) * 16 + idx
+        c[lane_c, idx % 4] = tup[0]
+        for kk in range(4):
+            a[kk * 16 + idx] = tup[1 + kk]
+            b[kk * 16 + idx] = one if tup[1 + kk] != 0 else zero
+
+    args = {"a": a, "b": b, "c": c.reshape(-1), "d": _poison(64 * 4)}
+    emu, ran = _both(k, (1,), args, ["d"])
+    _same_bits(emu, ran)
+
+
+def test_probe_xdlop_grouped_rounding_and_truncation():
+    """XDLOP `f16` rounds after each 8-element group and truncates negative sub-quantum products."""
+    import thin
+
+    k = thin.compile(gen_mfma_dense, shape="f32_16x16x16_f16", acc_file="a")
+    a = np.zeros((64, 2), dtype=np.uint32)
+    b = np.zeros((64, 2), dtype=np.uint32)
+    c = np.zeros((64, 4), dtype=np.uint32)
+
+    h_one = int(np.float16(1.0).view(np.uint16))
+    h_nhalf = int(np.float16(-0.5).view(np.uint16))
+    h_tiny = int(np.float16(2.0**-24).view(np.uint16))  # f16 min subnormal
+    h_big = int(np.float16(4096.0).view(np.uint16))  # 4096 * 4096 = 2^24
+    h_nbig = int(np.float16(-4096.0).view(np.uint16))
+
+    # Case (0, 0): p0 = +1.0, p1 = (-0.5)*(2^-24) = -2^-25 -> truncated toward zero -> +1.0!
+    a[0, 0] = np.uint32(h_one | (h_nhalf << 16))
+    b[0, 0] = np.uint32(h_one | (h_tiny << 16))
+
+    # Case (1, 1): group 0 has +2^24 + 1.0 (rounds RNE to +2^24 in f32, losing +1.0!),
+    # then group 1 (`k=8`, lane `2*16 + 1 = 33`) adds -2^24 -> result is 0.0, NOT 1.0!
+    a[1, 0] = np.uint32(h_big | (h_one << 16))
+    b[1, 0] = np.uint32(h_big | (h_one << 16))
+    a[33, 0] = np.uint32(h_nbig)
+    b[33, 0] = np.uint32(h_big)
+
+    args = {"a": a.reshape(-1), "b": b.reshape(-1), "c": c.reshape(-1), "d": _poison(64 * 4)}
+    emu, ran = _both(k, (1,), args, ["d"])
+    _same_bits(emu, ran)
+    out = ran["d"].reshape(64, 4)
+    assert int(out[0, 0]) == 0x3F80_0000
+    assert int(out[1, 1]) == 0x0000_0000
+
+
+def test_probe_mfma_nan_bit_patterns():
+    """SGEMM/DGEMM quiet & preserve NaN payloads; XDLOP maps any A/B/C NaN to `0xFFC00000`."""
+    import thin
+
+    # 1) SGEMM (`v_mfma_f32_16x16x4_f32`):
+    ks = thin.compile(gen_mfma_dense, shape="f32_16x16x4_f32", acc_file="a")
+    a = np.zeros(64, dtype=np.uint32)
+    b = np.zeros(64, dtype=np.uint32)
+    c = np.zeros((64, 4), dtype=np.uint32)
+    one = np.uint32(0x3F80_0000)
+    a[0], b[0] = 0x7F80_0013, one  # (0,0): A sNaN -> 0x7FC00013
+    a[1], b[1] = one, 0xFF80_0025  # (1,1): B -sNaN -> 0xFFC00025
+    a[2], b[2], c[2, 2] = one, one, 0x7F80_0037  # (2,2): C sNaN -> 0x7FC00037
+    c[3, 3], a[19], b[19] = 0x7FC0_0049, 0, 0x7F80_0000  # (3,3): C qNaN + k=1 0*Inf -> 0xFFC00000
+    emu_s, ran_s = _both(ks, (1,), {"a": a, "b": b, "c": c.reshape(-1), "d": _poison(256)}, ["d"])
+    _same_bits(emu_s, ran_s)
+    out_s = ran_s["d"].reshape(64, 4)
+    assert [int(out_s[i, i]) for i in range(4)] == [
+        0x7FC0_0013,
+        0xFFC0_0025,
+        0x7FC0_0037,
+        0xFFC0_0000,
+    ]
+
+    # 2) XDLOP (`v_mfma_f32_16x16x16_f16`): even `C = sNaN/qNaN` with finite A,B gives `0xFFC00000`!
+    kx = thin.compile(gen_mfma_dense, shape="f32_16x16x16_f16", acc_file="a")
+    ax = np.zeros((64, 2), dtype=np.uint32)
+    bx = np.zeros((64, 2), dtype=np.uint32)
+    cx = np.zeros((64, 4), dtype=np.uint32)
+    ax[0, 0], bx[0, 0] = 0x7C05, 0x3C00  # (0,0): A sNaN16 -> 0xFFC00000
+    cx[1, 1] = 0x7F80_0013  # (1,1): C sNaN32 -> 0xFFC00000
+    cx[2, 2] = 0x7FC0_0037  # (2,2): C qNaN32 -> 0xFFC00000
+    ax[3, 0], bx[3, 0] = 0x0000, 0x7C00  # (3,3): 0 * +Inf16 -> 0xFFC00000
+    emu_x, ran_x = _both(
+        kx,
+        (1,),
+        {"a": ax.reshape(-1), "b": bx.reshape(-1), "c": cx.reshape(-1), "d": _poison(256)},
+        ["d"],
+    )
+    _same_bits(emu_x, ran_x)
+    out_x = ran_x["d"].reshape(64, 4)
+    assert [int(out_x[i, i]) for i in range(4)] == [0xFFC0_0000] * 4
+
+    # 3) DGEMM (`v_mfma_f64_16x16x4_f64` with `neg:[1,0,1]`):
+    kd = thin.compile(gen_mfma_bcast_f64_and_hazards)
+    da = np.zeros(64, dtype=np.uint64)
+    db = np.zeros(64, dtype=np.uint64)
+    dc = np.zeros((64, 4), dtype=np.uint64)
+    one64 = np.uint64(0x3FF0_0000_0000_0000)
+    da[0], db[0] = 0x7FF0_0000_0000_0013, one64
+    da[1], db[1] = one64, 0xFFF0_0000_0000_0025
+    da[2], db[2], dc[34, 0] = one64, one64, 0x7FF0_0000_0000_0037
+    dc[51, 0], da[19], db[19] = 0x7FF8_0000_0000_0049, 0, 0x7FF0_0000_0000_0000
+    pf64 = np.concatenate([da, db, dc.reshape(-1)]).view(np.uint32).copy()
+    args_d = {
+        "pa": np.zeros(256, dtype=np.uint32),
+        "pb": np.zeros(256, dtype=np.uint32),
+        "pf64": pf64,
+        "out_bcast": _poison(256),
+        "out_f64": _poison(512),
+        "out_chain": _poison(256),
+    }
+    emu_d, ran_d = _both(kd, (1,), args_d, ["out_f64"])
+    _same_bits(emu_d, ran_d)
+    out_d = ran_d["out_f64"].view(np.uint64).reshape(64, 4)
+    assert [int(out_d[ln, 0]) for ln in (0, 17, 34, 51)] == [
+        0xFFF8_0000_0000_0013,
+        0xFFF8_0000_0000_0025,
+        0xFFF8_0000_0000_0037,
+        0xFFF8_0000_0000_0000,
+    ]

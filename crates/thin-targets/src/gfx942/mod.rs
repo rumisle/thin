@@ -582,6 +582,15 @@ pub(crate) fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
             "i32_4x4x4_16b_i8" => (I32, I8, I8, 4, 4, 4, 16, 2, true, true),
             _ => return None,
         };
+        let sum = if d.integer() || d == F64 || (a == F32 && b == F32) {
+            Summation::Ordered
+        } else {
+            Summation::Grouped {
+                group_half: 8,
+                group_byte: 16,
+                fraction: 24,
+            }
+        };
         return Some(MatrixForm {
             a,
             b,
@@ -595,8 +604,8 @@ pub(crate) fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
             sparse: false,
             cbsz_abid,
             blgp,
-            sum: Summation::Ordered,
-            provisional: true,
+            sum,
+            provisional: false,
         });
     }
     let rest = mnemonic.strip_prefix("v_smfmac_")?;
@@ -617,6 +626,15 @@ pub(crate) fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
         "i32_32x32x32_i8" => (I32, I8, I8, 32, 32, 32, 8),
         _ => return None,
     };
+    let sum = if d.integer() {
+        Summation::Ordered
+    } else {
+        Summation::Grouped {
+            group_half: 8,
+            group_byte: 16,
+            fraction: 24,
+        }
+    };
     Some(MatrixForm {
         a,
         b,
@@ -630,8 +648,8 @@ pub(crate) fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
         sparse: true,
         cbsz_abid: true,
         blgp: false,
-        sum: Summation::Ordered,
-        provisional: true,
+        sum,
+        provisional: false,
     })
 }
 static SMEM: [&str; 9] = [

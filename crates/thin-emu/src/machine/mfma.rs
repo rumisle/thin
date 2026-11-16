@@ -4,9 +4,10 @@
 
 use thin_target::{Elem, MatrixForm};
 
-use super::alu::{int_field, list_at, tag_error};
-use super::numbers::{self as num, f16_value, f32_of, Small};
+use super::alu::{fma as fma_f32, int_field, list_at, tag_error};
+use super::numbers::{self as num, f16_value, f32_of, floor_log2, Small};
 use super::wave::{Wave, MAX_W};
+use super::wmma::{parts, round_exact};
 use super::Exec;
 use crate::tags::{self, is_record, MatrixOp, MatrixOperand, OperandFormat, Tag, ACC_MARK};
 use crate::{Base, Cause, EmuError, Ins};
@@ -208,18 +209,26 @@ fn decode_elem(dwords: &[u32; MAX_DWORDS], ty: Elem, dw: usize, bit_lo: usize) -
     }
 }
 
-/// Evaluates an `f32`-accumulating dot product `sum_k(a_k * b_k) + c` in IEEE RNE,
-/// producing quieted `c_bits` when only `c` is NaN and default quiet NaN `0xFFC0_0000`
-/// on factor NaN or invalid arithmetic (`0 * Inf`, `Inf - Inf`).
-fn eval_f32_dot(av: &[f64], bv: &[f64], c_bits: u32) -> u32 {
-    let cv = f64::from(f32_of(c_bits));
-    if av.iter().chain(bv).any(|v| v.is_nan()) {
+/// Evaluates a CDNA 3 XDLOP `f32`-accumulating dot product (`f16`, `bf16`,
+/// `xf32`, `fp8`, `bf8`, dense and sparse `v_smfmac_*`) using the MI300X-measured
+/// 128-bit grouped dot model:
+/// - Any `NaN` in `A`, `B`, or `C`, or `0 * Inf` / `+Inf + (-Inf)`, returns `0xFFC0_0000`.
+/// - Active reduction terms are processed sequentially in contiguous groups of
+///   `g = (128 / a_bits).min(active_terms)`.
+/// - Within each group, `top = max_q (floor_log2(|a[q]|) + floor_log2(|b[q]|))` over
+///   non-zero products sets `qe = top - 24`; products are truncated toward zero at `2^qe`,
+///   combined with `acc` (exact if `lsb_exp(acc) >= qe`, floored at `2^qe` below), and
+///   rounded RNE to `f32` after every group.
+fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, a_bits: usize) -> u32 {
+    if num::is_nan32(c_bits) || av.iter().chain(bv).any(|v| v.is_nan()) {
         return num::DNAN32;
     }
-    let mut has_pos_inf = false;
-    let mut has_neg_inf = false;
-    let mut sum = 0.0f64;
-    for (&x, &y) in av.iter().zip(bv) {
+    let cv = f64::from(f32_of(c_bits));
+    let mut products = [0.0f64; 32];
+    let n = av.len();
+    let mut has_pos_inf = cv == f64::INFINITY;
+    let mut has_neg_inf = cv == f64::NEG_INFINITY;
+    for (q, (&x, &y)) in av.iter().zip(bv).enumerate() {
         let p = x * y;
         if p.is_nan() {
             return num::DNAN32;
@@ -229,75 +238,80 @@ fn eval_f32_dot(av: &[f64], bv: &[f64], c_bits: u32) -> u32 {
         } else if p == f64::NEG_INFINITY {
             has_neg_inf = true;
         }
-        sum += p;
+        products[q] = p;
     }
     if has_pos_inf && has_neg_inf {
         return num::DNAN32;
     }
-    if num::is_nan32(c_bits) {
-        return c_bits | 0x0040_0000;
+    if has_pos_inf {
+        return 0x7F80_0000;
     }
-    let total = sum + cv;
-    if total.is_nan() {
-        return num::DNAN32;
+    if has_neg_inf {
+        return 0xFF80_0000;
     }
-    if total == 0.0 {
+
+    let g = (128 / a_bits).min(n).max(1);
+    let mut acc = cv;
+    for s0 in (0..n).step_by(g) {
+        let end = (s0 + g).min(n);
+        let Some(top) = (s0..end)
+            .filter(|&q| products[q] != 0.0)
+            .map(|q| floor_log2(av[q].abs()) + floor_log2(bv[q].abs()))
+            .max()
+        else {
+            continue;
+        };
+        let qe = top - 24;
+        let step = 2f64.powi(qe);
+        let s: i128 = (s0..end)
+            .filter(|&q| products[q] != 0.0)
+            .map(|q| (products[q] / step).trunc() as i128)
+            .sum();
+        acc = if acc == 0.0 {
+            round_exact(s, qe, Elem::F32)
+        } else {
+            let (am, ae) = parts(acc);
+            if ae >= qe {
+                if ae - qe <= 90 {
+                    round_exact((am << (ae - qe)) + s, qe, Elem::F32)
+                } else {
+                    round_exact((am << 64) + s.signum(), ae - 64, Elem::F32)
+                }
+            } else {
+                let floored = (acc / step).floor() as i128;
+                round_exact(floored + s, qe, Elem::F32)
+            }
+        };
+    }
+
+    if acc == 0.0 {
         let neg = |x: f64| x == 0.0 && x.is_sign_negative();
-        let all_neg = neg(cv) && av.iter().zip(bv).all(|(&x, &y)| neg(x * y));
+        let all_neg = neg(cv) && products[..n].iter().all(|&p| neg(p));
         return if all_neg { 0x8000_0000 } else { 0 };
     }
-    (total as f32).to_bits()
+    (acc as f32).to_bits()
 }
 
 /// Evaluates an `f32`-input SGEMM MFMA (`v_mfma_f32_*_f32`) via sequential
-/// single-rounded IEEE binary32 `mul_add` steps (`D = fma(A[k], B[k], acc)`).
-fn eval_sgemm_fma(av: &[f64], bv: &[f64], c_bits: u32) -> u32 {
-    for (&x, &y) in av.iter().zip(bv) {
-        if x.is_nan()
-            || y.is_nan()
-            || (x == 0.0 && y.is_infinite())
-            || (x.is_infinite() && y == 0.0)
-        {
-            return num::DNAN32;
-        }
+/// single-rounded `v_fma_f32` steps (`D = fma(A[k], B[k], acc)`), preserving
+/// NaN sign and payload per step as measured on MI300X.
+fn eval_sgemm_fma(a_raw: &[u32], b_raw: &[u32], c_bits: u32) -> u32 {
+    let mut acc = c_bits;
+    for (&x, &y) in a_raw.iter().zip(b_raw) {
+        acc = fma_f32(x, y, acc);
     }
-    if num::is_nan32(c_bits) {
-        return c_bits | 0x0040_0000;
-    }
-    let mut acc = f32_of(c_bits);
-    for (&x, &y) in av.iter().zip(bv) {
-        acc = (x as f32).mul_add(y as f32, acc);
-        if acc.is_nan() {
-            return num::DNAN32;
-        }
-    }
-    acc.to_bits()
+    acc
 }
 
-/// Evaluates an `f64`-accumulating MFMA dot product via fused `mul_add` steps.
-fn eval_f64_dot(av: &[f64], bv: &[f64], c_bits: u64) -> u64 {
-    const DNAN64: u64 = 0xFFF8_0000_0000_0000;
-    const QUIET64: u64 = 0x0008_0000_0000_0000;
-    for (&x, &y) in av.iter().zip(bv) {
-        if x.is_nan()
-            || y.is_nan()
-            || (x == 0.0 && y.is_infinite())
-            || (x.is_infinite() && y == 0.0)
-        {
-            return DNAN64;
-        }
+/// Evaluates an `f64`-accumulating MFMA dot product via fused `mul_add` steps
+/// with MI300X-measured `fma_nan64` payload propagation.
+fn eval_f64_dot(a_raw: &[u64], b_raw: &[u64], c_bits: u64) -> u64 {
+    let mut acc = c_bits;
+    for (&x, &y) in a_raw.iter().zip(b_raw) {
+        let r = f64::from_bits(x).mul_add(f64::from_bits(y), f64::from_bits(acc));
+        acc = num::fma_nan64(r, x, y, acc);
     }
-    let mut acc = f64::from_bits(c_bits);
-    if acc.is_nan() {
-        return c_bits | QUIET64;
-    }
-    for (&x, &y) in av.iter().zip(bv) {
-        acc = x.mul_add(y, acc);
-        if acc.is_nan() {
-            return DNAN64;
-        }
-    }
-    acc.to_bits()
+    acc
 }
 
 /// Executes a wave64 `v_mfma_*` or `v_smfmac_*` instruction in value mode.
@@ -441,6 +455,10 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
     let active_terms = if form.sparse { k / 2 } else { k };
     let mut av = vec![0.0f64; active_terms];
     let mut bv = vec![0.0f64; active_terms];
+    let mut a_raw32 = vec![0u32; active_terms];
+    let mut b_raw32 = vec![0u32; active_terms];
+    let mut a_raw64 = vec![0u64; active_terms];
+    let mut b_raw64 = vec![0u64; active_terms];
 
     for b in 0..blocks {
         for i in 0..m {
@@ -497,16 +515,26 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                             input_loc(m, k, blocks, i, kk, b, a_bits, false, false, cbsz, abid, 0);
                         let (b_dw, b_lo, b_lane) =
                             input_loc(n, k, blocks, j, kk, b, b_bits, false, false, 0, 0, blgp);
-                        let mut x = decode_elem(&a_regs[a_lane], form.a, a_dw, a_lo);
-                        let mut y = decode_elem(&b_regs[b_lane], form.b, b_dw, b_lo);
-                        if neg_f64[0] {
-                            x = -x;
+                        if is_f64 {
+                            let mut xa = u64::from(a_regs[a_lane][a_dw])
+                                | (u64::from(a_regs[a_lane][a_dw + 1]) << 32);
+                            let mut yb = u64::from(b_regs[b_lane][b_dw])
+                                | (u64::from(b_regs[b_lane][b_dw + 1]) << 32);
+                            if neg_f64[0] {
+                                xa ^= 1u64 << 63;
+                            }
+                            if neg_f64[1] {
+                                yb ^= 1u64 << 63;
+                            }
+                            a_raw64[kk] = xa;
+                            b_raw64[kk] = yb;
+                        } else if form.a == Elem::F32 && form.b == Elem::F32 {
+                            a_raw32[kk] = a_regs[a_lane][a_dw];
+                            b_raw32[kk] = b_regs[b_lane][b_dw];
+                        } else {
+                            av[kk] = decode_elem(&a_regs[a_lane], form.a, a_dw, a_lo);
+                            bv[kk] = decode_elem(&b_regs[b_lane], form.b, b_dw, b_lo);
                         }
-                        if neg_f64[1] {
-                            y = -y;
-                        }
-                        av[kk] = x;
-                        bv[kk] = y;
                     }
                 }
 
@@ -516,7 +544,7 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                     if neg_f64[2] {
                         c_bits ^= 1u64 << 63;
                     }
-                    let res = eval_f64_dot(&av, &bv, c_bits);
+                    let res = eval_f64_dot(&a_raw64, &b_raw64, c_bits);
                     out[d_dw][d_lane] = res as u32;
                     out[d_dw + 1][d_lane] = (res >> 32) as u32;
                 } else if is_int {
@@ -527,10 +555,10 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                     out[d_dw][d_lane] = acc as i32 as u32;
                 } else if form.a == Elem::F32 && form.b == Elem::F32 {
                     let c_bits = c_regs[d_lane][d_dw];
-                    out[d_dw][d_lane] = eval_sgemm_fma(&av, &bv, c_bits);
+                    out[d_dw][d_lane] = eval_sgemm_fma(&a_raw32, &b_raw32, c_bits);
                 } else {
                     let c_bits = c_regs[d_lane][d_dw];
-                    out[d_dw][d_lane] = eval_f32_dot(&av, &bv, c_bits);
+                    out[d_dw][d_lane] = eval_xdlop_dot(&av, &bv, c_bits, a_bits);
                 }
             }
         }
