@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "thin"
-description = "A Python DSL for writing AMD GPU kernels (gfx1201, RDNA 4) at the instruction level, with an emulator"
+description = "A Python DSL for writing AMD GPU kernels (gfx1201 RDNA 4, gfx942 CDNA 3 / MI300X) at the instruction level, with an emulator"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "FSL-1.1-ALv2"

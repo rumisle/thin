@@ -43,9 +43,16 @@ Bit-level conversions and ALU routines explicitly handle NaNs, signed zero,
 subnormals, fused rounding and destination halves. A host floating-point
 operation is used only where its behavior matches the implemented instruction.
 Hardware tests include payload-heavy NaNs, cancellation, midpoints and dense
-transcendental sweeps. The WMMA dot model incorporates measured summation and
-rounding behavior. Some bf8 random cases still disagree; this is a documented
-model limit, not a license to accept a wrong output.
+transcendental sweeps. The `gfx1201` WMMA dot model incorporates measured summation and rounding
+behavior (some bf8 random cases still disagree; this is a documented model
+limit, not a license to accept a wrong output). On `gfx942` (measured on an
+Instinct MI300X), integer and `f64` DGEMM forms, sequential single-rounded
+`f32` SGEMM forms (including NaN payload propagation), `xf32` bitwise mantissa
+truncation (`raw & 0xFFFF_E000`) and the 128-bit grouped XDLOP dot model (`f16`,
+`bf16`, `xf32`, `fp8`/`bf8`, dense and sparse `v_smfmac_*`, with canonical
+`0xFFC0_0000` NaN output) match hardware bit for bit across the hardware suite
+(extreme wide-exponent `fp8`/`bf8` randoms remain a documented model limit, as
+on `gfx1201`).
 
 ## Provenance
 
@@ -70,9 +77,11 @@ report wrong coordinates, missing or repeated partial sums and invalid stores.
 It does not establish numerical accuracy, arbitrary epilogue equivalence,
 complete K coverage across every control-flow path or correctness under every
 concurrent schedule. A coordinate/provenance match is not an algebraic proof.
-The current target has no wired GEMM matrix form for WMMA: asking the checker
-to validate that event gives an explicit limit instead of claiming success.
-Abstract matrix-form tests exercise the checker independently of execution.
+Dense `MatrixForm` shapes on `gfx942` (MFMA over AGPR/VGPR accumulators,
+including inputs staged via VMEM-to-LDS DMA) wire directly into the checker;
+forms without a wired GEMM shape model (such as `gfx1201` WMMA or sparse
+`v_smfmac_*`) raise an explicit `EmuLimit` instead of claiming success.
+Abstract matrix-form tests also exercise the checker independently of execution.
 
 MX scale factors, scale tables, nibble layouts and pending scales are not
 implemented. Unsupported machine operations and checker events must produce

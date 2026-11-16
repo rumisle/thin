@@ -4,7 +4,7 @@
 
 thin is a Python DSL for writing AMD GPU kernels at the instruction level, with an emulator that models the hardware exactly.
 
-thin currently supports gfx1201 (RDNA 4).
+thin currently supports **gfx1201** (RDNA 4) and **gfx942** (CDNA 3 / Instinct MI300X).
 
 ## Install
 
@@ -51,8 +51,8 @@ kernel.bind(grid=cdiv(n, 256), args={"x": x, "y": y, "z": z, "n": n}).emulate()
 assert np.array_equal(z, x + y)
 ```
 
-`emulate()` runs the kernel on the CPU, on numpy arrays. On a gfx1201 GPU,
-bind torch tensors and call `run()`:
+`emulate()` runs the kernel on the CPU, on numpy arrays. On a supported AMD GPU
+(`gfx1201` or `gfx942`), bind torch tensors and call `run()`:
 
 ```python
 import torch
@@ -62,6 +62,24 @@ zg = torch.zeros_like(xg)
 kernel.bind(grid=cdiv(n, 256), args={"x": xg, "y": yg, "z": zg, "n": n}).run()
 assert torch.equal(zg, xg + yg)
 ```
+
+Select a target explicitly with `thin.target.targeting` (default `gfx1201`):
+
+```python
+from thin.target import targeting
+
+with targeting("gfx942"):
+    mi300x_kernel = compile(vadd)
+    mi300x_kernel.bind(grid=cdiv(n, 256), args={"x": x, "y": y, "z": z, "n": n}).emulate()
+```
+
+On `gfx942` (CDNA 3 / MI300X), thin models wave64 execution, AGPR (`b.a`) and
+VGPR (`b.v`) accumulators, all dense `v_mfma_*` and sparse 4:2 `v_smfmac_*`
+shapes (`b.mfma`, `b.smfmac`, `b.read_acc`, `b.write_acc`), pass-count-aware
+`s_nop` matrix hazards, FNUZ FP8/BF8 (`e4m3fnuz` / `e5m2fnuz`), global/buffer
+to LDS DMA (`O.global_load(tile, ...)` / `O.buffer_load(tile, ...)`), GFX9 DPP
+broadcasts and wave shifts, packed `v_pk_*_f32` ops, and the 32-bank LDS
+conflict model.
 
 ## Development
 
@@ -80,8 +98,9 @@ With uv:
 
 The first build compiles the Rust core; after that, a Rust edit rebuilds
 the extension in about a second (with pip, run `pip install -e .` again).
-Hardware tests need a gfx1201 GPU: `pytest -m gfx1201`. The timing
-harness, `metron`, lives in `python/metron`.
+Hardware tests run per target: `pytest -m gfx1201` on RDNA 4, or
+`pytest -m gfx942` on Instinct MI300X. The timing harness, `metron`, lives in
+`python/metron`.
 
 Documentation is in [docs/](https://github.com/rumisle/thin/tree/main/docs).
 

@@ -1,7 +1,8 @@
 # Architecture
 
 thin compiles instruction-level Python kernels to AMD GPU code objects and
-runs the same programs in a CPU emulator. gfx1201 is the current target.
+runs the same programs in a CPU emulator. `gfx1201` (RDNA 4) and `gfx942`
+(CDNA 3 / Instinct MI300X) are the supported targets.
 `metron`, kept in this tree, is a separate timing and correctness harness;
 it is not part of thin's PyPI distribution.
 
@@ -15,12 +16,12 @@ checks its dependencies and rejects domain branches and loops in the binding.
 
 | crate | responsibility |
 |---|---|
-| thin-formats | element encodings, host MX quantization, layouts, MessagePack, code objects |
-| thin-target | target vocabulary, form rules, shared assembly reader and assembler driver |
-| thin-ir | immutable instructions, snapshots, CFG, dataflow, diagnostics and printing |
-| thin-passes | hazards, waits, register allocation, ranges, alias and LDS checks |
-| thin-targets | concrete targets, instruction tables, encoder/decoder, hardware hooks |
-| thin-dsl | Builder state, typed values, expression lowering, control flow and arguments |
+| thin-formats | element encodings (OCP & FNUZ FP8/BF8, FP16/BF16/FP4/FP6), host MX quantization, layouts, MessagePack, code objects |
+| thin-target | target vocabulary, `MatrixForm` shapes, form rules, shared assembly reader and assembler driver |
+| thin-ir | immutable instructions, snapshots, CFG, dataflow (`v`/`s`/`a` files, `m0`, VMEM-to-LDS DMA), diagnostics and printing |
+| thin-passes | pass-count-aware hazards (`s_delay_alu` / `s_nop`), waits (`s_wait_*` / `s_waitcnt`), register allocation, ranges, alias and LDS checks |
+| thin-targets | concrete targets (`gfx1201`, `gfx942`), instruction tables, encoder/decoder, hardware hooks |
+| thin-dsl | Builder state, typed values, matrix/MFMA/SMFMAC helpers, VMEM-to-LDS DMA, expression lowering, control flow and arguments |
 | thin-codegen | compilation pipeline, placement, ABI, manifest and code-object construction |
 | thin-lift | physical assembly/code-object lifting, register-value recovery and execution laws |
 | thin-emu | decoded machine execution, memory, provenance and experimental GEMM checks |
@@ -65,7 +66,8 @@ This gives scheduling tests a check that cannot simply repeat the same bug.
 
 ## Encoding and lifting
 
-The gfx1201 encoder and decoder use checked-in instruction tables. Successfully
+Each target's encoder and decoder (`gfx1201` and `gfx942`) use checked-in
+instruction tables derived from AMD's machine-readable ISA XML. Successfully
 decoded bytes must encode back identically; forms that cannot preserve the
 input are refused rather than guessed. ELF descriptor and metadata checks
 are separate from instruction decoding.
@@ -93,9 +95,14 @@ plain data. Tag tables are caller-owned Rust values; the Python binding keeps
 process-scoped tables with a scoped fresh-table context for tests.
 
 The emulator is a functional model with selected counters, not a cycle-level
-GPU simulator. Its numerical routines and WMMA model are tested against GPU
-measurements. A successful run does not prove a kernel race-free on all hardware
-schedules. Read [emulator.md](emulator.md) before treating a diagnostic as a proof.
+GPU simulator. Its numerical routines, wave32 WMMA model (`gfx1201`, fitted to
+RX 9070 XT measurements) and wave64 MFMA / sparse SMFMAC model (`gfx942`,
+fitted to Instinct MI300X measurements across AGPR/VGPR accumulators, FNUZ
+FP8/BF8, VMEM-to-LDS DMA, GFX9 DPP controls, packed `v_pk_*_f32` ops and
+32-bank LDS conflict tracking) are tested against ISA specifications, AMD
+Matrix Calculator, LLVM MC/codegen and GPU hardware. A successful run
+does not prove a kernel race-free on all hardware schedules. Read
+[emulator.md](emulator.md) before treating a diagnostic as a proof.
 
 ## Runtime and tooling
 
@@ -116,8 +123,10 @@ uses host launches instead.
   and expected output data is under each crate's `tests/data`.
 - Python API, runtime and host protocol tests live in `tests`; Python-only
   golden data is in `tests/data`. Shared core data is read in place.
-- Hardware tests (`pytest -m gfx1201`) compare emitted programs, numerical
-  edge cases, WMMA output, memory visibility and timing behavior on RDNA 4.
+- Hardware tests (`pytest -m gfx1201` on RDNA 4; `pytest -m gfx942` on CDNA 3 /
+  MI300X) compare emitted programs, numerical edge cases, WMMA/MFMA/SMFMAC
+  output, FNUZ FP8 conversions, VMEM-to-LDS DMA, DPP/VOP3P semantics, memory
+  visibility and timing behavior against `thin.emu`.
 - Architecture tests enforce target isolation, the emulator's layering and
   the binding boundary. The independent native wait checker validates waits;
   Python delay-hint tests recompute VALU dependencies from assembly. There

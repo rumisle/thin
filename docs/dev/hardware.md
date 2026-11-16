@@ -1,11 +1,20 @@
 # Hardware validation
 
-The hardware suite runs on an RX 9070 XT (gfx1201, 32 WGPs / 64 CUs,
-16 GB), with ROCm 7.1. Tests explicitly select and assert gfx1201.
+Hardware suites run per target:
+
+- **RDNA 4 (`gfx1201`)**: validated on an RX 9070 XT (32 WGPs / 64 CUs, 16 GB)
+  with ROCm 7.1 (`pytest -m gfx1201`).
+- **CDNA 3 (`gfx942`)**: validated on an Instinct MI300X VF (304 CUs across
+  8 XCDs in SPX partition, 192 GB HBM3) with ROCm 10.1 (`pytest -m gfx942`, see
+  `tests/hw/test_gfx942_hw.py`).
+
+Tests explicitly select the matching GPU, enter `targeting(<arch>)`, and skip
+cleanly when that GPU is absent.
 
 ```sh
 uv sync
-uv run pytest -m gfx1201
+uv run pytest -m gfx1201   # on RDNA 4
+uv run pytest -m gfx942    # on MI300X / CDNA 3
 ```
 
 Rebuild the extension after pulling Rust changes. Tests are held to
