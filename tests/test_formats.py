@@ -424,7 +424,7 @@ def test_code_object_refusals():
     with pytest.raises(formats.CodeObjectError):
         formats.write(b"k", b"\0", bytes(64), meta, 0x4E)
     with pytest.raises(formats.CodeObjectError):
-        formats.write("k", b"\0", bytes(64), meta, 0x4F)
+        formats.write("k", b"\0", bytes(64), meta, 0xFF)
     import enum
 
     class Flag(enum.IntEnum):
@@ -439,7 +439,8 @@ def test_code_object_refusals():
     with pytest.raises(formats.CodeObjectError, match="an int, not float"):
         formats.write("k", b"\0", bytes(64), meta, 78.0)
     with pytest.raises(ValueError, match="0x4e"):
-        formats.target_of(0x4F)
+        formats.target_of(0xFF)
+    assert formats.target_of(0x54F) == "gfx950"
     assert formats.read(formats.write("k", b"\0", bytes(64), meta, 0x4E)).symbol == "k"
 
 

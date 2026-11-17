@@ -93,7 +93,7 @@ class _Table:
             roles[0] = "rw"
         if roles and (
             mnemonic == "v_swap_b32"
-            or (mnemonic.startswith("v_permlane") and mnemonic.endswith("_swap_b32"))
+            or (mnemonic.startswith("v_permlane") and "_swap_b32" in mnemonic)
         ):
             roles[0:2] = ["rw", "rw"]
         for key in [mnemonic, *([rules.alias[mnemonic]] if mnemonic in rules.alias else [])]:

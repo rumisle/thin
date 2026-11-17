@@ -252,6 +252,42 @@ fn source(word: &mut Word<'_>, field: &OpOperand, o: &Operand) -> Result<u32, St
     Ok(code)
 }
 
+pub(super) fn is_f64_fmt(fmt: &str) -> bool {
+    matches!(fmt, "FMT_NUM_F64" | "FMT_NUM_PK4_F64" | "FMT_NUM_PK16_F64")
+}
+
+pub(super) fn is_b64_fmt(fmt: &str) -> bool {
+    matches!(
+        fmt,
+        "FMT_NUM_B64"
+            | "FMT_NUM_U64"
+            | "FMT_NUM_I64"
+            | "FMT_NUM_M64"
+            | "FMT_NUM_PK2_B32"
+            | "FMT_NUM_PK2_B64"
+    )
+}
+
+pub(super) fn is_wide_fmt(fmt: &str) -> bool {
+    matches!(
+        fmt,
+        "FMT_NUM_F32" | "FMT_NUM_B32" | "FMT_NUM_U32" | "FMT_NUM_I32"
+    ) || (fmt.starts_with("FMT_NUM_PK") && !is_f64_fmt(fmt) && !is_b64_fmt(fmt))
+}
+
+pub(super) fn is_float_fmt(fmt: &str) -> bool {
+    matches!(
+        fmt,
+        "FMT_NUM_F16"
+            | "FMT_NUM_BF16"
+            | "FMT_NUM_F32"
+            | "FMT_NUM_F64"
+            | "FMT_NUM_PK2_F16"
+            | "FMT_NUM_PK2_BF16"
+            | "FMT_NUM_PK2_F32"
+    )
+}
+
 fn constant(
     word: &mut Word<'_>,
     field: &OpOperand,
@@ -260,15 +296,9 @@ fn constant(
     allow_literal: bool,
 ) -> Result<u32, String> {
     let text = &o.text;
-    let wide = matches!(
-        field.format.as_str(),
-        "FMT_NUM_F32" | "FMT_NUM_B32" | "FMT_NUM_U32" | "FMT_NUM_I32"
-    );
-    let f64_fmt = field.format == "FMT_NUM_F64";
-    let b64_fmt = matches!(
-        field.format.as_str(),
-        "FMT_NUM_B64" | "FMT_NUM_U64" | "FMT_NUM_I64" | "FMT_NUM_M64"
-    );
+    let wide = is_wide_fmt(&field.format);
+    let f64_fmt = is_f64_fmt(&field.format);
+    let b64_fmt = is_b64_fmt(&field.format);
     match (o.kind, &o.value) {
         (OperandKind::Int, Some(Value::Int(v))) => {
             if (0..=64).contains(v) {
@@ -734,16 +764,52 @@ fn vop3(word: &mut Word<'_>, op: &Op, line: &Line) -> Refusal {
     Ok(())
 }
 
-/// VOP3 ops accepting `op_sel` on gfx942 (verified exhaustively against `llvm-mc -mcpu=gfx942`).
-pub(super) const OPSEL_OPS: [(&str, u32); 28] = [
+/// VOP3 ops accepting `op_sel` across CDNA 3 and CDNA 4 (verified against `llvm-mc`).
+pub(super) const OPSEL_OPS: [(&str, u32); 64] = [
     ("v_add_i16", 0b1011),
     ("v_alignbit_b32", 0b1111),
     ("v_alignbyte_b32", 0b1111),
+    ("v_ashr_pk_i8_i32", 0b1111),
+    ("v_ashr_pk_u8_i32", 0b1111),
+    ("v_bitop3_b16", 0b1111),
     ("v_cvt_pk_bf8_f32", 0b1011),
     ("v_cvt_pk_fp8_f32", 0b1011),
     ("v_cvt_pknorm_i16_f16", 0b1011),
     ("v_cvt_pknorm_u16_f16", 0b1011),
+    ("v_cvt_scalef32_f16_bf8", 0b1011),
+    ("v_cvt_scalef32_f16_fp8", 0b1011),
+    ("v_cvt_scalef32_f32_bf8", 0b1011),
+    ("v_cvt_scalef32_f32_fp8", 0b1011),
+    ("v_cvt_scalef32_pk_bf16_bf8", 0b1011),
+    ("v_cvt_scalef32_pk_bf16_fp4", 0b1011),
+    ("v_cvt_scalef32_pk_bf16_fp8", 0b1011),
+    ("v_cvt_scalef32_pk_bf8_bf16", 0b1011),
+    ("v_cvt_scalef32_pk_bf8_f16", 0b1011),
+    ("v_cvt_scalef32_pk_bf8_f32", 0b1111),
+    ("v_cvt_scalef32_pk_f16_bf8", 0b1011),
+    ("v_cvt_scalef32_pk_f16_fp4", 0b1011),
+    ("v_cvt_scalef32_pk_f16_fp8", 0b1011),
+    ("v_cvt_scalef32_pk_f32_bf8", 0b1011),
+    ("v_cvt_scalef32_pk_f32_fp4", 0b1011),
+    ("v_cvt_scalef32_pk_f32_fp8", 0b1011),
+    ("v_cvt_scalef32_pk_fp4_bf16", 0b1111),
+    ("v_cvt_scalef32_pk_fp4_f16", 0b1111),
+    ("v_cvt_scalef32_pk_fp4_f32", 0b1111),
+    ("v_cvt_scalef32_pk_fp8_bf16", 0b1011),
+    ("v_cvt_scalef32_pk_fp8_f16", 0b1011),
+    ("v_cvt_scalef32_pk_fp8_f32", 0b1111),
+    ("v_cvt_scalef32_sr_bf8_bf16", 0b1111),
+    ("v_cvt_scalef32_sr_bf8_f16", 0b1111),
+    ("v_cvt_scalef32_sr_bf8_f32", 0b1111),
+    ("v_cvt_scalef32_sr_fp8_bf16", 0b1111),
+    ("v_cvt_scalef32_sr_fp8_f16", 0b1111),
+    ("v_cvt_scalef32_sr_fp8_f32", 0b1111),
+    ("v_cvt_scalef32_sr_pk_fp4_bf16", 0b1111),
+    ("v_cvt_scalef32_sr_pk_fp4_f16", 0b1111),
+    ("v_cvt_scalef32_sr_pk_fp4_f32", 0b1111),
+    ("v_cvt_sr_bf16_f32", 0b1011),
     ("v_cvt_sr_bf8_f32", 0b1111),
+    ("v_cvt_sr_f16_f32", 0b1011),
     ("v_cvt_sr_fp8_f32", 0b1111),
     ("v_div_fixup_f16", 0b1111),
     ("v_fma_f16", 0b1111),
@@ -774,11 +840,36 @@ pub(super) fn opsel_bits(name: &str) -> u32 {
 }
 
 pub(super) fn opsel_len(name: &str, nsrc: usize) -> usize {
-    if matches!(name, "v_cvt_sr_fp8_f32" | "v_cvt_sr_bf8_f32") {
+    if matches!(
+        name,
+        "v_cvt_sr_fp8_f32"
+            | "v_cvt_sr_bf8_f32"
+            | "v_cvt_scalef32_pk_fp4_bf16"
+            | "v_cvt_scalef32_pk_fp4_f16"
+    ) {
         4
     } else {
         nsrc + 1
     }
+}
+
+pub(super) fn vop3_takes_clamp_omod(name: &str) -> bool {
+    !name.starts_with("v_cvt_scalef32_")
+        && !matches!(
+            name,
+            "v_cvt_sr_bf16_f32"
+                | "v_cvt_sr_f16_f32"
+                | "v_ashr_pk_i8_i32"
+                | "v_ashr_pk_u8_i32"
+                | "v_bitop3_b16"
+                | "v_bitop3_b32"
+                | "v_permlane16_swap_b32"
+                | "v_permlane16_swap_b32_e64"
+                | "v_permlane32_swap_b32"
+                | "v_permlane32_swap_b32_e64"
+                | "v_prng_b32"
+                | "v_prng_b32_e64"
+        )
 }
 
 fn vop3_opsel(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -> Refusal {
@@ -809,9 +900,11 @@ fn vop3_opsel(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -> Refusal 
     word.put("opsel", u64::from(value))
 }
 
-/// Sign modifiers `(neg, abs)` for VOP3/VOP3_SDST/VOP3SD/DPP16 on gfx942
-/// (verified exhaustively against `llvm-mc -mcpu=gfx942`).
+/// Sign modifiers `(neg, abs)` for VOP3/VOP3_SDST/VOP3SD/DPP16 across CDNA 3 and CDNA 4.
 pub(super) fn signs_of(name: &str, class: &str, field: &OpOperand) -> (bool, bool) {
+    if name.contains("_pk32_") || name.contains("_2xpk16_") {
+        return (false, false);
+    }
     if matches!(
         name,
         "v_cmp_class_f16_e64" | "v_cmpx_class_f16_e64" | "v_ldexp_f16_e64"
@@ -819,14 +912,55 @@ pub(super) fn signs_of(name: &str, class: &str, field: &OpOperand) -> (bool, boo
     {
         return (false, false);
     }
-    let float = matches!(
-        field.format.as_str(),
-        "FMT_NUM_F16" | "FMT_NUM_BF16" | "FMT_NUM_F32" | "FMT_NUM_F64"
-    );
+    let float = is_float_fmt(&field.format);
     let cndmask = name == "v_cndmask_b32_e64" && (field.field == "src0" || field.field == "src1");
     let neg = float || cndmask;
     let abs = neg && class != "VOP3SD";
     (neg, abs)
+}
+
+fn bit_modifier(line: &Line, key: &str) -> Result<u64, String> {
+    match int_modifier(line, key)? {
+        None | Some(0) => Ok(0),
+        Some(1) => Ok(1),
+        Some(v) => Err(format!("{key}:{v}: expected 0 or 1")),
+    }
+}
+
+fn vop3_permlane_swap(word: &mut Word<'_>, line: &Line) -> Refusal {
+    if let Some(o) = line.operands.iter().find(|o| o.neg || o.abs) {
+        return Err(format!("`{}`: no neg or abs here", o.text));
+    }
+    let bc = bit_modifier(line, "bound_ctrl")?;
+    let fi = bit_modifier(line, "fi")?;
+    let opsel = fi | (bc << 1);
+    if opsel != 0 {
+        word.put("opsel", opsel)?;
+    }
+    Ok(())
+}
+
+fn vop3_bitop3(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -> Refusal {
+    if let Some(o) = line.operands.iter().find(|o| o.neg || o.abs) {
+        return Err(format!("`{}`: no neg or abs on {name}", o.text));
+    }
+    let b = int_modifier(line, "bitop3")?.unwrap_or(0);
+    if !(0..=255).contains(&b) {
+        return Err(format!("bitop3 {b}: 0..255"));
+    }
+    let neg = (b & 7) as u64;
+    let abs = ((b >> 3) & 7) as u64;
+    let omod = ((b >> 6) & 3) as u64;
+    if neg != 0 {
+        word.put("neg", neg)?;
+    }
+    if abs != 0 {
+        word.put("abs", abs)?;
+    }
+    if omod != 0 {
+        word.put("omod", omod)?;
+    }
+    vop3_opsel(word, op, name, line)
 }
 
 fn vop3_signs_and_clamp(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -> Refusal {
@@ -863,6 +997,9 @@ fn vop3_signs_and_clamp(word: &mut Word<'_>, op: &Op, name: &str, line: &Line) -
     }
     if abs != 0 {
         word.put("abs", abs)?;
+    }
+    if !vop3_takes_clamp_omod(name) {
+        return Ok(());
     }
     if flag_modifier(line, "clamp")? != 0 {
         word.put("clmp", 1)?;
@@ -980,18 +1117,77 @@ fn packed(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal 
     Ok(())
 }
 
+/// Register count in dwords for an `f8f6f4` MFMA `src0` (`cbsz`) or `src1` (`blgp`) tuple:
+/// `2 | 3` (FP6 / BF6) -> 6 dwords, `4` (FP4) -> 4 dwords, `0 | 1 | 5..7` (FP8 / BF8) -> 8 dwords.
+pub(super) fn f8f6f4_dwords(sel: u64) -> u32 {
+    match sel {
+        2 | 3 => 6,
+        4 => 4,
+        _ => 8,
+    }
+}
+
 /// Matrix ops (`VOP3P_MFMA`): `v_mfma_*` and `v_smfmac_*`.
 fn mfma(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     let present = fields(op, &["vdst", "src0", "src1", "src2"]);
     count(line, present.len())?;
     let smfmac = mnemonic.starts_with("v_smfmac_");
+    let f8f6f4 = mnemonic.ends_with("_f8f6f4");
+
+    let cbsz_opt = int_modifier(line, "cbsz")?;
+    if let Some(cbsz) = cbsz_opt {
+        if !(0..8).contains(&cbsz) {
+            return Err(format!("cbsz {cbsz}: 0..7"));
+        }
+        word.put("cbsz", cbsz as u64)?;
+    }
+    if !f8f6f4 {
+        if let Some(abid) = int_modifier(line, "abid")? {
+            if !(0..16).contains(&abid) {
+                return Err(format!("abid {abid}: 0..15"));
+            }
+            word.put("abid", abid as u64)?;
+        }
+    }
+    let mut blgp_val = 0u64;
+    if mnemonic.starts_with("v_mfma_f64_") {
+        if int_modifier(line, "blgp")?.is_some() {
+            return Err("blgp: not valid on f64 MFMA (use neg:[s0,s1,s2])".into());
+        }
+        if let Some(given) = line.modifiers.take("neg") {
+            let ModValue::List(bits) = given else {
+                return Err("neg: expected a list of 3 bits".into());
+            };
+            if bits.is_empty() || bits.len() > 3 || bits.iter().any(|b| !(0..=1).contains(b)) {
+                return Err("neg: expected 1..3 binary bits".into());
+            }
+            let mask = bits
+                .iter()
+                .enumerate()
+                .fold(0u64, |v, (j, b)| v | (*b as u64) << j);
+            word.put("blgp", mask)?;
+        }
+    } else if let Some(blgp) = int_modifier(line, "blgp")? {
+        if smfmac || !(0..8).contains(&blgp) {
+            return Err(format!("blgp {blgp}: not valid here"));
+        }
+        blgp_val = blgp as u64;
+        word.put("blgp", blgp_val)?;
+    }
+
     let (vdst, cd_acc) = av_register(&line.operands[0], dwords(present[0]))?;
     word.put("vdst", u64::from(vdst))?;
     word.put("acc_cd", u64::from(cd_acc))?;
 
     let mut acc_ab = 0u64;
+    let ab_sels = [cbsz_opt.unwrap_or(0) as u64, blgp_val];
     for (idx, (&f, o)) in present[1..3].iter().zip(&line.operands[1..3]).enumerate() {
-        let (reg, is_acc) = av_register(o, dwords(f))?;
+        let w = if f8f6f4 {
+            f8f6f4_dwords(ab_sels[idx])
+        } else {
+            dwords(f)
+        };
+        let (reg, is_acc) = av_register(o, w)?;
         word.put(&f.field, 256 + u64::from(reg))?;
         acc_ab |= u64::from(is_acc) << idx;
     }
@@ -1019,42 +1215,83 @@ fn mfma(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
             _ => return Err(format!("`{}`: invalid MFMA src2 operand", o2.text)),
         }
     };
-    word.put("src2", u64::from(src2_code))?;
+    word.put("src2", u64::from(src2_code))
+}
 
-    if let Some(cbsz) = int_modifier(line, "cbsz")? {
-        if !(0..8).contains(&cbsz) {
-            return Err(format!("cbsz {cbsz}: 0..7"));
-        }
+/// 128-bit MX-scaled matrix ops (`VOP3PX2`): `v_mfma_scale_f32_{16x16x128,32x32x64}_f8f6f4`.
+fn mfma_scale(word: &mut Word<'_>, op: &Op, line: &Line) -> Refusal {
+    let present = fields(
+        op,
+        &["vdst", "src0", "src1", "src2", "scale_src0", "scale_src1"],
+    );
+    count(line, present.len())?;
+
+    let cbsz = int_modifier(line, "cbsz")?.unwrap_or(0);
+    if !(0..8).contains(&cbsz) {
+        return Err(format!("cbsz {cbsz}: 0..7"));
+    }
+    if cbsz != 0 {
         word.put("cbsz", cbsz as u64)?;
     }
-    if let Some(abid) = int_modifier(line, "abid")? {
-        if !(0..16).contains(&abid) {
-            return Err(format!("abid {abid}: 0..15"));
-        }
-        word.put("abid", abid as u64)?;
+    let blgp = int_modifier(line, "blgp")?.unwrap_or(0);
+    if !(0..8).contains(&blgp) {
+        return Err(format!("blgp {blgp}: 0..7"));
     }
-    if mnemonic.starts_with("v_mfma_f64_") {
-        if int_modifier(line, "blgp")?.is_some() {
-            return Err("blgp: not valid on f64 MFMA (use neg:[s0,s1,s2])".into());
-        }
-        if let Some(given) = line.modifiers.take("neg") {
-            let ModValue::List(bits) = given else {
-                return Err("neg: expected a list of 3 bits".into());
-            };
-            if bits.is_empty() || bits.len() > 3 || bits.iter().any(|b| !(0..=1).contains(b)) {
-                return Err("neg: expected 1..3 binary bits".into());
-            }
-            let mask = bits
-                .iter()
-                .enumerate()
-                .fold(0u64, |v, (j, b)| v | (*b as u64) << j);
-            word.put("blgp", mask)?;
-        }
-    } else if let Some(blgp) = int_modifier(line, "blgp")? {
-        if smfmac || !(0..8).contains(&blgp) {
-            return Err(format!("blgp {blgp}: not valid here"));
-        }
+    if blgp != 0 {
         word.put("blgp", blgp as u64)?;
+    }
+
+    for (key, field_name) in [("op_sel", "opsel"), ("op_sel_hi", "opsel_hi")] {
+        let Some(given) = line.modifiers.take(key) else {
+            continue;
+        };
+        let ModValue::List(bits) = given else {
+            return Err(format!("{key}: a list of 3 bits"));
+        };
+        if bits.len() != 3 || bits.iter().any(|b| !(0..=1).contains(b)) || bits[2] != 0 {
+            return Err(format!("{key}: expected [b0,b1,0]"));
+        }
+        let v = (bits[0] as u64) | ((bits[1] as u64) << 1);
+        if v != 0 {
+            word.put(field_name, v)?;
+        }
+    }
+
+    let (vdst, cd_acc) = av_register(&line.operands[0], dwords(present[0]))?;
+    word.put("vdst", u64::from(vdst))?;
+    word.put("acc_cd", u64::from(cd_acc))?;
+
+    let mut acc_ab = 0u64;
+    let ab_sels = [cbsz as u64, blgp as u64];
+    for (idx, (&f, o)) in present[1..3].iter().zip(&line.operands[1..3]).enumerate() {
+        let (reg, is_acc) = av_register(o, f8f6f4_dwords(ab_sels[idx]))?;
+        word.put(&f.field, 256 + u64::from(reg))?;
+        acc_ab |= u64::from(is_acc) << idx;
+    }
+    word.put("acc", acc_ab)?;
+
+    let f2 = present[3];
+    let o2 = &line.operands[3];
+    let w2 = dwords(f2);
+    let src2_code = match o2.kind {
+        OperandKind::V | OperandKind::A => {
+            let (reg, is_acc) = av_register(o2, w2)?;
+            if is_acc != cd_acc {
+                return Err(format!(
+                    "`{}`: MFMA src2 register file must match vdst",
+                    o2.text
+                ));
+            }
+            256 + reg
+        }
+        OperandKind::Int | OperandKind::Float => constant(word, f2, o2, w2, false)?,
+        _ => return Err(format!("`{}`: invalid MFMA src2 operand", o2.text)),
+    };
+    word.put("src2", u64::from(src2_code))?;
+
+    for (&f, o) in present[4..6].iter().zip(&line.operands[4..6]) {
+        let reg = register(o, OperandKind::V, 1)?;
+        word.put(&f.field, 256 + u64::from(reg))?;
     }
     Ok(())
 }
@@ -1110,10 +1347,7 @@ fn dpp(t: &CdnaTarget, mnemonic: &str, line: &Line) -> Result<Vec<u8>, String> {
                 wop.operand(sname)
                     .map_or((false, false), |sf| signs_of(&e64, &wop.class, sf))
             } else {
-                let float = matches!(
-                    f.format.as_str(),
-                    "FMT_NUM_F16" | "FMT_NUM_BF16" | "FMT_NUM_F32" | "FMT_NUM_F64"
-                );
+                let float = is_float_fmt(&f.format);
                 (float, float)
             };
             if (o.neg && !sign_ok.0) || (o.abs && !sign_ok.1) {
@@ -1330,7 +1564,7 @@ fn flat_family(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Ref
     cache_flags(word, line)
 }
 
-pub(super) fn is_mubuf_lds_op(mnemonic: &str) -> bool {
+pub(super) fn is_mubuf_lds_op(wide_lds_dma: bool, mnemonic: &str) -> bool {
     matches!(
         mnemonic,
         "buffer_load_ubyte"
@@ -1339,11 +1573,11 @@ pub(super) fn is_mubuf_lds_op(mnemonic: &str) -> bool {
             | "buffer_load_sshort"
             | "buffer_load_dword"
             | "buffer_load_format_x"
-    )
+    ) || (wide_lds_dma && matches!(mnemonic, "buffer_load_dwordx3" | "buffer_load_dwordx4"))
 }
 
 /// `MUBUF` buffer loads, stores, atomics, LDS DMA, and cache maintenance (`buffer_wbl2`, `buffer_inv`).
-fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
+fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, wide_lds_dma: bool, line: &Line) -> Refusal {
     let ops = &line.operands;
     if op.operands.is_empty() {
         // buffer_wbl2 / buffer_inv
@@ -1357,9 +1591,10 @@ fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     let lds = flag_modifier(line, "lds")?;
     let idxen = flag_modifier(line, "idxen")?;
     let offen = flag_modifier(line, "offen")?;
+    let lds_ok = is_mubuf_lds_op(wide_lds_dma, mnemonic);
     let (vdata_opt, vaddr_op, rsrc_op, soff_op) = match (lds != 0, ops.as_slice()) {
-        (true, [va, rs, so]) if is_mubuf_lds_op(mnemonic) => (None, va, rs, so),
-        (true, _) if !is_mubuf_lds_op(mnemonic) => {
+        (true, [va, rs, so]) if lds_ok => (None, va, rs, so),
+        (true, _) if !lds_ok => {
             return Err(format!(
                 "{mnemonic}: lds is not supported on {}",
                 word.target
@@ -1429,7 +1664,21 @@ fn ds(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
         if f.field == "addr" || f.xml_type == "OPR_VGPR" {
             word.put(&f.field, u64::from(register(o, OperandKind::V, dwords(f))?))?;
         } else {
-            let (reg, is_acc) = av_register(o, dwords(f))?;
+            let width = dwords(f);
+            let (reg, is_acc) = if mnemonic == "ds_read_b96_tr_b6" && f.field == "vdst" {
+                match o.kind {
+                    OperandKind::V if o.count == width => (o.n, false),
+                    OperandKind::A if o.count == width => (o.n, true),
+                    _ => {
+                        return Err(format!(
+                            "`{}`: a {width}-dword VGPR or AGPR operand",
+                            o.text
+                        ))
+                    }
+                }
+            } else {
+                av_register(o, width)?
+            };
             if let Some(prev) = acc_seen {
                 if prev != is_acc {
                     return Err("DS data/vdst operands must share register file (v or a)".into());
@@ -1531,16 +1780,23 @@ pub(crate) fn encode(t: &CdnaTarget, text: &str) -> Result<Encoded, String> {
             "VOP1" | "VOP1_SDST" | "VOP2" | "VOPC" => short(&mut word, op, m, &line)?,
             "VOP3" | "VOP3_SDST" | "VOP3SD" => {
                 vop3(&mut word, op, &line)?;
-                vop3_opsel(&mut word, op, &name, &line)?;
-                vop3_signs_and_clamp(&mut word, op, &name, &line)?;
+                if name.starts_with("v_permlane") && name.contains("_swap_") {
+                    vop3_permlane_swap(&mut word, &line)?;
+                } else if name.starts_with("v_bitop3_") {
+                    vop3_bitop3(&mut word, op, &name, &line)?;
+                } else {
+                    vop3_opsel(&mut word, op, &name, &line)?;
+                    vop3_signs_and_clamp(&mut word, op, &name, &line)?;
+                }
             }
             "VOP3P" => {
                 vop3(&mut word, op, &line)?;
                 packed(&mut word, op, m, &line)?;
             }
             "VOP3P_MFMA" => mfma(&mut word, op, m, &line)?,
+            "VOP3PX2" => mfma_scale(&mut word, op, &line)?,
             "FLAT" | "GLOBAL" | "SCRATCH" => flat_family(&mut word, op, m, &line)?,
-            "MUBUF" => mubuf(&mut word, op, m, &line)?,
+            "MUBUF" => mubuf(&mut word, op, m, t.spec.wide_lds_dma, &line)?,
             "DS" => ds(&mut word, op, m, &line)?,
             other => return Err(format!("{name}: class {other} is not encoded")),
         }

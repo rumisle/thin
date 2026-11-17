@@ -266,8 +266,8 @@ named! {
 }
 
 /// Every field name, in the normative order; the first 17, indices 40..49,
-/// and index 52 are the fields a target's line spells.
-pub static FIELD_NAMES: [&str; 53] = [
+/// and indices 52..55 are the fields a target's line spells.
+pub static FIELD_NAMES: [&str; 55] = [
     "dpp",
     "row_mask",
     "bank_mask",
@@ -323,13 +323,15 @@ pub static FIELD_NAMES: [&str; 53] = [
     "lgkmcnt",
     "expcnt",
     "neg",
+    "bitop3",
+    "fi",
 ];
 
 /// How many leading entries of [`FIELD_NAMES`] a target's line spells.
 pub const LINE_FIELDS: usize = 17;
 
 /// Every field name a target's line may spell.
-pub static LINE_FIELD_NAMES: [&str; 27] = [
+pub static LINE_FIELD_NAMES: [&str; 29] = [
     "dpp",
     "row_mask",
     "bank_mask",
@@ -357,11 +359,13 @@ pub static LINE_FIELD_NAMES: [&str; 27] = [
     "abid",
     "blgp",
     "neg",
+    "bitop3",
+    "fi",
 ];
 
 /// Whether a [`FIELD_NAMES`] index is spelled on an instruction line.
 pub fn is_line_field(index: usize) -> bool {
-    index < LINE_FIELDS || (40..49).contains(&index) || index == 52
+    index < LINE_FIELDS || (40..49).contains(&index) || (52..55).contains(&index)
 }
 
 named! {

@@ -69,7 +69,13 @@ pub fn line(i: &Instr, regs: &[String]) -> Result<String, Error> {
         .iter()
         .filter(|(id, v)| is_line_field(id.0 as usize) && !v.is_none())
         .collect();
-    fields.sort_by_key(|(id, _)| *id);
+    fields.sort_by_key(|(id, _)| {
+        if id.name() == "bitop3" {
+            (0u8, id.0)
+        } else {
+            (1u8, id.0)
+        }
+    });
     for (id, v) in fields {
         if let Some(text) = suffix(id.name(), v)? {
             out.push(' ');
@@ -110,13 +116,13 @@ fn operand<'a>(
 /// false is not spelled.
 fn suffix(key: &str, v: &FieldValue) -> Result<Option<String>, Error> {
     Ok(Some(match (key, v) {
-        (_, FieldValue::Bool(false)) | ("omod", FieldValue::Int(0)) => return Ok(None),
+        (_, FieldValue::Bool(false)) | ("omod" | "bitop3", FieldValue::Int(0)) => return Ok(None),
         ("omod", FieldValue::Int(1)) => "mul:2".into(),
         ("omod", FieldValue::Int(2)) => "mul:4".into(),
         ("omod", FieldValue::Int(3)) => "div:2".into(),
         ("dpp", v) => v.py_str(),
-        // The bound control bit, as llvm-mc spells it on gfx12.
-        ("bound_ctrl", FieldValue::Bool(true)) => "bound_ctrl:1".into(),
+        // The bound control and fetch-inactive bits, spelled as `key:1` by llvm-mc.
+        ("bound_ctrl" | "fi", FieldValue::Bool(true)) => format!("{key}:1"),
         ("row_mask" | "bank_mask", FieldValue::Int(m)) => format!("{key}:{m:#x}"),
         (_, FieldValue::Bool(true)) => key.into(),
         (_, FieldValue::Ints(v)) => format!("{key}:[{}]", join(v.iter().map(i128::to_string))),

@@ -263,17 +263,16 @@ pub fn base(op: &str) -> &str {
         .unwrap_or(op)
 }
 
-/// A memory form's bytes per lane, from its name.
-pub fn mem_bytes(name: &str) -> u32 {
-    let last = name.rsplit('_').next().unwrap_or(name);
-    if name.len() <= last.len() {
-        return 4;
+fn parse_mem_suffix(part: &str) -> Option<u32> {
+    let last = part.rsplit('_').next().unwrap_or(part);
+    if part.len() <= last.len() {
+        return None;
     }
     let sized = last
         .strip_prefix(['b', 'i', 'u', 'f'])
         .and_then(|n| n.parse::<u32>().ok())
         .filter(|n| [8, 16, 32, 64, 96, 128].contains(n));
-    match (sized, last) {
+    Some(match (sized, last) {
         (Some(n), _) => n / 8,
         (_, "byte" | "ubyte" | "sbyte") => 1,
         (_, "short" | "ushort" | "sshort") => 2,
@@ -281,8 +280,18 @@ pub fn mem_bytes(name: &str) -> u32 {
         (_, "dwordx2" | "x2") => 8,
         (_, "dwordx3") => 12,
         (_, "dwordx4") => 16,
-        _ => 4,
+        _ => return None,
+    })
+}
+
+/// A memory form's bytes per lane, from its name.
+pub fn mem_bytes(name: &str) -> u32 {
+    if let Some((head, _)) = name.split_once("_tr_") {
+        if let Some(bytes) = parse_mem_suffix(head) {
+            return bytes;
+        }
     }
+    parse_mem_suffix(name).unwrap_or(4)
 }
 
 /// Whether a form reads its destination.
@@ -318,6 +327,8 @@ mod tests {
         assert_eq!(mem_bytes("b32"), 4);
         assert_eq!(mem_bytes("s_load_b512"), 4);
         assert_eq!(mem_bytes("global_load_b96"), 12);
+        assert_eq!(mem_bytes("ds_read_b64_tr_b4"), 8);
+        assert_eq!(mem_bytes("ds_read_b96_tr_b6"), 12);
     }
 
     #[test]

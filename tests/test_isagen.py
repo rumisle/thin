@@ -510,7 +510,7 @@ def test_gfx950_isa_tables_bidirectional_round_trip_against_llvm_mc():
 def test_gfx950_operand_table_bidirectional_round_trip_against_llvm_mc():
     ot950 = json.loads((ROOT / "crates/thin-targets/data/gfx950/operand_table.json").read_text())
     rows = [r for r in ot950 if r["mnemonic"] not in _LLVM_OMITTED_GFX9_VARIANTS]
-    assert len(rows) == 2049
+    assert len(rows) == 2051
 
     lines = [_operand_row_line(r) for r in rows]
     bytes1 = _llvm_mc_encode("gfx950", lines)

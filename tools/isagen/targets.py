@@ -155,6 +155,8 @@ TARGETS = {
         ),
         lds_dma=(
             "buffer_load_dword",
+            "buffer_load_dwordx3",
+            "buffer_load_dwordx4",
             "buffer_load_format_x",
             "buffer_load_sbyte",
             "buffer_load_sshort",

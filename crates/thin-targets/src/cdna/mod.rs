@@ -376,6 +376,8 @@ pub(crate) struct Spec {
     pub lds_max: u32,
     /// Whether `fp8`/`bf8` instructions use CDNA 3 FNUZ encodings (`true`) or OCP (`false`).
     pub fnuz_fp8: bool,
+    /// Whether `MUBUF` `lds` DMA supports `buffer_load_dwordx3` and `buffer_load_dwordx4` (CDNA 4+).
+    pub wide_lds_dma: bool,
     /// Named scalar registers `(name, code, dwords)`.
     pub specials: &'static [(&'static str, u32, u32)],
     /// `hwreg(...)` `(name, id)` pairs.
@@ -392,6 +394,8 @@ pub(crate) struct Spec {
     pub fields: fn(&str, &str, usize) -> Result<Vec<Field>, Error>,
     /// Form sign-modifier slot builder (`FormRules.signs`).
     pub signs: fn(&str) -> Vec<usize>,
+    /// Variable tuple widths per `(spelling, slot)` (`FormRules.widths`).
+    pub widths: fn(&str, usize) -> Vec<u32>,
     /// LDS bank conflict geometry (`(bank_count, lane_phases)`).
     pub lds_banks: LdsBanksFn,
     /// Lazy table loader for this target.
@@ -492,8 +496,17 @@ pub(crate) fn fields(spelling: &str, encoding: &str, nsrc: usize) -> Result<Vec<
             bits("neg_hi")?,
             flag("clamp")?,
         ],
+        "ENC_VOP3PX2" => vec![
+            Field::new("op_sel", FieldKind::Bits, 3, false)?,
+            Field::new("op_sel_hi", FieldKind::Bits, 3, false)?,
+            int("cbsz", 3, false)?,
+            int("blgp", 3, false)?,
+        ],
         "VOP3P_MFMA" if spelling.starts_with("v_smfmac_") => {
             vec![int("cbsz", 3, false)?, int("abid", 4, false)?]
+        }
+        "VOP3P_MFMA" if spelling.ends_with("_f8f6f4") => {
+            vec![int("cbsz", 3, false)?, int("blgp", 3, false)?]
         }
         "VOP3P_MFMA" if spelling.starts_with("v_mfma_f64_") => {
             vec![int("cbsz", 3, false)?, int("abid", 4, false)?, bits("neg")?]
@@ -503,17 +516,32 @@ pub(crate) fn fields(spelling: &str, encoding: &str, nsrc: usize) -> Result<Vec<
             int("abid", 4, false)?,
             int("blgp", 3, false)?,
         ],
-        "ENC_VOP3" if encoder::opsel_bits(spelling) != 0 => vec![
-            Field::new(
-                "op_sel",
-                FieldKind::Bits,
-                encoder::opsel_len(spelling, nsrc) as u32,
-                false,
-            )?,
-            flag("clamp")?,
-            int("omod", 2, false)?,
+        "ENC_VOP1" | "ENC_VOP3"
+            if spelling.starts_with("v_permlane") && spelling.contains("_swap_") =>
+        {
+            vec![flag("bound_ctrl")?, flag("fi")?]
+        }
+        "ENC_VOP3" if spelling == "v_bitop3_b16" => vec![
+            int("bitop3", 8, false)?,
+            Field::new("op_sel", FieldKind::Bits, 4, false)?,
         ],
-        "ENC_VOP3" => vec![flag("clamp")?, int("omod", 2, false)?],
+        "ENC_VOP3" if spelling == "v_bitop3_b32" => vec![int("bitop3", 8, false)?],
+        "ENC_VOP3" => {
+            let mut out = Vec::new();
+            if encoder::opsel_bits(spelling) != 0 {
+                out.push(Field::new(
+                    "op_sel",
+                    FieldKind::Bits,
+                    encoder::opsel_len(spelling, nsrc) as u32,
+                    false,
+                )?);
+            }
+            if encoder::vop3_takes_clamp_omod(spelling) {
+                out.push(flag("clamp")?);
+                out.push(int("omod", 2, false)?);
+            }
+            out
+        }
         "VOP3_SDST_ENC" if spelling.starts_with("v_div_scale_") => {
             vec![flag("clamp")?, int("omod", 2, false)?]
         }
@@ -559,12 +587,8 @@ pub(crate) fn signs_for(data: Result<&'static Data, Error>, mnemonic: &str) -> V
                     wop.operand(wf)
                         .is_some_and(|sf| encoder::signs_of(&e64, &wop.class, sf).0)
                 } else {
-                    sop.operand(fname).is_some_and(|sf| {
-                        matches!(
-                            sf.format.as_str(),
-                            "FMT_NUM_F16" | "FMT_NUM_BF16" | "FMT_NUM_F32" | "FMT_NUM_F64"
-                        )
-                    })
+                    sop.operand(fname)
+                        .is_some_and(|sf| encoder::is_float_fmt(&sf.format))
                 }
             })
             .map(|(k, _)| k)
@@ -586,7 +610,8 @@ pub(crate) fn signs_for(data: Result<&'static Data, Error>, mnemonic: &str) -> V
         .collect()
 }
 
-fn no_widths(_: &str, _: usize) -> Vec<u32> {
+/// Default empty `FormRules.widths` callback.
+pub(crate) fn no_widths(_: &str, _: usize) -> Vec<u32> {
     Vec::new()
 }
 
@@ -888,7 +913,7 @@ pub(crate) fn build(spec: &'static Spec) -> Result<Target, Error> {
         counter,
         fields: spec.fields,
         signs: spec.signs,
-        widths: no_widths,
+        widths: spec.widths,
     };
     let forms = form_rules.forms(rows, &waits())?;
     let encodings: BTreeSet<String> = (isa.ops.keys())

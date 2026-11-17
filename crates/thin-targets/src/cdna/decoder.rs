@@ -6,8 +6,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use thin_target::Error;
 
 use super::encoder::{
-    dwords, is_carry_in_vop2, is_carry_vop2, is_ds_two_offset, opsel_bits, packed_rules,
-    scalar_align, signs_of, vector_align, EXEC_LO_CODE, INLINE_FLOATS, INV_2PI, INV_2PI_F64,
+    dwords, f8f6f4_dwords, is_b64_fmt, is_carry_in_vop2, is_carry_vop2, is_ds_two_offset,
+    is_f64_fmt, is_float_fmt, is_wide_fmt, opsel_bits, packed_rules, scalar_align, signs_of,
+    vector_align, vop3_takes_clamp_omod, EXEC_LO_CODE, INLINE_FLOATS, INV_2PI, INV_2PI_F64,
     LITERAL_CLASSES, M0_CODE, SADDR_OFF, SGPR_COUNT, VCC_LO,
 };
 use super::{Data, PhysicalFormCache, Spec, WAITCNT_NONE};
@@ -15,7 +16,7 @@ use crate::decode::{label, Decode, DecodeError, Instruction, MVal, Opd, Why};
 use crate::tables::{Encoding, Op};
 
 /// The fields the rules read, by name; an index is a field id (`NF <= 64`).
-const NAMES: [&str; 58] = [
+const NAMES: [&str; 60] = [
     "vdst",
     "sdst",
     "src0",
@@ -74,6 +75,8 @@ const NAMES: [&str; 58] = [
     "op",
     "literal",
     "omod",
+    "scale_src0",
+    "scale_src1",
 ];
 const NF: usize = NAMES.len();
 const VDST: usize = 0;
@@ -134,6 +137,8 @@ const VSRC0: usize = 54;
 const OP: usize = 55;
 const LITERAL: usize = 56;
 const OMOD: usize = 57;
+const SCALE_SRC0: usize = 58;
+const SCALE_SRC1: usize = 59;
 
 /// `src0` codes that select DPP16 and SDWA.
 const DPP16: u32 = 0xFA;
@@ -200,6 +205,7 @@ enum Rule {
     Vop3,
     Vop3p,
     Mfma,
+    MfmaScale,
     Flat,
     Mubuf,
     Ds,
@@ -243,6 +249,7 @@ pub(crate) struct Decoder {
     spec: &'static Spec,
     lut: Vec<u8>,
     seg_families: [Option<u8>; 4],
+    vop3px2_family: Option<u8>,
     families: Vec<Family>,
     classes: Vec<Class>,
     ops: Vec<OpInfo>,
@@ -267,8 +274,8 @@ fn leak(s: String) -> &'static str {
     Box::leak(s.into_boxed_str())
 }
 
-fn xml_of(t: &str, format: &str) -> Xml {
-    if t == "OPR_SIMM8" || format == "FMT_NUM_U8" {
+fn xml_of(t: &str) -> Xml {
+    if t == "OPR_SIMM8" {
         return Xml::Simm8;
     }
     match t {
@@ -305,6 +312,7 @@ fn rule_of(class: &str) -> Rule {
         "VOP3" | "VOP3_SDST" | "VOP3SD" => Rule::Vop3,
         "VOP3P" => Rule::Vop3p,
         "VOP3P_MFMA" => Rule::Mfma,
+        "VOP3PX2" => Rule::MfmaScale,
         "FLAT" | "GLOBAL" | "SCRATCH" => Rule::Flat,
         "MUBUF" => Rule::Mubuf,
         "DS" => Rule::Ds,
@@ -356,8 +364,26 @@ impl Decoder {
             });
         }
 
+        let mut families = Vec::new();
+        let mut family_of: HashMap<&str, usize> = HashMap::new();
+        let mut vop3px2_family = None;
         let mut groups: BTreeMap<(u32, u32, u64, Option<u64>), Vec<&'static str>> = BTreeMap::new();
         for (name, e) in &isa.encodings {
+            if name == "VOP3PX2" {
+                let cid = class_id["VOP3PX2"];
+                let op = classes[cid as usize].slots[OP];
+                let f = families.len();
+                family_of.insert("VOP3PX2", f);
+                families.push(Family {
+                    class: cid,
+                    op,
+                    ops: vec![u16::MAX; 1 << op.bits],
+                    dpp16: None,
+                    sdwa: None,
+                });
+                vop3px2_family = Some(f as u8);
+                continue;
+            }
             let fixed = (e
                 .fields
                 .iter()
@@ -376,8 +402,6 @@ impl Decoder {
                 .push(name.as_str());
         }
 
-        let mut families = Vec::new();
-        let mut family_of: HashMap<&str, usize> = HashMap::new();
         let mut lut = vec![u8::MAX; 512];
         let mut width = vec![0u32; 512];
         let mut seg_families = [None; 4];
@@ -461,6 +485,7 @@ impl Decoder {
             spec,
             lut,
             seg_families,
+            vop3px2_family,
             families,
             classes,
             ops,
@@ -485,18 +510,12 @@ fn op_info(
         let Some(id) = NAMES.iter().position(|n| *n == o.field) else {
             continue;
         };
-        let xml = xml_of(&o.xml_type, &o.format);
+        let xml = xml_of(&o.xml_type);
         opd[id] = Some(Opnd {
             dwords: dwords(o) as u8,
-            wide: matches!(
-                o.format.as_str(),
-                "FMT_NUM_F32" | "FMT_NUM_B32" | "FMT_NUM_U32" | "FMT_NUM_I32"
-            ),
-            f64_fmt: o.format == "FMT_NUM_F64",
-            b64_fmt: matches!(
-                o.format.as_str(),
-                "FMT_NUM_B64" | "FMT_NUM_U64" | "FMT_NUM_I64" | "FMT_NUM_M64"
-            ),
+            wide: is_wide_fmt(&o.format),
+            f64_fmt: is_f64_fmt(&o.format),
+            b64_fmt: is_b64_fmt(&o.format),
             xml,
         });
         if xml != Xml::Sendmsg {
@@ -530,10 +549,7 @@ fn op_info(
                             .map_or((false, false), |sf| signs_of(&e64, &wop.class, sf))
                     } else {
                         op.operand(short_f).map_or((false, false), |sf| {
-                            let flt = matches!(
-                                sf.format.as_str(),
-                                "FMT_NUM_F16" | "FMT_NUM_BF16" | "FMT_NUM_F32" | "FMT_NUM_F64"
-                            );
+                            let flt = is_float_fmt(&sf.format);
                             (flt, flt)
                         })
                     }
@@ -676,6 +692,17 @@ impl Cx<'_, '_> {
     }
 
     fn vec_or_acc(&self, f: usize, c: u32, acc: bool, width: u32) -> R<Opd> {
+        self.vec_or_acc_aligned(f, c, acc, width, true)
+    }
+
+    fn vec_or_acc_aligned(
+        &self,
+        f: usize,
+        c: u32,
+        acc: bool,
+        width: u32,
+        even_align: bool,
+    ) -> R<Opd> {
         let letter = if acc { 'a' } else { 'v' };
         if c + width > 256 {
             return Err(self.err(
@@ -684,7 +711,7 @@ impl Cx<'_, '_> {
                 format!("{letter}{c} +{width}: past {letter}255"),
             ));
         }
-        let align = vector_align(width);
+        let align = if even_align { vector_align(width) } else { 1 };
         if width > 1 && c % align != 0 {
             return Err(self.err(
                 Why::Operand,
@@ -1216,6 +1243,9 @@ impl Cx<'_, '_> {
                 k += 1;
             }
         }
+        if !vop3_takes_clamp_omod(self.info.mnemonic) {
+            return Ok(());
+        }
         if self.class.slots[CLMP].bits > 0 && self.take(CLMP) == 1 {
             self.ins.modify("clamp", MVal::Flag);
         }
@@ -1229,6 +1259,35 @@ impl Cx<'_, '_> {
             }
         }
         Ok(())
+    }
+
+    fn vop3_permlane_swap(&mut self) -> R<()> {
+        let opsel = self.take(OPSEL);
+        if opsel & !0b11 != 0 {
+            return Err(self.err(
+                Why::Field,
+                Some("opsel"),
+                format!(
+                    "opsel = {opsel}: {} reads bits 0..1 only",
+                    self.info.mnemonic
+                ),
+            ));
+        }
+        if (opsel >> 1) & 1 != 0 {
+            self.ins.modify("bound_ctrl", MVal::Int(1));
+        }
+        if opsel & 1 != 0 {
+            self.ins.modify("fi", MVal::Int(1));
+        }
+        Ok(())
+    }
+
+    fn vop3_bitop3(&mut self) -> R<()> {
+        let b = self.take(NEG) | (self.take(ABS) << 3) | (self.take(OMOD) << 6);
+        if b != 0 {
+            self.ins.modify("bitop3", MVal::Int(b as i32));
+        }
+        self.vop3_opsel()
     }
 
     fn bits(&self, f: usize, key: &str, v: u32, nsrc: u32, mask: u64) -> R<MVal> {
@@ -1317,15 +1376,38 @@ impl Cx<'_, '_> {
 
     fn mfma(&mut self) -> R<()> {
         let smfmac = self.info.mnemonic.starts_with("v_smfmac_");
+        let f8f6f4 = self.info.mnemonic.ends_with("_f8f6f4");
         let cd_acc = self.take(ACC_CD) != 0;
         let acc_ab = self.take(ACC);
+        let cbsz = self.take(CBSZ);
+        let abid = self.take(ABID);
+        let blgp = self.take(BLGP);
+        if smfmac && blgp != 0 {
+            return Err(self.err(
+                Why::Field,
+                Some("blgp"),
+                "blgp not taken on v_smfmac".into(),
+            ));
+        }
+        if f8f6f4 && abid != 0 {
+            return Err(self.err(
+                Why::Field,
+                Some("abid"),
+                "abid not taken on f8f6f4 MFMA".into(),
+            ));
+        }
 
         let w_dst = u32::from(self.opnd(VDST).dwords);
         let vdst = self.take(VDST);
         self.push(self.vec_or_acc(VDST, vdst, cd_acc, w_dst)?);
 
+        let ab_sels = [u64::from(cbsz), u64::from(blgp)];
         for (idx, f) in [SRC0, SRC1].into_iter().enumerate() {
-            let w = u32::from(self.opnd(f).dwords);
+            let w = if f8f6f4 {
+                f8f6f4_dwords(ab_sels[idx])
+            } else {
+                u32::from(self.opnd(f).dwords)
+            };
             let code = self.take(f);
             if code < 256 {
                 return Err(self.err(
@@ -1373,16 +1455,6 @@ impl Cx<'_, '_> {
         };
         self.push(op2);
 
-        let cbsz = self.take(CBSZ);
-        let abid = self.take(ABID);
-        let blgp = self.take(BLGP);
-        if smfmac && blgp != 0 {
-            return Err(self.err(
-                Why::Field,
-                Some("blgp"),
-                "blgp not taken on v_smfmac".into(),
-            ));
-        }
         if cbsz != 0 {
             self.ins.modify("cbsz", MVal::Int(cbsz as i32));
         }
@@ -1396,6 +1468,110 @@ impl Cx<'_, '_> {
             } else {
                 self.ins.modify("blgp", MVal::Int(blgp as i32));
             }
+        }
+        Ok(())
+    }
+
+    fn mfma_scale(&mut self) -> R<()> {
+        let cd_acc = self.take(ACC_CD) != 0;
+        let acc_ab = self.take(ACC);
+        let cbsz = self.take(CBSZ);
+        let abid = self.take(ABID);
+        let blgp = self.take(BLGP);
+        if abid != 1 {
+            return Err(self.err(
+                Why::Field,
+                Some("abid"),
+                format!("abid = {abid}: VOP3PX2 fixes abid to 1"),
+            ));
+        }
+        let opsel = self.take(OPSEL);
+        let opsel_hi = self.take(OPSEL_HI);
+        let opsel_hi2 = self.take(OPSEL_HI2);
+        if opsel >> 2 != 0 {
+            return Err(self.err(
+                Why::Field,
+                Some("opsel"),
+                format!("opsel = {opsel}: bit 2 must be 0 on VOP3PX2"),
+            ));
+        }
+        if opsel_hi2 != 0 {
+            return Err(self.err(
+                Why::Field,
+                Some("opsel_hi2"),
+                format!("opsel_hi2 = {opsel_hi2}: bit 14 must be 0 on VOP3PX2"),
+            ));
+        }
+
+        let w_dst = u32::from(self.opnd(VDST).dwords);
+        let vdst = self.take(VDST);
+        self.push(self.vec_or_acc(VDST, vdst, cd_acc, w_dst)?);
+
+        let ab_sels = [u64::from(cbsz), u64::from(blgp)];
+        for (idx, f) in [SRC0, SRC1].into_iter().enumerate() {
+            let w = f8f6f4_dwords(ab_sels[idx]);
+            let code = self.take(f);
+            if code < 256 {
+                return Err(self.err(
+                    Why::Operand,
+                    Some(NAMES[f]),
+                    format!("code {code}: MFMA matrix A/B requires VGPR or AGPR"),
+                ));
+            }
+            let is_acc = ((acc_ab >> idx) & 1) != 0;
+            self.push(self.vec_or_acc(f, code - 256, is_acc, w)?);
+        }
+
+        let o2 = self.opnd(SRC2);
+        let w2 = u32::from(o2.dwords);
+        let c2 = self.take(SRC2);
+        let op2 = if c2 >= 256 {
+            self.vec_or_acc(SRC2, c2 - 256, cd_acc, w2)?
+        } else {
+            match c2 {
+                128..=192 => Opd::Int(i64::from(c2) - 128),
+                193..=208 => Opd::Int(192 - i64::from(c2)),
+                240..=247 if o2.wide => Opd::Float(INLINE_FLOATS[c2 as usize - 240]),
+                _ => {
+                    return Err(self.err(
+                        Why::Operand,
+                        Some("src2"),
+                        format!("code {c2}: invalid MFMA src2 constant"),
+                    ))
+                }
+            }
+        };
+        self.push(op2);
+
+        for f in [SCALE_SRC0, SCALE_SRC1] {
+            let sc = self.take(f);
+            if sc < 256 {
+                return Err(self.err(
+                    Why::Operand,
+                    Some(NAMES[f]),
+                    format!("code {sc}: {} requires a VGPR", NAMES[f]),
+                ));
+            }
+            self.push(self.vec_or_acc(f, sc - 256, false, 1)?);
+        }
+
+        if opsel != 0 {
+            self.ins.modify(
+                "op_sel",
+                MVal::List([(opsel & 1) as u8, ((opsel >> 1) & 1) as u8, 0, 0], 3),
+            );
+        }
+        if opsel_hi != 0 {
+            self.ins.modify(
+                "op_sel_hi",
+                MVal::List([(opsel_hi & 1) as u8, ((opsel_hi >> 1) & 1) as u8, 0, 0], 3),
+            );
+        }
+        if cbsz != 0 {
+            self.ins.modify("cbsz", MVal::Int(cbsz as i32));
+        }
+        if blgp != 0 {
+            self.ins.modify("blgp", MVal::Int(blgp as i32));
         }
         Ok(())
     }
@@ -1669,12 +1845,13 @@ impl Cx<'_, '_> {
         let lds = self.take(LDS);
         let acc = self.take(ACC) != 0;
         if lds != 0 {
-            if !super::encoder::is_mubuf_lds_op(self.info.mnemonic) || acc {
+            let lds_ok =
+                super::encoder::is_mubuf_lds_op(self.d.spec.wide_lds_dma, self.info.mnemonic);
+            if !lds_ok || acc {
                 return Err(self.err(
                     Why::Field,
                     Some("lds"),
-                    "lds=1 is valid on single-dword/sub-dword buffer_load_* without acc only"
-                        .into(),
+                    "lds=1 is not supported on this buffer op or with acc".into(),
                 ));
             }
         } else {
@@ -1740,7 +1917,8 @@ impl Cx<'_, '_> {
             } else {
                 false
             };
-            self.push(self.vec_or_acc(f, c, use_acc, width)?);
+            let even_align = !(self.info.mnemonic == "ds_read_b96_tr_b6" && f == VDST);
+            self.push(self.vec_or_acc_aligned(f, c, use_acc, width, even_align)?);
         }
         if acc && !any_av {
             return Err(self.err(
@@ -1849,11 +2027,15 @@ impl Decoder {
             ));
         }
         let w0 = u32::from_le_bytes([rest[0], rest[1], rest[2], rest[3]]);
-        let lut_entry = self.lut[(w0 >> 23) as usize];
-        let fam_idx = if lut_entry == SEG_DISPATCH {
-            self.seg_families[((w0 >> 14) & 3) as usize]
+        let fam_idx = if (w0 >> 16) == 0xD3AC && self.vop3px2_family.is_some() {
+            self.vop3px2_family
         } else {
-            (lut_entry != u8::MAX).then_some(lut_entry)
+            let lut_entry = self.lut[(w0 >> 23) as usize];
+            if lut_entry == SEG_DISPATCH {
+                self.seg_families[((w0 >> 14) & 3) as usize]
+            } else {
+                (lut_entry != u8::MAX).then_some(lut_entry)
+            }
         };
         let Some(family) = fam_idx.and_then(|idx| self.families.get(usize::from(idx))) else {
             return Err(refuse(
@@ -1962,14 +2144,21 @@ impl Decoder {
             Rule::Short => cx.short()?,
             Rule::Vop3 => {
                 cx.vop3()?;
-                cx.vop3_opsel()?;
-                cx.vop3_signs_and_clamp()?;
+                if info.mnemonic.starts_with("v_permlane") && info.mnemonic.contains("_swap_") {
+                    cx.vop3_permlane_swap()?;
+                } else if info.mnemonic.starts_with("v_bitop3_") {
+                    cx.vop3_bitop3()?;
+                } else {
+                    cx.vop3_opsel()?;
+                    cx.vop3_signs_and_clamp()?;
+                }
             }
             Rule::Vop3p => {
                 cx.vop3()?;
                 cx.packed()?;
             }
             Rule::Mfma => cx.mfma()?,
+            Rule::MfmaScale => cx.mfma_scale()?,
             Rule::Flat => cx.flat_family()?,
             Rule::Mubuf => cx.mubuf()?,
             Rule::Ds => cx.ds()?,

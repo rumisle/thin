@@ -18,7 +18,7 @@ use thin_target::{assemble, CodeItem, Error, Target};
 pub use decode::{Decode, DecodeError, Instruction};
 
 /// The ELF machine number (`e_flags & 0xFF`) of each registered target.
-pub static MACHINES: [Machine; 2] = [
+pub static MACHINES: [Machine; 3] = [
     Machine {
         number: 0x4E,
         target: gfx1201::NAME,
@@ -27,12 +27,17 @@ pub static MACHINES: [Machine; 2] = [
         number: 0x4C,
         target: gfx942::NAME,
     },
+    Machine {
+        number: 0x4F,
+        target: gfx950::NAME,
+    },
 ];
 
 mod cdna;
 pub mod decode;
 mod gfx1201;
 mod gfx942;
+mod gfx950;
 mod tables;
 
 use std::sync::OnceLock;
@@ -43,6 +48,7 @@ pub fn hazards(name: &str) -> Result<&'static dyn thin_passes::hazards::HazardMo
     match name {
         gfx1201::NAME => Ok(&gfx1201::hazards::Model),
         gfx942::NAME => Ok(&gfx942::HAZARD_MODEL),
+        gfx950::NAME => Ok(&gfx950::HAZARD_MODEL),
         _ => get(name).map(|_| unreachable!("every registered target has a hazard model")),
     }
 }
@@ -50,7 +56,7 @@ pub fn hazards(name: &str) -> Result<&'static dyn thin_passes::hazards::HazardMo
 /// The known target names, in the registry's order. The first is
 /// the default.
 pub fn names() -> &'static [&'static str] {
-    &[gfx1201::NAME, gfx942::NAME]
+    &[gfx1201::NAME, gfx942::NAME, gfx950::NAME]
 }
 
 /// The default target's name.
@@ -64,12 +70,16 @@ pub fn default_name() -> &'static str {
 pub fn get(name: &str) -> Result<&'static Target, Error> {
     static GFX1201: OnceLock<Target> = OnceLock::new();
     static GFX942: OnceLock<Target> = OnceLock::new();
+    static GFX950: OnceLock<Target> = OnceLock::new();
     match name {
         gfx1201::NAME => Ok(GFX1201.get_or_init(|| {
             gfx1201::build().unwrap_or_else(|e| panic!("gfx1201 does not build: {e}"))
         })),
         gfx942::NAME => Ok(GFX942.get_or_init(|| {
             gfx942::build().unwrap_or_else(|e| panic!("gfx942 does not build: {e}"))
+        })),
+        gfx950::NAME => Ok(GFX950.get_or_init(|| {
+            gfx950::build().unwrap_or_else(|e| panic!("gfx950 does not build: {e}"))
         })),
         _ => Err(Error::Value(format!(
             "{name}: not a target (one of {})",
@@ -89,6 +99,7 @@ pub fn physical_form(
     match name {
         gfx1201::NAME => gfx1201::decoder::physical_form(instruction),
         gfx942::NAME => gfx942::physical_form(instruction),
+        gfx950::NAME => gfx950::physical_form(instruction),
         _ => get(name).map(|_| unreachable!("registered target has physical forms")),
     }
 }
@@ -98,6 +109,7 @@ pub fn decoder(name: &str) -> Result<&'static dyn Decode, Error> {
     match name {
         gfx1201::NAME => Ok(gfx1201::decoder::decoder()?),
         gfx942::NAME => Ok(gfx942::decoder()?),
+        gfx950::NAME => Ok(gfx950::decoder()?),
         _ => get(name).map(|_| unreachable!("every registered target has a decoder")),
     }
 }

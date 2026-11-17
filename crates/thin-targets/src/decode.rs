@@ -12,8 +12,8 @@ use std::fmt::{self, Write as _};
 
 use thin_target::{Line, ModValue, Modifiers, Operand, OperandKind, Value};
 
-/// The most operands a line of an encoder has (`v_add_co_ci_u32_e32`).
-pub const MAX_OPERANDS: usize = 5;
+/// The most operands a line of an encoder has (`v_mfma_scale_f32_*_f8f6f4`).
+pub const MAX_OPERANDS: usize = 6;
 /// The most modifiers (`s_wait_alu` with its seven counters).
 pub const MAX_MODIFIERS: usize = 7;
 
