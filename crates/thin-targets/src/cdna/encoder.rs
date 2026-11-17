@@ -1,17 +1,14 @@
-//! gfx942's line encoder: encodes .s lines as `llvm-mc -mcpu=gfx942` does;
+//! CDNA line encoder: encodes .s lines as `llvm-mc` does;
 //! any other line is refused.
 
 use thin_target::{
     dpp16_control, parse_line, Encoded, Line, ModValue, Operand, OperandKind, Value,
 };
 
-use super::{Gfx942, WAITCNT_NONE};
+use super::{CdnaTarget, WAITCNT_NONE};
 use crate::tables::{Encoding, Op, OpOperand};
 
 type Refusal = Result<(), String>;
-
-/// Mnemonics LLVM spells otherwise on gfx942.
-pub(super) const SPELLED_OTHERWISE: [&str; 0] = [];
 
 /// The f32 values with inline codes 240..247, in code order.
 pub(super) const INLINE_FLOATS: [f32; 8] = [0.5, -0.5, 1.0, -1.0, 2.0, -2.0, 4.0, -4.0];
@@ -32,6 +29,7 @@ pub(super) const SADDR_OFF: u32 = 0x7F;
 
 /// An instruction word being built in one encoding class.
 struct Word<'a> {
+    target: &'a str,
     class: &'a str,
     encoding: &'a Encoding,
     bits: u128,
@@ -40,8 +38,14 @@ struct Word<'a> {
 }
 
 impl<'a> Word<'a> {
-    fn new(class: &'a str, encoding: &'a Encoding, opcode: u64) -> Result<Word<'a>, String> {
+    fn new(
+        target: &'a str,
+        class: &'a str,
+        encoding: &'a Encoding,
+        opcode: u64,
+    ) -> Result<Word<'a>, String> {
         let mut word = Word {
+            target,
             class,
             encoding,
             bits: 0,
@@ -87,9 +91,10 @@ impl<'a> Word<'a> {
             return Ok(());
         }
         match self.scalar_bus {
-            Some((prev, pw)) if (prev, pw) != (code, width) => {
-                Err("constant bus limit (1 scalar source on gfx942) exceeded".into())
-            }
+            Some((prev, pw)) if (prev, pw) != (code, width) => Err(format!(
+                "constant bus limit (1 scalar source on {}) exceeded",
+                self.target
+            )),
             _ => {
                 self.scalar_bus = Some((code, width));
                 Ok(())
@@ -167,7 +172,7 @@ fn register(o: &Operand, file: OperandKind, width: u32) -> Result<u32, String> {
         ));
     }
     if file == OperandKind::S && o.n == 125 {
-        return Err("`null` is not supported on gfx942".into());
+        return Err("`null` is not supported on CDNA".into());
     }
     aligned(o)?;
     Ok(o.n)
@@ -223,7 +228,7 @@ fn source(word: &mut Word<'_>, field: &OpOperand, o: &Operand) -> Result<u32, St
         OperandKind::A if !agprs => return Err(format!("`{text}`: no AGPR here")),
         OperandKind::S if sgprs && o.count == width => {
             if o.n == 125 {
-                return Err("`null` is not supported on gfx942".into());
+                return Err(format!("`null` is not supported on {}", word.target));
             }
             if t == "OPR_SREG_NOVCC" && (VCC_LO..=VCC_LO + 1).contains(&o.n) {
                 return Err(format!("`{text}`: VCC is not allowed here"));
@@ -900,7 +905,7 @@ fn packed(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal 
     let nsrc = fields(op, &["src0", "src1", "src2"]).len();
     let (masks, clamp, hi_default, takes_signs) = packed_rules(mnemonic, nsrc);
     if word.literal.is_some() {
-        return Err("no literal in VOP3P on gfx942".into());
+        return Err(format!("no literal in VOP3P on {}", word.target));
     }
     let mut sign_neg = 0u64;
     let mut sign_abs = 0u64;
@@ -1055,7 +1060,7 @@ fn mfma(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
 }
 
 /// DPP16 (`VOP1_DPP16`, `VOP2_DPP16`).
-fn dpp(t: &Gfx942, mnemonic: &str, line: &Line) -> Result<Vec<u8>, String> {
+fn dpp(t: &CdnaTarget, mnemonic: &str, line: &Line) -> Result<Vec<u8>, String> {
     let base = mnemonic.strip_suffix("_dpp").expect("a _dpp mnemonic");
     if !t.rows.contains(mnemonic) {
         return Err(format!("{mnemonic}: not a DPP form"));
@@ -1085,7 +1090,7 @@ fn dpp(t: &Gfx942, mnemonic: &str, line: &Line) -> Result<Vec<u8>, String> {
         .encodings
         .get(&class)
         .ok_or_else(|| format!("no class {class}"))?;
-    let mut word = Word::new(&class, encoding, op.opcode)?;
+    let mut word = Word::new(t.spec.name, &class, encoding, op.opcode)?;
     word.put("src0", 0xFA)?;
     for (name, o) in by_field {
         let f = op.operand(name).ok_or_else(|| format!("no field {name}"))?;
@@ -1355,7 +1360,10 @@ fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     let (vdata_opt, vaddr_op, rsrc_op, soff_op) = match (lds != 0, ops.as_slice()) {
         (true, [va, rs, so]) if is_mubuf_lds_op(mnemonic) => (None, va, rs, so),
         (true, _) if !is_mubuf_lds_op(mnemonic) => {
-            return Err(format!("{mnemonic}: lds is not supported on gfx942"));
+            return Err(format!(
+                "{mnemonic}: lds is not supported on {}",
+                word.target
+            ));
         }
         (false, [vd, va, rs, so]) => (Some(vd), va, rs, so),
         _ => return Err(format!("{} operands", ops.len())),
@@ -1393,8 +1401,8 @@ fn mubuf(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     let soff = source(word, &soff_dummy, soff_op)?;
     if soff >= 256 || soff == 255 {
         return Err(format!(
-            "`{}`: invalid buffer soffset on gfx942",
-            soff_op.text
+            "`{}`: invalid buffer soffset on {}",
+            soff_op.text, word.target
         ));
     }
     word.put("soffset", u64::from(soff))?;
@@ -1459,7 +1467,7 @@ fn ds(word: &mut Word<'_>, op: &Op, mnemonic: &str, line: &Line) -> Refusal {
     word.put("offset1", (offset >> 8) as u64)
 }
 
-fn select<'t>(t: &'t Gfx942, line: &Line) -> Result<(String, &'t Op), String> {
+fn select<'t>(t: &'t CdnaTarget, line: &Line) -> Result<(String, &'t Op), String> {
     let m = line.mnemonic.as_str();
     let ops = &t.isa.ops;
     let pick = |name: &str| ops.get(name).map(|op| (name.to_owned(), op));
@@ -1480,15 +1488,15 @@ fn select<'t>(t: &'t Gfx942, line: &Line) -> Result<(String, &'t Op), String> {
     } else {
         pick(m)
     };
-    found.ok_or_else(|| format!("{m}: not a gfx942 mnemonic"))
+    found.ok_or_else(|| format!("{m}: not a {} mnemonic", t.spec.name))
 }
 
-/// Classes on gfx942 that allow a 32-bit literal constant (`VOP3*` does NOT on CDNA3).
+/// Classes on CDNA that allow a 32-bit literal constant (`VOP3*` does NOT).
 pub(super) const LITERAL_CLASSES: [&str; 7] =
     ["SOP1", "SOP2", "SOPC", "VOP1", "VOP1_SDST", "VOP2", "VOPC"];
 
 /// Encodes one line.
-pub fn encode(t: &Gfx942, text: &str) -> Result<Encoded, String> {
+pub(crate) fn encode(t: &CdnaTarget, text: &str) -> Result<Encoded, String> {
     let line = parse_line(t, text)?;
     let signed = line.operands.iter().find(|o| o.neg || o.abs);
     let no_signs = |o: &Operand| Err(format!("`{}`: no neg or abs here", o.text));
@@ -1509,7 +1517,7 @@ pub fn encode(t: &Gfx942, text: &str) -> Result<Encoded, String> {
         }
         let encoding = (t.isa.encodings.get(&op.class))
             .ok_or_else(|| format!("{name}: no class {}", op.class))?;
-        let mut word = Word::new(&op.class, encoding, op.opcode)?;
+        let mut word = Word::new(t.spec.name, &op.class, encoding, op.opcode)?;
         let m = line.mnemonic.as_str();
         match op.class.as_str() {
             "SOP1" | "SOP2" | "SOPC" | "SOPK" => salu(&mut word, op, &line)?,

@@ -1,5 +1,5 @@
-//! gfx942's hazard model: CDNA3 architectural wait-state rules, including
-//! pass-count- and family-aware XDL / SMFMA / DGEMM / SMFMAC wait states.
+//! Parameterized CDNA architectural wait-state rules, including pass-count-
+//! and family-aware XDL / SMFMA / DGEMM / SMFMAC wait states.
 
 use std::sync::OnceLock;
 
@@ -7,34 +7,32 @@ use thin_ir::{Imm, ImmValue, Instr, Operand, Reg, Snapshot};
 use thin_passes::hazards::{Dep, DynamicStates, HazardModel, Rule, Side, States, Test};
 use thin_target::{phys_named, Elem, Flags, Kind};
 
-use super::mfma_form;
+/// The largest wait-state count among CDNA 3 [`rules()`] (16-pass XDL -> VALU/VMEM/DS/SrcAB = 19).
+pub const CDNA3_WINDOW: u32 = 19;
 
-/// The largest wait-state count among [`rules()`] (16-pass XDL -> VALU/VMEM/DS/SrcAB = 19).
-pub const WINDOW: u32 = 19;
+/// Shared CDNA 3 hazard model.
+pub struct Cdna3Model;
 
-/// gfx942's hazard model.
-pub struct Model;
-
-impl HazardModel for Model {
+impl HazardModel for Cdna3Model {
     fn rules(&self) -> &[Rule] {
-        rules()
+        cdna3_rules()
     }
 }
 
-fn rules() -> &'static [Rule] {
+pub fn cdna3_rules() -> &'static [Rule] {
     static RULES: OnceLock<Vec<Rule>> = OnceLock::new();
-    RULES.get_or_init(build_rules)
+    RULES.get_or_init(build_cdna3_rules)
 }
 
-/// Number of wait-state rules in gfx942's hazard table.
-pub fn rule_count() -> u32 {
-    rules().len() as u32
+/// Number of wait-state rules in CDNA 3's hazard table.
+pub fn cdna3_rule_count() -> usize {
+    cdna3_rules().len()
 }
 
-/// CDNA3 matrix execution pipeline family and hardware pass count (`2, 4, 8, 16`).
+/// CDNA matrix execution pipeline family and hardware pass count (`2, 4, 8, 16`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MatClass {
-    /// CDNA3 XDL pipeline (`f16`, `bf16`, `xf32`, `fp8`/`bf8`, `i8`, and all `v_smfmac_*`).
+    /// CDNA XDL pipeline (`f16`, `bf16`, `xf32`, `fp8`/`bf8`, `i8`, and all `v_smfmac_*`).
     Xdl(u32),
     /// Legacy SGEMM MAI pipeline (`f32`-input `v_mfma_f32_*_f32`).
     Smfma(u32),
@@ -43,8 +41,8 @@ enum MatClass {
 }
 
 impl MatClass {
-    fn of(i: &Instr) -> Option<(MatClass, bool)> {
-        let mf = mfma_form(&i.form().op)?;
+    fn of(s: &Snapshot, i: &Instr) -> Option<(MatClass, bool)> {
+        let mf = s.target().matrix_form(&i.form().op)?;
         let p = mf.passes;
         let cls = if mf.d == Elem::F64 {
             MatClass::Dgemm(p)
@@ -80,8 +78,8 @@ fn valu_to_mat(_: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
 }
 
 /// Matrix -> VALU RAW/WAW and Matrix -> Matrix non-SrcC (`SrcA`/`SrcB`/`Idx`) RAW.
-fn mat_to_valu_or_ab(_: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
-    match MatClass::of(prev).map(|x| x.0) {
+fn mat_to_valu_or_ab(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+    match MatClass::of(s, prev).map(|x| x.0) {
         Some(MatClass::Xdl(p)) => p + 3,
         Some(MatClass::Smfma(p)) => p + 2,
         Some(MatClass::Dgemm(4)) => 6,
@@ -91,8 +89,8 @@ fn mat_to_valu_or_ab(_: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
 }
 
 /// Matrix -> VMEM / DS RAW (`DGEMM` takes 9 / 18 states; `XDL` / `SMFMA` match VALU).
-fn mat_to_mem(_: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
-    match MatClass::of(prev).map(|x| x.0) {
+fn mat_to_mem(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+    match MatClass::of(s, prev).map(|x| x.0) {
         Some(MatClass::Xdl(p)) => p + 3,
         Some(MatClass::Smfma(p)) => p + 2,
         Some(MatClass::Dgemm(4)) => 9,
@@ -263,7 +261,7 @@ fn overlapped_src_c(prev: MatClass, cur: MatClass) -> u32 {
 
 /// Matrix -> Matrix `SrcC` RAW (`getMFMAReadWaitStates` with `IsSrcC = true`).
 fn mat_to_src_c(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
-    let (Some((p_cls, _)), Some((c_cls, c_sparse))) = (MatClass::of(prev), MatClass::of(cur))
+    let (Some((p_cls, _)), Some((c_cls, c_sparse))) = (MatClass::of(s, prev), MatClass::of(s, cur))
     else {
         return 0;
     };
@@ -294,8 +292,8 @@ fn mat_to_src_c(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
 }
 
 /// Late `SrcC` read -> VALU/VMEM/DS write WAR (`SMFMAReadAsCWindow` on CDNA3: XDL only, `passes - 1`).
-fn mat_src_c_late(_: &Snapshot, prev: &Instr) -> u32 {
-    match MatClass::of(prev) {
+fn mat_src_c_late(s: &Snapshot, prev: &Instr) -> u32 {
+    match MatClass::of(s, prev) {
         Some((MatClass::Xdl(p), false)) => p.saturating_sub(1),
         _ => 0,
     }
@@ -306,8 +304,8 @@ fn mat_src_c_war(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
 }
 
 /// `v_mfma_f64_*` -> `v_fma_f64` / `v_fmac_f64` pipeline hazard (2 wait states regardless of regs).
-fn dgemm_to_fma64(_: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
-    if !matches!(MatClass::of(prev), Some((MatClass::Dgemm(_), _))) {
+fn dgemm_to_fma64(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
+    if !matches!(MatClass::of(s, prev), Some((MatClass::Dgemm(_), _))) {
         return 0;
     }
     let op = cur.form().op.as_str();
@@ -371,7 +369,7 @@ fn dyn_rule(
 /// CDNA3 architectural wait-state rules (AMD Instinct CDNA3 ISA Guide,
 /// Chapter 4 "Program Organization / Wait States", cross-checked against
 /// `GCNHazardRecognizers.cpp` and `llc -mcpu=gfx942`).
-fn build_rules() -> Vec<Rule> {
+fn build_cdna3_rules() -> Vec<Rule> {
     let salu = || side(&[Kind::Salu], Flags::NONE, Flags::NONE, &[]);
     let valu = || side(&[Kind::Valu], Flags::NONE, Flags::NONE, &[]);
     let valu_or_mat = || side(&[Kind::Valu, Kind::Matrix], Flags::NONE, Flags::NONE, &[]);
@@ -513,12 +511,19 @@ fn build_rules() -> Vec<Rule> {
             mat(),
             valu(),
             Dep::RawOrWaw,
-            WINDOW,
+            CDNA3_WINDOW,
             mat_to_valu_or_ab,
             no_late,
         ),
         // 9b. Matrix -> VMEM / DS RAW: pass-count-aware (XDL: p+3, SMFMA: p+2, DGEMM: 9/18).
-        dyn_rule(mat(), vmem_ds(), Dep::Raw, WINDOW, mat_to_mem, no_late),
+        dyn_rule(
+            mat(),
+            vmem_ds(),
+            Dep::Raw,
+            CDNA3_WINDOW,
+            mat_to_mem,
+            no_late,
+        ),
         // 9c. DGEMM -> v_fma_f64 / v_fmac_f64 pipeline hazard: 2 wait states.
         dyn_rule(mat(), valu(), Dep::None, 2, dgemm_to_fma64, no_late),
         // 10. Matrix -> Matrix reading result as SrcA/SrcB/Idx (non-SrcC): pass-count-aware.
@@ -526,7 +531,7 @@ fn build_rules() -> Vec<Rule> {
             mat(),
             mat(),
             Dep::ReadsNotAsSrcC,
-            WINDOW,
+            CDNA3_WINDOW,
             mat_to_valu_or_ab,
             no_late,
         ),

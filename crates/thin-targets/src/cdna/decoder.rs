@@ -1,17 +1,16 @@
-//! gfx942's instruction decoder: the exact inverse of its line encoder
+//! CDNA instruction decoder: the exact inverse of its line encoder
 //! driven by the same ISA tables.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::sync::OnceLock;
 
 use thin_target::Error;
 
 use super::encoder::{
     dwords, is_carry_in_vop2, is_carry_vop2, is_ds_two_offset, opsel_bits, packed_rules,
     scalar_align, signs_of, vector_align, EXEC_LO_CODE, INLINE_FLOATS, INV_2PI, INV_2PI_F64,
-    LITERAL_CLASSES, M0_CODE, SADDR_OFF, SGPR_COUNT, SPELLED_OTHERWISE, VCC_LO,
+    LITERAL_CLASSES, M0_CODE, SADDR_OFF, SGPR_COUNT, VCC_LO,
 };
-use super::{data, Data, HWREG, SPECIALS, WAITCNT_NONE};
+use super::{Data, PhysicalFormCache, Spec, WAITCNT_NONE};
 use crate::decode::{label, Decode, DecodeError, Instruction, MVal, Opd, Why};
 use crate::tables::{Encoding, Op};
 
@@ -241,6 +240,7 @@ struct Family {
 }
 
 pub(crate) struct Decoder {
+    spec: &'static Spec,
     lut: Vec<u8>,
     seg_families: [Option<u8>; 4],
     families: Vec<Family>,
@@ -313,12 +313,13 @@ fn rule_of(class: &str) -> Rule {
     }
 }
 
-fn bad(what: String) -> Error {
-    Error::Definition(format!("the gfx942 decoder: {what}"))
+fn bad(target: &str, what: String) -> Error {
+    Error::Definition(format!("the {target} decoder: {what}"))
 }
 
 impl Decoder {
-    fn build(data: &'static Data) -> Result<Decoder, Error> {
+    pub(crate) fn build(spec: &'static Spec, data: &'static Data) -> Result<Decoder, Error> {
+        let tname = spec.name;
         let isa = &data.isa;
         let rows: HashSet<&str> = data.rows.iter().map(|r| r.mnemonic.as_str()).collect();
         let mut class_id: HashMap<&'static str, u16> = HashMap::new();
@@ -337,8 +338,9 @@ impl Decoder {
                     slots[id] = slot;
                 }
                 if matches!(f.kind.as_str(), "src" | "ssrc") && !f.name.contains("dst") {
-                    let id = (NAMES.iter().position(|n| *n == f.name))
-                        .ok_or_else(|| bad(format!("{name}: unknown source field {}", f.name)))?;
+                    let id = (NAMES.iter().position(|n| *n == f.name)).ok_or_else(|| {
+                        bad(tname, format!("{name}: unknown source field {}", f.name))
+                    })?;
                     srcs |= 1 << id;
                 }
             }
@@ -361,9 +363,9 @@ impl Decoder {
                 .iter()
                 .find(|f| f.kind == "fixed" && f.name == "encoding"))
             .or_else(|| e.fields.iter().find(|f| f.kind == "fixed"))
-            .ok_or_else(|| bad(format!("{name}: no fixed encoding field")))?;
+            .ok_or_else(|| bad(tname, format!("{name}: no fixed encoding field")))?;
             if fixed.hi != 31 || fixed.lo < 23 {
-                return Err(bad(format!("{name}: fixed bits outside 31..23")));
+                return Err(bad(tname, format!("{name}: fixed bits outside 31..23")));
             }
             let seg = (e.fields.iter())
                 .find(|f| f.kind == "fixed" && f.name == "seg")
@@ -384,7 +386,7 @@ impl Decoder {
             let root = (names.iter())
                 .filter(|n| !n.ends_with("_LIT") && !n.contains("_DPP") && !n.contains("_SDWA"))
                 .min_by_key(|n| n.len())
-                .ok_or_else(|| bad(format!("{names:?}: no base class")))?;
+                .ok_or_else(|| bad(tname, format!("{names:?}: no base class")))?;
             let layout = &classes[class_id[root] as usize];
             let op = layout.slots[OP];
             let variant = |suffix: &str| {
@@ -397,9 +399,10 @@ impl Decoder {
                 family_of.insert(*n, f);
                 let s = classes[class_id[n] as usize].slots[OP];
                 if s.bits != op.bits || s.lo != op.lo {
-                    return Err(bad(format!(
-                        "{n}: its op field moves within {root}'s family"
-                    )));
+                    return Err(bad(
+                        tname,
+                        format!("{n}: its op field moves within {root}'s family"),
+                    ));
                 }
             }
             families.push(Family {
@@ -422,9 +425,10 @@ impl Decoder {
                     continue;
                 }
                 if bits == width[index] && *slot != mark {
-                    return Err(bad(format!(
-                        "{root}: its fixed bits overlap another family's"
-                    )));
+                    return Err(bad(
+                        tname,
+                        format!("{root}: its fixed bits overlap another family's"),
+                    ));
                 }
                 if bits >= width[index] {
                     width[index] = bits;
@@ -442,18 +446,19 @@ impl Decoder {
             if families[f].op.bits == 0 {
                 continue;
             }
-            let info = op_info(isa, &rows, &classes, &class_id, name, op)?;
+            let info = op_info(spec, isa, &rows, &classes, &class_id, name, op)?;
             let family = &mut families[f];
             let slot = (family.ops.get_mut(op.opcode as usize))
-                .ok_or_else(|| bad(format!("{name}: opcode outside its family")))?;
+                .ok_or_else(|| bad(tname, format!("{name}: opcode outside its family")))?;
             if *slot != u16::MAX {
-                return Err(bad(format!("{name}: a second op of its opcode")));
+                return Err(bad(tname, format!("{name}: a second op of its opcode")));
             }
             *slot = ops.len() as u16;
             ops.push(info);
         }
 
         Ok(Decoder {
+            spec,
             lut,
             seg_families,
             families,
@@ -464,6 +469,7 @@ impl Decoder {
 }
 
 fn op_info(
+    spec: &'static Spec,
     isa: &'static crate::tables::IsaTables,
     rows: &HashSet<&str>,
     classes: &[Class],
@@ -501,8 +507,8 @@ fn op_info(
     if name == "s_setreg_imm32_b32" {
         rule = Rule::Setreg;
     }
-    if SPELLED_OTHERWISE.contains(&name) {
-        rule = Rule::Refused("LLVM spells it otherwise on gfx942");
+    if spec.spelled_otherwise.contains(&name) {
+        rule = Rule::Refused("LLVM spells it otherwise on this target");
     }
     let print: &'static str = match op.class.as_str() {
         "VOP3SD" if isa.ops.contains_key(&format!("{name}_e32")) => leak(format!("{name}_e64")),
@@ -516,7 +522,7 @@ fn op_info(
                 Err("no DPP form in the operand table")
             } else {
                 let e = (isa.encodings.get(&dpp_class))
-                    .ok_or_else(|| bad(format!("no class {dpp_class}")))?;
+                    .ok_or_else(|| bad(spec.name, format!("no class {dpp_class}")))?;
                 let e64 = format!("{base}_e64");
                 let dpp_signs = [("src0", "src0"), ("vsrc1", "src1")].map(|(short_f, wide_f)| {
                     if let Some(wop) = isa.ops.get(&e64) {
@@ -587,20 +593,14 @@ fn short_shape(class: &str, name: &str, opd: &[Option<Opnd>; NF]) -> Option<&'st
     (fields == n && all).then_some(shape)
 }
 
-pub(crate) fn decoder() -> Result<&'static Decoder, Error> {
-    static DECODER: OnceLock<Result<Decoder, Error>> = OnceLock::new();
-    let built = DECODER.get_or_init(|| Decoder::build(data()?));
-    built.as_ref().map_err(Clone::clone)
-}
-
-fn special(c: u32, width: u32) -> Option<Opd> {
-    SPECIALS
+fn special(specials: &'static [(&'static str, u32, u32)], c: u32, width: u32) -> Option<Opd> {
+    specials
         .iter()
         .find(|s| s.1 == c && s.2 == width)
         .map(Opd::Named)
 }
 
-fn scalar(c: u32, width: u32) -> Option<Opd> {
+fn scalar(specials: &'static [(&'static str, u32, u32)], c: u32, width: u32) -> Option<Opd> {
     if c + width <= SGPR_COUNT {
         if width > 1 && c % scalar_align(width) != 0 {
             return None;
@@ -613,7 +613,7 @@ fn scalar(c: u32, width: u32) -> Option<Opd> {
     if c < SGPR_COUNT {
         return None;
     }
-    special(c, width)
+    special(specials, c, width)
 }
 
 fn sext(v: u32, bits: u32) -> i64 {
@@ -723,7 +723,7 @@ impl Cx<'_, '_> {
         if c < SGPR_COUNT {
             return Err(self.unnamed(f, c, width));
         }
-        special(c, width).ok_or_else(|| self.unnamed(f, c, width))
+        special(self.d.spec.specials, c, width).ok_or_else(|| self.unnamed(f, c, width))
     }
 
     #[cold]
@@ -731,7 +731,10 @@ impl Cx<'_, '_> {
         self.err(
             Why::Operand,
             Some(NAMES[f]),
-            format!("scalar code {c} is no {width}-dword register gfx942's syntax names"),
+            format!(
+                "scalar code {c} is no {width}-dword register {}'s syntax names",
+                self.d.spec.name
+            ),
         )
     }
 
@@ -796,7 +799,7 @@ impl Cx<'_, '_> {
             }
             return refuse(self, format!("code {c}: no vector register here"));
         }
-        if let Some(s) = scalar(c, width) {
+        if let Some(s) = scalar(self.d.spec.specials, c, width) {
             if !sgprs {
                 return refuse(self, format!("scalar code {c}: no scalar register here"));
             }
@@ -915,7 +918,7 @@ impl Cx<'_, '_> {
     fn hwreg(&mut self) -> R<Opd> {
         let code = self.take(SIMM16);
         let id = code & 63;
-        let name = HWREG.iter().find(|r| r.1 == id).map(|r| r.0);
+        let name = self.d.spec.hwreg.iter().find(|r| r.1 == id).map(|r| r.0);
         let (offset, size) = ((code >> 6) & 31, (code >> 11) + 1);
         if offset + size > 32 {
             return Err(self.err(
@@ -1055,7 +1058,8 @@ impl Cx<'_, '_> {
                 if c > M0_CODE {
                     return Err(self.unnamed(OFFSET, c, 1));
                 }
-                let s = scalar(c, 1).ok_or_else(|| self.unnamed(OFFSET, c, 1))?;
+                let s =
+                    scalar(self.d.spec.specials, c, 1).ok_or_else(|| self.unnamed(OFFSET, c, 1))?;
                 self.push(s);
                 Ok(())
             }
@@ -1069,7 +1073,8 @@ impl Cx<'_, '_> {
                 if c > M0_CODE {
                     return Err(self.unnamed(SOFFSET, c, 1));
                 }
-                let s = scalar(c, 1).ok_or_else(|| self.unnamed(SOFFSET, c, 1))?;
+                let s = scalar(self.d.spec.specials, c, 1)
+                    .ok_or_else(|| self.unnamed(SOFFSET, c, 1))?;
                 let off = sext(self.take(OFFSET), 21);
                 self.push(s);
                 self.ins.modify("offset", MVal::Int(off as i32));
@@ -1078,7 +1083,10 @@ impl Cx<'_, '_> {
             _ => Err(self.err(
                 Why::Field,
                 Some("soffset_en"),
-                "imm=0 with soffset_en=1 is invalid on gfx942 SMEM".into(),
+                format!(
+                    "imm=0 with soffset_en=1 is invalid on {} SMEM",
+                    self.d.spec.name
+                ),
             )),
         }
     }
@@ -1091,7 +1099,7 @@ impl Cx<'_, '_> {
             .ok_or_else(|| self.err(Why::Form, None, "operands do not match short shape".into()))?;
         for &f in shape {
             let o = match f {
-                VCC => special(VCC_LO, 2).expect("vcc is named"),
+                VCC => special(self.d.spec.specials, VCC_LO, 2).expect("vcc is named"),
                 VDST if sdst => self.register(f, 's')?,
                 VDST if self.opnd(f).xml == Xml::Agpr => self.register(f, 'a')?,
                 VDST | VSRC1 => self.register(f, 'v')?,
@@ -1409,7 +1417,7 @@ impl Cx<'_, '_> {
         let mut src1_idx = None;
         for (idx, &f) in shape.iter().enumerate() {
             let o = match f {
-                VCC => special(VCC_LO, 2).expect("vcc is named"),
+                VCC => special(self.d.spec.specials, VCC_LO, 2).expect("vcc is named"),
                 _ => {
                     let opnd = self.opnd(f);
                     let width = u32::from(opnd.dwords);
@@ -1478,7 +1486,10 @@ impl Cx<'_, '_> {
                 return Err(self.err(
                     Why::Field,
                     Some("dpp"),
-                    format!("dpp control 0x{dpp:x}: none gfx942's syntax names"),
+                    format!(
+                        "dpp control 0x{dpp:x}: none {}'s syntax names",
+                        self.d.spec.name
+                    ),
                 ))
             }
         };
@@ -2020,14 +2031,15 @@ impl Decode for Decoder {
     }
 }
 
-/// Decoded instruction's physical IR form on gfx942.
-pub(crate) fn physical_form(i: &Instruction) -> Result<&'static thin_target::Form, Error> {
-    use std::sync::Mutex;
-    use thin_target::{Field, FieldKind, Form};
+/// Decoded instruction's physical IR form on a CDNA target.
+pub(crate) fn physical_form(
+    target_name: &str,
+    cache: &'static PhysicalFormCache,
+    i: &Instruction,
+) -> Result<&'static thin_target::Form, Error> {
+    use thin_target::{Field, FieldKind};
 
-    type Key = (i32, u16, u8);
-    static FORMS: OnceLock<Mutex<HashMap<Key, &'static Form>>> = OnceLock::new();
-    let target = crate::get(super::NAME)?;
+    let target = crate::get(target_name)?;
     let th = i
         .modifiers()
         .iter()
@@ -2071,10 +2083,7 @@ pub(crate) fn physical_form(i: &Instruction) -> Result<&'static thin_target::For
             i.mnemonic
         )));
     }
-    let mut forms = FORMS
-        .get_or_init(|| Mutex::new(HashMap::new()))
-        .lock()
-        .expect("physical form cache");
+    let mut forms = cache.lock().expect("physical form cache");
     let form = forms.entry((base.id, signs, opsel)).or_insert_with(|| {
         let mut form = base.clone();
         for (k, slot) in form.slots.iter_mut().enumerate() {

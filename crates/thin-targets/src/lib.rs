@@ -29,6 +29,7 @@ pub static MACHINES: [Machine; 2] = [
     },
 ];
 
+mod cdna;
 pub mod decode;
 mod gfx1201;
 mod gfx942;
@@ -41,7 +42,7 @@ use std::sync::OnceLock;
 pub fn hazards(name: &str) -> Result<&'static dyn thin_passes::hazards::HazardModel, Error> {
     match name {
         gfx1201::NAME => Ok(&gfx1201::hazards::Model),
-        gfx942::NAME => Ok(&gfx942::hazards::Model),
+        gfx942::NAME => Ok(&gfx942::HAZARD_MODEL),
         _ => get(name).map(|_| unreachable!("every registered target has a hazard model")),
     }
 }
@@ -87,7 +88,7 @@ pub fn physical_form(
 ) -> Result<&'static thin_target::Form, Error> {
     match name {
         gfx1201::NAME => gfx1201::decoder::physical_form(instruction),
-        gfx942::NAME => gfx942::decoder::physical_form(instruction),
+        gfx942::NAME => gfx942::physical_form(instruction),
         _ => get(name).map(|_| unreachable!("registered target has physical forms")),
     }
 }
@@ -96,7 +97,7 @@ pub fn physical_form(
 pub fn decoder(name: &str) -> Result<&'static dyn Decode, Error> {
     match name {
         gfx1201::NAME => Ok(gfx1201::decoder::decoder()?),
-        gfx942::NAME => Ok(gfx942::decoder::decoder()?),
+        gfx942::NAME => Ok(gfx942::decoder()?),
         _ => get(name).map(|_| unreachable!("every registered target has a decoder")),
     }
 }

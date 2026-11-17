@@ -1,10 +1,12 @@
-//! gfx942's code-object facts: the footer and its descriptor words.
+//! CDNA code-object facts: the footer and its descriptor words.
 
 use std::fmt::Write as _;
 
 use thin_target::{Block, Error, Footer, Resources};
 
-/// The block directives gfx942 takes beyond the common set.
+use super::Spec;
+
+/// The block directives CDNA targets take beyond the common set.
 pub static DIRECTIVES: [&str; 6] = [
     "accum_offset",
     "dx10_clamp",
@@ -22,11 +24,12 @@ fn entry(out: &mut String, indent: &str, key: &str, value: impl std::fmt::Displa
 }
 
 /// The .s text after a kernel's body: the descriptor block and the
-/// metadata for gfx942 (CDNA3, wave64, unified VGPR+AGPR file).
-pub fn footer(f: &Footer) -> Result<String, Error> {
+/// metadata for a CDNA target (wave64, unified VGPR+AGPR file).
+pub(crate) fn footer(spec: &Spec, f: &Footer) -> Result<String, Error> {
+    let target = spec.name;
     if f.preload > 16 {
         return Err(Error::Value(format!(
-            "gfx942 preloads at most 16 argument dwords (preload {})",
+            "{target} preloads at most 16 argument dwords (preload {})",
             f.preload
         )));
     }
@@ -39,7 +42,7 @@ pub fn footer(f: &Footer) -> Result<String, Error> {
     let vgpr = f.vgpr.max(1);
     if vgpr > 256 || f.agpr > 256 {
         return Err(Error::Value(format!(
-            "gfx942 has at most 256 VGPRs and 256 AGPRs (vgpr {}, agpr {})",
+            "{target} has at most 256 VGPRs and 256 AGPRs (vgpr {}, agpr {})",
             f.vgpr, f.agpr
         )));
     }
@@ -143,7 +146,7 @@ pub fn interface_resources(block: &Block) -> Result<Resources, Error> {
     })
 }
 
-/// gfx942's own descriptor words from a block.
+/// CDNA descriptor words from a block.
 pub fn resources(block: &Block) -> Result<Resources, Error> {
     let iface = interface_resources(block)?;
     let (vgpr, sgpr) = (block.get("next_free_vgpr")?, block.get("next_free_sgpr")?);
