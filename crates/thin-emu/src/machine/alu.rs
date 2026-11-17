@@ -206,8 +206,15 @@ fn unary_f32(name: &str, x: u32) -> Option<u32> {
     use super::trans32 as t;
     let a = f(x);
     let r = match name {
-        "exp" => return Some(t::exp(x)),
+        "exp" | "exp.legacy" => return Some(t::exp(x)),
         "log" => return Some(t::log(x)),
+        "log.legacy" => {
+            return Some(if (x & 0x7FFF_FFFF) < 0x0080_0000 {
+                0xFF7F_FFFF
+            } else {
+                t::log(x)
+            });
+        }
         "rcp" => return Some(t::rcp(x)),
         "sqrt" => return Some(t::sqrt(x)),
         "rsq" => return Some(t::rsq(x)),
@@ -220,6 +227,55 @@ fn unary_f32(name: &str, x: u32) -> Option<u32> {
         _ => return None,
     };
     Some(num::nan32(r, &[x]))
+}
+
+/// Bitwise 3-input LUT (`D[i] = ttbl[{s0[i], s1[i], s2[i]}]`).
+fn bitop3_u32(s0: u32, s1: u32, s2: u32, ttbl: u8) -> u32 {
+    let mut r = 0u32;
+    for m in 0..8u32 {
+        if (ttbl >> m) & 1 != 0 {
+            let p0 = if (m & 4) != 0 { s0 } else { !s0 };
+            let p1 = if (m & 2) != 0 { s1 } else { !s1 };
+            let p2 = if (m & 1) != 0 { s2 } else { !s2 };
+            r |= p0 & p1 & p2;
+        }
+    }
+    r
+}
+
+/// IEEE `minimum` / `maximum` at binary16: NaN-propagating (first NaN quieted),
+/// `-0 < +0`, tie gives `y`.
+fn minimum16(x: u32, y: u32, max: bool) -> u32 {
+    let (x, y) = (x & 0xFFFF, y & 0xFFFF);
+    if num::is_nan16(x) || num::is_nan16(y) {
+        return num::nan16(num::DNAN16, &[x, y]);
+    }
+    let (a, b) = (num::f16_value(x), num::f16_value(y));
+    let less = a < b || (a == 0.0 && b == 0.0 && (x & 0x8000 != 0) && (y & 0x8000 == 0));
+    let more = a > b || (a == 0.0 && b == 0.0 && (x & 0x8000 == 0) && (y & 0x8000 != 0));
+    if (!max && less) || (max && more) {
+        x
+    } else {
+        y
+    }
+}
+
+/// Reads a `v_dot2c_f32_bf16` operand where `NEG` negates `[15:0]` and `ABS` is
+/// translated by hardware to `NEG_HI` (`[31:16]`).
+fn dot2c_src(wv: &Wave, o: &Operand) -> Result<Src, EmuError> {
+    let plain = Operand {
+        base: o.base.clone(),
+        neg: false,
+        abs: false,
+    };
+    let mut s = wv.vread(&plain, 0)?;
+    let mask = (if o.neg { 0x0000_8000 } else { 0 }) | (if o.abs { 0x8000_0000 } else { 0 });
+    if mask != 0 {
+        for v in &mut s.v[..wv.w] {
+            *v ^= mask;
+        }
+    }
+    Ok(s)
 }
 
 // ---------------------------------------------------------------- helpers
@@ -930,6 +986,76 @@ fn valu_inner(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result
         }
         "v.permlane16.b32" => permlane16(wv, ins, false)?,
         "v.permlanex16.b32" => permlane16(wv, ins, true)?,
+        "v.permlane16.swap.b32" => permlane_swap(wv, ins, false)?,
+        "v.permlane32.swap.b32" => permlane_swap(wv, ins, true)?,
+        "v.prng.b32" => {
+            let x = wv.vread(arg(1)?, 0)?;
+            for l in 0..w {
+                out[l] = num::prng_b32(x.v[l]);
+            }
+            wv.vwrite(&ops[0], 0, &out, None, exec)?;
+        }
+        "v.bitop3.b32" | "v.bitop3.b16" => {
+            let ttbl = int_field(ins, "bitop3", 0) as u8;
+            let (x, y, z) = (
+                wv.vread(arg(1)?, 0)?,
+                wv.vread(arg(2)?, 0)?,
+                wv.vread(arg(3)?, 0)?,
+            );
+            if canon == "v.bitop3.b32" {
+                for l in 0..w {
+                    out[l] = bitop3_u32(x.v[l], y.v[l], z.v[l], ttbl);
+                }
+                wv.vwrite(&ops[0], 0, &out, None, exec)?;
+            } else {
+                let hw = super::cvt::hw_opsel(ins);
+                let (sh0, sh1, sh2, dh) = (
+                    (hw & 1) as usize,
+                    ((hw >> 1) & 1) as usize,
+                    ((hw >> 2) & 1) as usize,
+                    ((hw >> 3) & 1) as usize,
+                );
+                let old = wv.vread(&ops[0], 0)?;
+                let mut t: Vec<Lane> = old.tags(w).to_vec();
+                for l in 0..w {
+                    let s0 = (x.v[l] >> (16 * sh0)) & 0xFFFF;
+                    let s1 = (y.v[l] >> (16 * sh1)) & 0xFFFF;
+                    let s2 = (z.v[l] >> (16 * sh2)) & 0xFFFF;
+                    let v16 = bitop3_u32(s0, s1, s2, ttbl) & 0xFFFF;
+                    out[l] = super::cvt::put_half(old.v[l], dh, v16);
+                    t[l][2 * dh] = 0;
+                    t[l][2 * dh + 1] = 0;
+                }
+                wv.vwrite(&ops[0], 0, &out, old.tagged.then_some(t.as_slice()), exec)?;
+            }
+        }
+        "v.ashr.pk.i8.i32" | "v.ashr.pk.u8.i32" => {
+            let signed = canon == "v.ashr.pk.i8.i32";
+            let dh = ((super::cvt::hw_opsel(ins) >> 3) & 1) as usize;
+            let (x, y, z, old) = (
+                wv.vread(arg(1)?, 0)?,
+                wv.vread(arg(2)?, 0)?,
+                wv.vread(arg(3)?, 0)?,
+                wv.vread(&ops[0], 0)?,
+            );
+            let mut t: Vec<Lane> = old.tags(w).to_vec();
+            let sat8 = |n: i32| -> u32 {
+                if signed {
+                    u32::from(n.clamp(-128, 127) as i8 as u8)
+                } else {
+                    u32::from(n.clamp(0, 255) as u8)
+                }
+            };
+            for l in 0..w {
+                let sh = z.v[l] & 31;
+                let b0 = sat8((x.v[l] as i32) >> sh);
+                let b1 = sat8((y.v[l] as i32) >> sh);
+                out[l] = super::cvt::put_half(old.v[l], dh, b0 | (b1 << 8));
+                t[l][2 * dh] = 0;
+                t[l][2 * dh + 1] = 0;
+            }
+            wv.vwrite(&ops[0], 0, &out, old.tagged.then_some(t.as_slice()), exec)?;
+        }
         "v.lshlrev.b16" | "v.max.num.f16" | "v.pack.b32.f16" => half16(e, wv, ins, canon)?,
         "v.exp.f16" | "v.log.f16" | "v.rcp.f16" | "v.sqrt.f16" | "v.rsq.f16" => {
             trans16(e, wv, ins, canon)?;
@@ -939,24 +1065,63 @@ fn valu_inner(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result
         "v.pk.fma.f32" | "v.pk.mul.f32" | "v.pk.add.f32" | "v.pk.mov.b32" => {
             pk_f32_op(e, wv, ins, canon)?;
         }
+        "v.pk.minimum3.f16" | "v.pk.maximum3.f16" => {
+            pk_minmax3_f16(e, wv, ins, canon == "v.pk.maximum3.f16")?;
+        }
         c if c.ends_with(".dpp") => {
             if !dpp(e, wv, ins, c)? {
                 return Ok(false);
             }
         }
-        "v.fma.f32" | "v.fmac.f32" | "v.dot2.f32.bf16" => {
-            let (x, y) = (wv.vread(arg(1)?, 0)?, wv.vread(arg(2)?, 0)?);
+        "v.fma.f32" | "v.fmac.f32" | "v.dot2.f32.bf16" | "v.dot2c.f32.bf16" => {
+            let is_dot2c = canon == "v.dot2c.f32.bf16";
+            let (x, y) = if is_dot2c {
+                (dot2c_src(wv, arg(1)?)?, dot2c_src(wv, arg(2)?)?)
+            } else {
+                (wv.vread(arg(1)?, 0)?, wv.vread(arg(2)?, 0)?)
+            };
             let z = if canon == "v.fma.f32" || canon == "v.dot2.f32.bf16" {
                 wv.vread(arg(3)?, 0)?
             } else {
                 wv.vread(&ops[0], 0)?
             };
+            let (xm, ym, clamp) = if canon == "v.dot2.f32.bf16" {
+                let m = |i: usize| {
+                    (if list_at(ins, "neg_lo", i, 0) & 1 != 0 {
+                        0x0000_8000
+                    } else {
+                        0
+                    }) | (if list_at(ins, "neg_hi", i, 0) & 1 != 0 {
+                        0x8000_0000
+                    } else {
+                        0
+                    })
+                };
+                (
+                    m(0),
+                    m(1),
+                    ins.field("clamp").is_some_and(|f| field_int(f) != 0),
+                )
+            } else {
+                (0, 0, false)
+            };
             for l in 0..w {
-                out[l] = if canon.contains("dot2") {
-                    dot2_bf16(x.v[l], y.v[l], z.v[l])
+                let mut r = if canon.contains("dot2") {
+                    dot2_bf16(x.v[l] ^ xm, y.v[l] ^ ym, z.v[l])
                 } else {
                     fma(x.v[l], y.v[l], z.v[l])
                 };
+                if clamp {
+                    let fv = f(r);
+                    r = if fv.is_nan() || fv <= 0.0 {
+                        0
+                    } else if fv >= 1.0 {
+                        1.0f32.to_bits()
+                    } else {
+                        r
+                    };
+                }
+                out[l] = r;
             }
             let t = match float_rule(e, w, x.tags(w), y.tags(w), false, false)? {
                 Some(p) => float_rule(e, w, &p, z.tags(w), false, true)?,
@@ -1448,6 +1613,145 @@ fn permlane16(wv: &mut Wave, ins: &Ins, cross: bool) -> Result<(), EmuError> {
     wv.vwrite(&ops[0], 0, &out, t, write)
 }
 
+/// CDNA 4 `v_permlane16_swap_b32` (`swap32 = false`) and `v_permlane32_swap_b32`
+/// (`swap32 = true`): swaps even rows / lower 32 lanes of `src0` (`ops[1]`) with
+/// odd rows / upper 32 lanes of `vdst` (`ops[0]`), honoring `exec`, `fi`, and
+/// `bound_ctrl` on both destinations and supporting `vdst == src0`.
+fn permlane_swap(wv: &mut Wave, ins: &Ins, swap32: bool) -> Result<(), EmuError> {
+    let w = wv.w;
+    let ops = &ins.operands;
+    if ops.len() != 2 {
+        return Err(fault(format!("{}: two operands", ins.text)));
+    }
+    let modified = ops.iter().any(|o| o.neg || o.abs)
+        || ["abs", "neg", "neg_lo", "neg_hi", "omod", "clamp"]
+            .iter()
+            .any(|f| ins.field(f).is_some());
+    if modified {
+        return Err(limit(format!(
+            "{}: abs, neg and omod are not emulated",
+            ins.text
+        )));
+    }
+    let (old_dst, old_src) = (wv.vread(&ops[0], 0)?, wv.vread(&ops[1], 0)?);
+    let fi = int_field(ins, "fi", 0) != 0;
+    let bc = int_field(ins, "bound_ctrl", 0) != 0;
+    let exec = wv.exec;
+    let step = if swap32 { 32 } else { 16 };
+
+    let mut dst_out = [0u32; MAX_W];
+    let mut src_out = [0u32; MAX_W];
+    let mut dst_tags = vec![[0; 4]; w];
+    let mut src_tags = vec![[0; 4]; w];
+    let mut write_dst = 0u64;
+    let mut write_src = 0u64;
+
+    for lo in (0..w).filter(|&l| (l & step) == 0 && l + step < w) {
+        let hi = lo + step;
+        // src0[lo] <- old_dst[hi]
+        if (exec >> lo) & 1 != 0 {
+            let live_hi = (exec >> hi) & 1 != 0;
+            if live_hi || fi {
+                src_out[lo] = old_dst.v[hi];
+                src_tags[lo] = old_dst.tag(hi);
+                write_src |= 1 << lo;
+            } else if bc {
+                write_src |= 1 << lo;
+            }
+        }
+        // vdst[hi] <- old_src[lo]
+        if (exec >> hi) & 1 != 0 {
+            let live_lo = (exec >> lo) & 1 != 0;
+            if live_lo || fi {
+                dst_out[hi] = old_src.v[lo];
+                dst_tags[hi] = old_src.tag(lo);
+                write_dst |= 1 << hi;
+            } else if bc {
+                write_dst |= 1 << hi;
+            }
+        }
+    }
+    wv.vwrite(
+        &ops[1],
+        0,
+        &src_out,
+        old_dst.tagged.then_some(src_tags.as_slice()),
+        write_src,
+    )?;
+    wv.vwrite(
+        &ops[0],
+        0,
+        &dst_out,
+        old_src.tagged.then_some(dst_tags.as_slice()),
+        write_dst,
+    )
+}
+
+/// CDNA 4 `v_pk_minimum3_f16` (`max = false`) and `v_pk_maximum3_f16` (`max = true`).
+fn pk_minmax3_f16(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, max: bool) -> Result<(), EmuError> {
+    let w = wv.w;
+    let ops = &ins.operands;
+    if ops.len() != 4 {
+        return Err(fault(format!("{}: four operands", ins.text)));
+    }
+    let srcs = [
+        wv.vread(&ops[1], 0)?,
+        wv.vread(&ops[2], 0)?,
+        wv.vread(&ops[3], 0)?,
+    ];
+    let clamp = ins.field("clamp").is_some_and(|f| field_int(f) != 0);
+    let mut out = [0u32; MAX_W];
+    let mut t = zeros(w);
+    let mut any = false;
+    for half in 0..2 {
+        let mut sel = [0usize; 3];
+        let mut neg = [false; 3];
+        for i in 0..3 {
+            if half == 0 {
+                sel[i] = list_at(ins, "op_sel", i, 0) as usize & 1;
+                neg[i] = list_at(ins, "neg_lo", i, 0) & 1 != 0;
+            } else {
+                sel[i] = list_at(ins, "op_sel_hi", i, 1) as usize & 1;
+                neg[i] = list_at(ins, "neg_hi", i, 0) & 1 != 0;
+            }
+        }
+        for l in 0..w {
+            let get = |i: usize| {
+                let mut h = (srcs[i].v[l] >> (16 * sel[i])) & 0xFFFF;
+                if neg[i] {
+                    h ^= 0x8000;
+                }
+                h
+            };
+            let mut h = minimum16(minimum16(get(0), get(1), max), get(2), max);
+            if clamp {
+                if num::is_nan16(h) || num::f16_value(h) <= 0.0 {
+                    h = 0;
+                } else if num::f16_value(h) >= 1.0 {
+                    h = 0x3C00;
+                }
+            }
+            out[l] = super::cvt::put_half(out[l], half, h);
+        }
+        let s0t: Vec<Lane> = (0..w).map(|l| widen16(&srcs[0].tag(l), sel[0])).collect();
+        let s1t: Vec<Lane> = (0..w).map(|l| widen16(&srcs[1].tag(l), sel[1])).collect();
+        let s2t: Vec<Lane> = (0..w).map(|l| widen16(&srcs[2].tag(l), sel[2])).collect();
+        let p = float_rule(e, w, &s0t, &s1t, true, false)?;
+        let r = match p {
+            Some(p) => float_rule(e, w, &p, &s2t, true, false)?,
+            None => float_rule(e, w, &zeros(w), &s2t, true, false)?,
+        };
+        if let Some(r) = r {
+            any = true;
+            for l in 0..w {
+                t[l][2 * half] = r[l][0];
+                t[l][2 * half + 1] = r[l][1];
+            }
+        }
+    }
+    wv.vwrite(&ops[0], 0, &out, any.then_some(t.as_slice()), wv.exec)
+}
+
 /// `v.cmp.K.T mask, x, y`.
 fn cmp(wv: &mut Wave, ins: &Ins, canon: &str) -> Result<(), EmuError> {
     let m = compare(wv, ins, canon, 1)?;
@@ -1800,41 +2104,83 @@ fn dpp(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, 
             }
         }
     }
-    if ops[1].abs {
+    let base = canon.strip_suffix(".dpp").unwrap_or(canon);
+    if base == "v.cvt.f32.bf16" {
         for v in &mut xs.v[..w] {
-            *v &= 0x7FFF_FFFF;
+            *v = (*v & 0xFFFF) << 16;
         }
     }
-    if ops[1].neg {
-        for v in &mut xs.v[..w] {
-            *v ^= 0x8000_0000;
+    if base == "v.dot2c.f32.bf16" {
+        let mask =
+            (if ops[1].neg { 0x0000_8000 } else { 0 }) | (if ops[1].abs { 0x8000_0000 } else { 0 });
+        if mask != 0 {
+            for v in &mut xs.v[..w] {
+                *v ^= mask;
+            }
+        }
+    } else {
+        if ops[1].abs {
+            for v in &mut xs.v[..w] {
+                *v &= 0x7FFF_FFFF;
+            }
+        }
+        if ops[1].neg {
+            for v in &mut xs.v[..w] {
+                *v ^= 0x8000_0000;
+            }
         }
     }
     let writes = dpp_writes(ins, wv.exec, w);
     let mut out = [0u32; MAX_W];
     let mut t = old.tags(w).to_vec();
-    let base = canon.strip_suffix(".dpp").unwrap_or(canon);
-    if base == "v.mov.b32" || base == "v.not.b32" {
-        for l in 0..w {
-            if srcs[l].is_some() || bound {
-                out[l] = if base == "v.not.b32" {
-                    !xs.v[l]
-                } else {
-                    xs.v[l]
-                };
-                t[l] = xs.tag(l);
-            } else {
-                out[l] = old.v[l];
+    if ops.len() == 2 {
+        let mut untagged_unary = false;
+        let unary_fn: Option<fn(u32) -> u32> = match base {
+            "v.mov.b32" | "v.cvt.f32.bf16" => Some(|v| v),
+            "v.not.b32" => Some(|v| !v),
+            "v.prng.b32" => {
+                untagged_unary = true;
+                Some(num::prng_b32)
             }
+            _ => None,
+        };
+        let f32_unary = base.strip_prefix("v.").and_then(|r| r.strip_suffix(".f32"));
+        if unary_fn.is_some() || f32_unary.is_some() {
+            for l in 0..w {
+                if srcs[l].is_some() || bound {
+                    out[l] = if let Some(uf) = unary_fn {
+                        uf(xs.v[l])
+                    } else {
+                        let Some(v) = unary_f32(f32_unary.unwrap_or(""), xs.v[l]) else {
+                            return Ok(false);
+                        };
+                        v
+                    };
+                    t[l] = if untagged_unary {
+                        [0; 4]
+                    } else if base == "v.cvt.f32.bf16" {
+                        let a = xs.tag(l);
+                        [a[0], a[1], a[0], a[1]]
+                    } else {
+                        xs.tag(l)
+                    };
+                } else {
+                    out[l] = old.v[l];
+                }
+            }
+            let tagged = (!untagged_unary && xs.tagged) || old.tagged;
+            wv.vwrite(&ops[0], 0, &out, tagged.then_some(t.as_slice()), writes)?;
+            return Ok(true);
         }
-        let tagged = xs.tagged || old.tagged;
-        wv.vwrite(&ops[0], 0, &out, tagged.then_some(t.as_slice()), writes)?;
-        return Ok(true);
     }
-    let y = ops
+    let y_op = ops
         .get(2)
         .ok_or_else(|| fault(format!("{}: operand 2 missing", ins.text)))?;
-    let y = wv.vread(y, 0)?;
+    let y = if base == "v.dot2c.f32.bf16" {
+        dot2c_src(wv, y_op)?
+    } else {
+        wv.vread(y_op, 0)?
+    };
     let mut vals = [0u32; MAX_W];
     let rt = if let Some((op, stat, add)) = float2(base) {
         for l in 0..w {
@@ -1854,9 +2200,13 @@ fn dpp(e: &mut Exec<'_>, wv: &mut Wave, ins: &Ins, canon: &str) -> Result<bool, 
             };
         }
         float_rule(e, w, xs.tags(w), y.tags(w), true, false)?
-    } else if base == "v.fmac.f32" || base == "v.mac.f32" {
+    } else if base == "v.fmac.f32" || base == "v.mac.f32" || base == "v.dot2c.f32.bf16" {
         for l in 0..w {
-            vals[l] = fma(xs.v[l], y.v[l], old.v[l]);
+            vals[l] = if base == "v.dot2c.f32.bf16" {
+                dot2_bf16(xs.v[l], y.v[l], old.v[l])
+            } else {
+                fma(xs.v[l], y.v[l], old.v[l])
+            };
         }
         match float_rule(e, w, xs.tags(w), y.tags(w), false, false)? {
             Some(p) => float_rule(e, w, &p, old.tags(w), false, true)?,

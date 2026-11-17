@@ -764,3 +764,141 @@ fn wave64_all_matrix_forms_execute_in_agpr_and_vgpr() {
         }
     }
 }
+
+#[test]
+fn cdna4_valu_and_all_49_scalef32_ops_execute() {
+    use thin_emu::machine::program::read_program;
+    let target = thin_targets::names()
+        .iter()
+        .map(|n| thin_targets::get(n).unwrap())
+        .find(|t| t.definition().wave == 64 && !t.fnuz_fp8())
+        .expect("wave64 OCP-FP8 target");
+    let f = Facts::of(target);
+
+    let run = |asm: &str, init: &mut dyn FnMut(&mut Wave)| -> Wave {
+        let full = format!("{asm}\n\ts_endpgm\n");
+        let prog = read_program(&full, target).unwrap_or_else(|e| panic!("{asm}: {e}"));
+        let mut m = Machine::new(prog, f.clone(), 96, 0, 0).unwrap();
+        let mut mem = Memory::default();
+        let mut tables = Tables::default();
+        let (mut ws, _) = m
+            .run_wg(&mut mem, &mut tables, 0, (0, 0), 1, 0, Some(init))
+            .unwrap_or_else(|e| panic!("{asm}: {e:?}"));
+        ws.remove(0)
+    };
+
+    // 1. All 49 v_cvt_scalef32_* instructions:
+    let scalef32_lines: &[&str] = &[
+        "\tv_cvt_scalef32_pk_fp8_f32 v0, v1, v2, 2.0 op_sel:[0,0,0,1]",
+        "\tv_cvt_scalef32_pk_bf8_f32 v0, v1, v2, 2.0",
+        "\tv_cvt_scalef32_pk_fp8_f16 v0, v3, 1.0 op_sel:[0,0,1]",
+        "\tv_cvt_scalef32_pk_bf8_f16 v0, v3, 1.0",
+        "\tv_cvt_scalef32_pk_fp8_bf16 v0, v4, 1.0 op_sel:[0,0,1]",
+        "\tv_cvt_scalef32_pk_bf8_bf16 v0, v4, 1.0",
+        "\tv_cvt_scalef32_sr_fp8_f32 v0, v1, v5, 1.0 op_sel:[0,0,1,0]",
+        "\tv_cvt_scalef32_sr_bf8_f32 v0, v1, v5, 1.0 op_sel:[0,0,0,1]",
+        "\tv_cvt_scalef32_sr_fp8_f16 v0, v3, v5, 1.0 op_sel:[1,0,1,1]",
+        "\tv_cvt_scalef32_sr_bf8_f16 v0, v3, v5, 1.0",
+        "\tv_cvt_scalef32_sr_fp8_bf16 v0, v4, v5, 1.0 op_sel:[1,0,0,1]",
+        "\tv_cvt_scalef32_sr_bf8_bf16 v0, v4, v5, 1.0",
+        "\tv_cvt_scalef32_pk_f32_fp8 v[6:7], v0, 2.0 op_sel:[1,0,0]",
+        "\tv_cvt_scalef32_pk_f32_bf8 v[6:7], v0, 2.0",
+        "\tv_cvt_scalef32_pk_f16_fp8 v6, v0, 1.0 op_sel:[1,0,0]",
+        "\tv_cvt_scalef32_pk_f16_bf8 v6, v0, 1.0",
+        "\tv_cvt_scalef32_pk_bf16_fp8 v6, v0, 1.0 op_sel:[1,0,0]",
+        "\tv_cvt_scalef32_pk_bf16_bf8 v6, v0, 1.0",
+        "\tv_cvt_scalef32_f32_fp8 v6, v0, 2.0 op_sel:[1,1,0]",
+        "\tv_cvt_scalef32_f32_bf8 v6, v0, 2.0 op_sel:[0,1,0]",
+        "\tv_cvt_scalef32_f16_fp8 v6, v0, 1.0 op_sel:[1,0,1]",
+        "\tv_cvt_scalef32_f16_bf8 v6, v0, 1.0 op_sel:[0,1,0]",
+        "\tv_cvt_scalef32_pk_fp4_f32 v0, v1, v2, 1.0 op_sel:[0,0,1,0]",
+        "\tv_cvt_scalef32_pk_fp4_f16 v0, v3, 1.0 op_sel:[0,0,0,1]",
+        "\tv_cvt_scalef32_pk_fp4_bf16 v0, v4, 1.0 op_sel:[0,0,1,1]",
+        "\tv_cvt_scalef32_sr_pk_fp4_f32 v0, v[1:2], v5, 1.0 op_sel:[0,0,1,0]",
+        "\tv_cvt_scalef32_sr_pk_fp4_f16 v0, v3, v5, 1.0 op_sel:[0,0,0,1]",
+        "\tv_cvt_scalef32_sr_pk_fp4_bf16 v0, v4, v5, 1.0",
+        "\tv_cvt_scalef32_pk_f32_fp4 v[6:7], v0, 2.0 op_sel:[1,1,0]",
+        "\tv_cvt_scalef32_pk_f16_fp4 v6, v0, 2.0 op_sel:[0,1,0]",
+        "\tv_cvt_scalef32_pk_bf16_fp4 v6, v0, 2.0",
+        "\tv_cvt_scalef32_2xpk16_fp6_f32 v[8:13], v[16:31], v[32:47], 1.0",
+        "\tv_cvt_scalef32_2xpk16_bf6_f32 v[8:13], v[16:31], v[32:47], 1.0",
+        "\tv_cvt_scalef32_pk32_fp6_f16 v[8:13], v[16:31], 1.0",
+        "\tv_cvt_scalef32_pk32_fp6_bf16 v[8:13], v[16:31], 1.0",
+        "\tv_cvt_scalef32_pk32_bf6_f16 v[8:13], v[16:31], 1.0",
+        "\tv_cvt_scalef32_pk32_bf6_bf16 v[8:13], v[16:31], 1.0",
+        "\tv_cvt_scalef32_sr_pk32_fp6_f32 v[8:13], v[16:47], v5, 1.0",
+        "\tv_cvt_scalef32_sr_pk32_bf6_f32 v[8:13], v[16:47], v5, 1.0",
+        "\tv_cvt_scalef32_sr_pk32_fp6_f16 v[8:13], v[16:31], v5, 1.0",
+        "\tv_cvt_scalef32_sr_pk32_bf6_f16 v[8:13], v[16:31], v5, 1.0",
+        "\tv_cvt_scalef32_sr_pk32_fp6_bf16 v[8:13], v[16:31], v5, 1.0",
+        "\tv_cvt_scalef32_sr_pk32_bf6_bf16 v[8:13], v[16:31], v5, 1.0",
+        "\tv_cvt_scalef32_pk32_f32_fp6 v[64:95], v[8:13], 2.0",
+        "\tv_cvt_scalef32_pk32_f32_bf6 v[64:95], v[8:13], 2.0",
+        "\tv_cvt_scalef32_pk32_f16_fp6 v[64:79], v[8:13], 2.0",
+        "\tv_cvt_scalef32_pk32_f16_bf6 v[64:79], v[8:13], 2.0",
+        "\tv_cvt_scalef32_pk32_bf16_fp6 v[64:79], v[8:13], 2.0",
+        "\tv_cvt_scalef32_pk32_bf16_bf6 v[64:79], v[8:13], 2.0",
+    ];
+    assert_eq!(scalef32_lines.len(), 49);
+    for &line in scalef32_lines {
+        let _ = run(line, &mut |w| {
+            w.v.fill(0x3F80_3F80);
+            w.v[5 * 64..6 * 64].fill(0x1234_5678);
+        });
+    }
+
+    // 2. Round-trip 2xpk16_fp6_f32 -> pk32_f32_fp6 (checks interleaved even/odd S0/S1 & 6-bit straddle):
+    let w = run(
+        "\tv_cvt_scalef32_2xpk16_fp6_f32 v[8:13], v[16:31], v[32:47], 0.5\n\
+         \tv_cvt_scalef32_pk32_f32_fp6 v[64:95], v[8:13], 0.5",
+        &mut |w| {
+            w.v.fill(0);
+            for pass in 0..16usize {
+                let v0 = ((pass % 7) as f32 * 0.25).to_bits();
+                let v1 = (-((pass % 7) as f32) * 0.25).to_bits();
+                w.v[(16 + pass) * 64..(17 + pass) * 64].fill(v0);
+                w.v[(32 + pass) * 64..(33 + pass) * 64].fill(v1);
+            }
+        },
+    );
+    for pass in 0..16usize {
+        let exp0 = ((pass % 7) as f32 * 0.25).to_bits();
+        let exp1 = if pass % 7 == 0 {
+            0x8000_0000
+        } else {
+            (-((pass % 7) as f32) * 0.25).to_bits()
+        };
+        assert_eq!(w.v[(64 + 2 * pass) * 64], exp0, "pass {pass} even");
+        assert_eq!(w.v[(64 + 2 * pass + 1) * 64], exp1, "pass {pass} odd");
+    }
+
+    // 3. v_permlane16_swap_b32 and v_permlane32_swap_b32:
+    let w = run(
+        "\tv_permlane16_swap_b32 v0, v1\n\tv_permlane32_swap_b32_e64 v2, v2",
+        &mut |w| {
+            for l in 0..64usize {
+                w.v[l] = 0x100 + l as u32; // v0
+                w.v[64 + l] = 0x200 + l as u32; // v1
+                w.v[2 * 64 + l] = 0x300 + l as u32; // v2 (in-place swap!)
+            }
+        },
+    );
+    for l in 0..64usize {
+        // v0 keeps even rows, gets v1's even rows in its odd rows:
+        let want_v0 = if (l & 16) == 0 {
+            0x100 + l as u32
+        } else {
+            0x200 + (l - 16) as u32
+        };
+        // v1 gets v0's odd rows in its even rows, keeps its odd rows:
+        let want_v1 = if (l & 16) == 0 {
+            0x100 + (l + 16) as u32
+        } else {
+            0x200 + l as u32
+        };
+        assert_eq!(w.v[l], want_v0);
+        assert_eq!(w.v[64 + l], want_v1);
+        // v2 in-place swaps 0..31 with 32..63:
+        assert_eq!(w.v[2 * 64 + l], 0x300 + (l ^ 32) as u32);
+    }
+}

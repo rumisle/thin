@@ -145,6 +145,64 @@ pub fn bf16_conv(u: u32) -> u32 {
     }
 }
 
+/// f32 → bf16 (RNE; a NaN keeps sign and payload, quieted).
+pub fn bf16_of_f32(u: u32) -> u32 {
+    if is_nan32(u) {
+        ((u >> 16) & 0x8000) | 0x7FC0 | ((u >> 16) & 0x3F)
+    } else {
+        bf16_rne(u)
+    }
+}
+
+/// `v_prng_b32`: 32-bit LFSR step `(x << 1) ^ (x[31] ? 197 : 0)`.
+#[inline]
+pub fn prng_b32(x: u32) -> u32 {
+    (x << 1) ^ if (x >> 31) != 0 { 197 } else { 0 }
+}
+
+/// f32 → bf16 with stochastic rounding (16 random bits `rand[31:16]`, truncated).
+pub fn sr_bf16_of_f32(u: u32, rand: u32) -> u32 {
+    let mag = u & 0x7FFF_FFFF;
+    let sign = (u >> 16) & 0x8000;
+    if mag > 0x7F80_0000 {
+        return sign | 0x7FC0 | ((mag >> 16) & 0x3F);
+    }
+    if mag == 0x7F80_0000 || mag == 0 {
+        return (u >> 16) & 0xFFFF;
+    }
+    let rounded = (mag + (rand >> 16)) >> 16;
+    sign | rounded.min(0x7F80)
+}
+
+/// f32 → f16 with stochastic rounding (13 random bits `rand[31:19]`, truncated).
+pub fn sr_f16_of_f32(u: u32, rand: u32) -> u32 {
+    let x = f32_of(u);
+    if x.is_nan() {
+        return ((u >> 16) & 0x8000) | 0x7E00 | ((u >> 13) & 0x3FF);
+    }
+    let sign = if x.is_sign_negative() { 0x8000 } else { 0 };
+    let a = f64::from(x).abs();
+    if a.is_infinite() {
+        return sign | 0x7C00;
+    }
+    if a == 0.0 {
+        return sign;
+    }
+    let e = floor_log2(a).max(-14);
+    let step = 2f64.powi(e - 10);
+    let noise = f64::from(rand >> 19) / f64::from(1u32 << 13);
+    let r = (a / step + noise).floor() * step;
+    if r > 65504.0 {
+        return sign | 0x7C00;
+    }
+    if r < 2f64.powi(-14) {
+        return sign | (r / 2f64.powi(-24)) as u32;
+    }
+    let ex = floor_log2(r);
+    let man = ((r / 2f64.powi(ex) - 1.0) * 1024.0) as u32;
+    sign | (((ex + 15) as u32) << 10) | man
+}
+
 /// One RNE rounding of an exact value to binary16, subnormals and infinity
 /// past the range; NaN → 0x7E00 (`f16_one`).
 pub fn f16_one(x: f64) -> u32 {
@@ -357,6 +415,60 @@ pub fn down(x: f64, scale: u32, fmt: Small) -> u32 {
         let lead = floor_log2(a.max(2f64.powi(emin - mb - 1)));
         let step = 2f64.powi(lead.max(emin) - mb);
         (a / step).round_ties_even() * step
+    };
+    if r > max {
+        return match fmt {
+            Small::E4M3 => 0x7F | sign,
+            Small::E5M2 => 0x7C | sign,
+            Small::E4M3Fnuz | Small::E5M2Fnuz => 0x80,
+            _ => fmt.largest() | sign,
+        };
+    }
+    let code = if r < 2f64.powi(emin) {
+        (r / 2f64.powi(emin - mb)) as u32
+    } else {
+        let ex = floor_log2(r);
+        let man = ((r / 2f64.powi(ex) - 1.0) * 2f64.powi(mb)) as u32;
+        (((ex + bias) as u32) << mb) | man
+    };
+    if code == 0 && fnuz {
+        0
+    } else {
+        code | sign
+    }
+}
+
+/// `down_sr(x, rand, scale, fmt)`: stochastic rounding (`23 - mb` top bits of
+/// `rand` added before truncation) to a small format's code.
+pub fn down_sr(x: f64, rand: u32, scale: u32, fmt: Small) -> u32 {
+    let (mb, emin, bias, max, eb) = fmt.params();
+    let e = scale_e(scale);
+    let fnuz = matches!(fmt, Small::E4M3Fnuz | Small::E5M2Fnuz);
+    let sign = if x.is_sign_negative() {
+        1 << (mb + eb)
+    } else {
+        0
+    };
+    if x.is_nan() || e == 255 {
+        return match fmt {
+            Small::E4M3 => 0xFF,
+            Small::E5M2 => 0xFE,
+            Small::E4M3Fnuz | Small::E5M2Fnuz => 0x80,
+            _ => sign | fmt.largest(),
+        };
+    }
+    let v = x / 2f64.powi(e - 127);
+    let a = v.abs();
+    let r = if a.is_infinite() {
+        f64::INFINITY
+    } else if a == 0.0 {
+        0.0
+    } else {
+        let r_bits = (23 - mb) as u32;
+        let noise = f64::from(rand >> (32 - r_bits)) / f64::from(1u32 << r_bits);
+        let lead = floor_log2(a).max(emin);
+        let step = 2f64.powi(lead - mb);
+        (a / step + noise).floor() * step
     };
     if r > max {
         return match fmt {

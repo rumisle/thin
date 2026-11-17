@@ -660,3 +660,179 @@ def test_gfx950_f8f6f4_all_25_format_pairs_and_mx_scale_mfma():
     )
     assert np.all(nan_out[2, :] == 0xFFC00000)
     assert np.all(nan_out[:2, :] != 0xFFC00000) and np.all(nan_out[3:, :] != 0xFFC00000)
+
+
+def _run_lanes(asm_body: str, n_out: int, target_name: str = "gfx950") -> np.ndarray:
+    from thin.emu import Cluster, Memory
+    from thin.target import targeting
+
+    lines = [
+        "\ts_load_dwordx2 s[4:5], s[0:1], 0x0",
+        "\ts_waitcnt lgkmcnt(0)",
+        asm_body,
+        f"\tv_mul_lo_u32 v90, v0, {n_out * 4}",
+    ]
+    for d in range(n_out):
+        lines.append(f"\tglobal_store_dword v90, v{80 + d}, s[4:5] offset:{d * 4}")
+    lines.append("\ts_endpgm\n")
+    mem = Memory()
+    out_buf = mem.alloc("out", 64 * n_out * 4, tagged=False)
+    ka = mem.alloc("ka", 8, tagged=False)
+    ka.write(0, np.array([out_buf.base], dtype=np.uint64).tobytes())
+    with targeting(target_name):
+        Cluster(
+            "\n".join(lines),
+            {"wgsize": 64, "vgpr": 96, "agpr": 0, "user_sgprs": 2},
+            mem,
+            [ka],
+            grid=(1,),
+        ).run()
+    return np.frombuffer(out_buf.read(0, 64 * n_out * 4), dtype=np.uint32).reshape(64, n_out)
+
+
+def test_gfx950_cvt_scalef32_and_sr_ops():
+    # Single wave64 kernel exercising OCP FP8, BF16/F16 pack/unpack, SR, and scalef32:
+    asm = "\n".join(
+        [
+            # v80: OCP FP8 pack of (-0.0, 448.0, -240.0, +inf) via v_cvt_pk_fp8_f32
+            "\tv_mov_b32 v1, 0x80000000",
+            "\tv_mov_b32 v2, 0x43e00000",  # 448.0
+            "\tv_mov_b32 v3, 0xc3700000",  # -240.0
+            "\tv_mov_b32 v4, 0x7f800000",  # +inf
+            "\tv_cvt_pk_fp8_f32 v80, v1, v2",
+            "\tv_cvt_pk_fp8_f32 v80, v3, v4 op_sel:[0,0,1]",
+            # v81: v_cvt_f32_bf16_e64 with -v (0x3fc0 = 1.5 -> -1.5 = 0xbfc00000)
+            "\tv_mov_b32 v5, 0xdead3fc0",
+            "\tv_cvt_f32_bf16_e64 v81, -v5",
+            # v82: v_cvt_pk_bf16_f32 RNE midpoint (1.0 + 2^-8 ties to even -> 0x3f80;
+            #      1.0 + 3*2^-8 -> 0x3f82; SNaN -> quieted 0x7fc5)
+            "\tv_mov_b32 v6, 0x3f808000",
+            "\tv_mov_b32 v7, 0x7f850001",
+            "\tv_cvt_pk_bf16_f32 v82, v6, v7",
+            # v83: SR midpoint test across 64 lanes: seed = (lane << 26)
+            #      1.5 in BF16 + 0.5 ULP = 0x3fc08000 -> 0x3fc0 for lane<32, 0x3fc1 for lane>=32
+            "\tv_lshlrev_b32 v8, 26, v0",
+            "\tv_mov_b32 v9, 0x3fc08000",
+            "\tv_mov_b32 v83, 0x12345678",
+            "\tv_cvt_sr_bf16_f32 v83, v9, v8 op_sel:[0,0,1]",
+            # v84: v_cvt_scalef32_sr_fp8_f32 at midpoint 1.0625 (between 1.0=0x38 & 1.125=0x39)
+            #      with scale = 2.0 (so input is 2.125 = 0x40080000), writing byte 2 (OPSEL[3:2]=2):
+            "\tv_mov_b32 v10, 0x40080000",
+            "\tv_mov_b32 v84, 0xaabbccdd",
+            "\tv_cvt_scalef32_sr_fp8_f32 v84, v10, v8, 2.0 op_sel:[0,0,0,1]",
+            # v85..v86: FP4 pack (scale=2.0 on [-3.0, 12.0] -> E2M1 [-1.5=0xb, 6.0=0x7] = 0x7b)
+            #           into byte 3, then unpack back with scale=2.0 -> [-3.0, 12.0]:
+            "\tv_mov_b32 v11, 0xc0400000",  # -3.0
+            "\tv_mov_b32 v12, 0x41400000",  # 12.0
+            "\tv_mov_b32 v13, 0x11223344",
+            "\tv_cvt_scalef32_pk_fp4_f32 v13, v11, v12, 2.0 op_sel:[0,0,1,1]",
+            "\tv_cvt_scalef32_pk_f32_fp4 v[85:86], v13, 2.0 op_sel:[1,1,0]",
+            # v87: NaN scale (e == 255, 0x7f800000) in v_cvt_scalef32_f32_fp8 -> 0xffc00000:
+            "\tv_cvt_scalef32_f32_fp8 v87, v80, v4",
+            # v88..v89: pk32 BF6 from BF16 -> unpack back to BF16 (scale = 0.5):
+            "\tv_mov_b32 v16, 0xc0003f80",  # [1.0, -2.0] in BF16 -> scaled by 2: [2.0, -4.0]
+            *(f"\tv_mov_b32 v{17 + d}, 0x3f00bf00" for d in range(15)),  # [-0.5, +0.5]
+            "\tv_cvt_scalef32_pk32_bf6_bf16 v[32:37], v[16:31], 0.5",
+            "\tv_cvt_scalef32_pk32_bf16_bf6 v[48:63], v[32:37], 0.5",
+            "\tv_mov_b32 v88, v48",
+            "\tv_mov_b32 v89, v53",
+        ]
+    )
+    out = _run_lanes(asm, 10)
+    # OCP E4M3: -0.0->0x80, 448.0->0x7e, -240.0->0xf7, +inf->0x7f
+    assert np.all(out[:, 0] == 0x7FF77E80)
+    assert np.all(out[:, 1] == 0xBFC00000)
+    assert np.all(out[:, 2] == 0x7FC53F80)
+    # SR BF16 preserves low half 0x5678; high half is 0x3fc0 for lanes 0..31 and 0x3fc1 for 32..63:
+    assert np.all(out[:32, 3] == 0x3FC05678)
+    assert np.all(out[32:, 3] == 0x3FC15678)
+    # SR FP8 writes byte 2 (0x38 for lanes 0..31, 0x39 for lanes 32..63), preserving 0xaa..ccdd:
+    assert np.all(out[:32, 4] == 0xAA38CCDD)
+    assert np.all(out[32:, 4] == 0xAA39CCDD)
+    # FP4 scaled round-trip:
+    assert np.all(out[:, 5].view(np.float32) == -3.0)
+    assert np.all(out[:, 6].view(np.float32) == 12.0)
+    # e == 255 scale -> canonical NaN 0xffc00000:
+    assert np.all(out[:, 7] == 0xFFC00000)
+    # BF6 pk32 round-trip:
+    assert np.all(out[:, 8] == 0xC0003F80)
+    assert np.all(out[:, 9] == 0x3F00BF00)
+
+
+def test_gfx950_new_valu_ops():
+    # Single wave64 kernel exercising prng, bitop3, ashr_pk, permlane_swap, dot2/dot2c bf16,
+    # pk_min/maximum3_f16, and exp/log_legacy_f32:
+    asm = "\n".join(
+        [
+            # v80: v_prng_b32 (lane 0: 0 -> 0; lane 1: 0x80000001 -> 2 ^ 197 = 199)
+            "\tv_lshlrev_b32 v1, 31, v0",
+            "\tv_or_b32 v1, v1, v0",
+            "\tv_prng_b32 v80, v1",
+            # v81: v_bitop3_b32 0xea = (A & B) | C, and v82: v_bitop3_b16 0x96 = A ^ B ^ C
+            "\tv_mov_b32 v2, 0xf0f0aa55",
+            "\tv_mov_b32 v3, 0xff0055aa",
+            "\tv_mov_b32 v4, 0x00ff0f0f",
+            "\tv_bitop3_b32 v81, v2, v3, v4 bitop3:0xea",
+            "\tv_mov_b32 v82, 0x1111dead",
+            "\tv_bitop3_b16 v82, v2, v3, v4 op_sel:[1,0,1,1] bitop3:0x96",
+            # v83: v_ashr_pk_i8_i32 & v_ashr_pk_u8_i32 into low/high halves:
+            "\tv_mov_b32 v5, -600",
+            "\tv_mov_b32 v6, 520",
+            "\tv_mov_b32 v7, 2",
+            "\tv_ashr_pk_i8_i32 v83, v5, v6, v7",  # [-150, 130] -> [-128=0x80, 127=0x7f] = 0x7f80
+            "\tv_ashr_pk_u8_i32 v83, v5, v6, v7 op_sel:[0,0,0,1]",  # -> [0x00, 130=0x82] = 0x8200
+            # v84, v85: v_permlane16_swap_b32 with masked EXEC + bound_ctrl:1:
+            "\tv_add_u32 v10, 0x100, v0",
+            "\tv_add_u32 v11, 0x200, v0",
+            "\ts_mov_b64 s[6:7], exec",
+            "\ts_mov_b32 exec_hi, 0x0000ffff",  # lanes 48..63 inactive!
+            "\tv_permlane16_swap_b32_e64 v10, v11 bound_ctrl:1",
+            "\ts_mov_b64 exec, s[6:7]",
+            "\tv_mov_b32 v84, v10",
+            "\tv_mov_b32 v85, v11",
+            # v86: v_dot2_f32_bf16 (neg_lo/neg_hi), v87: v_dot2c_f32_bf16_e64 (-v, |v|=neg_hi):
+            "\tv_mov_b32 v12, 0x40003f80",  # lo=1.0, hi=2.0
+            "\tv_mov_b32 v13, 0x40404080",  # lo=4.0, hi=3.0
+            "\tv_mov_b32 v14, 0x3f800000",  # 1.0
+            "\tv_dot2_f32_bf16 v86, v12, v13, v14 neg_lo:[1,0,0] neg_hi:[0,1,0]",
+            "\tv_mov_b32 v87, 0x41200000",  # 10.0
+            "\tv_dot2c_f32_bf16_e64 v87, -v12, |v13|",  # 10 + (-1)*4 + 2*(-3) = 0.0
+            # v88: v_pk_minimum3_f16 (-0.0 < +0.0, quieted SNaN) & v89: clamp -> +0.0:
+            "\tv_mov_b32 v15, 0x7c050000",  # lo=+0.0, hi=SNaN(0x7c05)
+            "\tv_mov_b32 v16, 0x3c008000",  # lo=-0.0, hi=1.0
+            "\tv_mov_b32 v17, 0x40003800",  # lo=0.5,  hi=2.0
+            "\tv_pk_minimum3_f16 v88, v15, v16, v17",
+            "\tv_pk_maximum3_f16 v89, v15, v16, v17 clamp",
+        ]
+    )
+    out = _run_lanes(asm, 10)
+    assert out[0, 0] == 0 and out[1, 0] == ((0x80000001 << 1) & 0xFFFFFFFF) ^ 197
+    assert np.all(out[:, 1] == ((0xF0F0AA55 & 0xFF0055AA) | 0x00FF0F0F))
+    hi_xor3 = (0xF0F0 ^ 0x55AA ^ 0x00FF) & 0xFFFF
+    assert np.all(out[:, 2] == ((hi_xor3 << 16) | 0xDEAD))
+    assert np.all(out[:, 3] == 0x82007F80)
+    # permlane16_swap with lanes 48..63 inactive and bound_ctrl:1:
+    # - rows 0 & 1 (0..31) both active -> normal swap
+    # - row 2 (32..47, active) reads v10[48..63] (inactive!) -> bound_ctrl zeroes v11[32..47]!
+    # - row 3 (48..63, inactive) -> v10[48..63] untouched (0x130..0x13f)!
+    assert np.array_equal(out[16:32, 4], 0x200 + np.arange(0, 16, dtype=np.uint32))
+    assert np.array_equal(out[0:16, 5], 0x100 + np.arange(16, 32, dtype=np.uint32))
+    assert np.all(out[32:48, 5] == 0)
+    assert np.array_equal(out[48:64, 4], 0x100 + np.arange(48, 64, dtype=np.uint32))
+    assert np.all(out[:, 6].view(np.float32) == -9.0)
+    assert np.all(out[:, 7].view(np.float32) == 0.0)
+    assert np.all(out[:, 8] == 0x7E058000)
+    assert np.all(out[:, 9] == 0x00003800)
+
+    # Also check v_exp_legacy_f32 and v_log_legacy_f32 (±0.0 -> -FLT_MAX = 0xff7fffff):
+    leg = _run_lanes(
+        "\tv_mov_b32 v1, 0x40400000\n"  # 3.0
+        "\tv_exp_legacy_f32 v80, v1\n"
+        "\tv_mov_b32 v2, 0x80000000\n"  # -0.0
+        "\tv_log_legacy_f32 v81, v2\n"
+        "\tv_log_legacy_f32 v82, v80",
+        3,
+    )
+    assert np.all(leg[:, 0].view(np.float32) == 8.0)
+    assert np.all(leg[:, 1] == 0xFF7FFFFF)
+    assert np.all(leg[:, 2].view(np.float32) == 3.0)
