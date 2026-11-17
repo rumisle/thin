@@ -42,11 +42,13 @@ __all__ = [
     "Layout",
     "LayoutError",
     "Section",
+    "bf8_dtype",
     "code",
     "col_major",
     "coords",
     "decode",
     "encode",
+    "fp8_dtype",
     "from_bytes",
     "nbytes",
     "quantize",
@@ -141,6 +143,26 @@ DTYPES: Mapping[str, Dtype] = MappingProxyType(
     }
 )
 """The registry: name to dtype."""
+
+
+def _resolve_target(target):
+    from thin import target as _target_mod
+
+    if target is None or isinstance(target, str):
+        return _target_mod.target(target)
+    if isinstance(target, _target_mod.Target):
+        return target
+    raise TypeError(f"a target name, Target or None, not {type(target).__name__}")
+
+
+def fp8_dtype(target=None) -> Dtype:
+    """The target's E4M3 ``fp8`` dtype (OCP ``e4m3fn`` or FNUZ ``e4m3fnuz``)."""
+    return DTYPES[_resolve_target(target).fp8]
+
+
+def bf8_dtype(target=None) -> Dtype:
+    """The target's E5M2 ``bf8`` dtype (OCP ``e5m2`` or FNUZ ``e5m2fnuz``)."""
+    return DTYPES[_resolve_target(target).bf8]
 
 
 def _check_dtype(dtype) -> Dtype:

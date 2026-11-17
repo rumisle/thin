@@ -191,7 +191,7 @@ class Target:
     """One target's view: its record, its forms and its queries."""
 
     def __init__(self, name: str):
-        wave, lds_max, chip, counters, waits, barrier, window = _native.target_info(name)
+        wave, lds_max, chip, counters, waits, barrier, window, fp8_info = _native.target_info(name)
         self.name = name
         self.wave = wave
         self.lds_max = lds_max
@@ -202,6 +202,8 @@ class Target:
         self.waits = [(m, list(fields)) for m, fields in waits]
         self.barrier = [(m, list(ops)) for m, ops in barrier]
         self.hazard_window = window
+        #: Whether FP8/BF8 instructions use FNUZ (``e4m3fnuz``/``e5m2fnuz``) rather than OCP.
+        self.fnuz_fp8, self.fp8, self.bf8 = fp8_info
         #: The kernel library's hooks: each a value, or None ("not yet").
         self.lib_hooks = dict(_native.target_lib_hooks(name))
         #: The instruction-cache invalidate: (instruction, nop, nops, per_cu) or None.

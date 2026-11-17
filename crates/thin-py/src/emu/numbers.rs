@@ -8,7 +8,9 @@ use thin_emu::machine::numbers as n;
 /// A small format by name.
 fn small(fmt: &str) -> PyResult<n::Small> {
     n::Small::named(fmt).ok_or_else(|| {
-        PyValueError::new_err(format!("format {fmt:?}: e4m3, e5m2, e2m1, e2m3 or e3m2"))
+        PyValueError::new_err(format!(
+            "format {fmt:?}: e4m3, e4m3fn, e5m2, e4m3fnuz, e5m2fnuz, e2m1, e2m3 or e3m2"
+        ))
     })
 }
 

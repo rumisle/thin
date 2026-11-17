@@ -65,7 +65,7 @@ type ChipRow = (
 );
 
 /// A target's record: (wave, lds_max, chip, counters as (name, field),
-/// waits as (mnemonic, fields), barrier, hazard window).
+/// waits as (mnemonic, fields), barrier, hazard window, (fnuz_fp8, fp8, bf8)).
 type TargetRow = (
     u32,
     u32,
@@ -74,6 +74,7 @@ type TargetRow = (
     Vec<(&'static str, Vec<&'static str>)>,
     Vec<(&'static str, Vec<i64>)>,
     u32,
+    (bool, &'static str, &'static str),
 );
 
 /// The instruction-cache invalidate: (instruction, nop, nops, per_cu), or None.
@@ -95,7 +96,8 @@ fn target_lib_hooks(py: Python<'_>, name: &str) -> PyResult<Vec<(&'static str, O
 /// A target's record.
 #[pyfunction]
 fn target_info(py: Python<'_>, name: &str) -> PyResult<TargetRow> {
-    let d = get(py, name)?.definition();
+    let t = get(py, name)?;
+    let d = t.definition();
     let c = &d.chip;
     let chip = (
         c.xcds,
@@ -121,6 +123,7 @@ fn target_info(py: Python<'_>, name: &str) -> PyResult<TargetRow> {
             .collect(),
         d.barrier.clone(),
         d.hazards.window,
+        (t.fnuz_fp8(), t.fp8_dtype(), t.bf8_dtype()),
     ))
 }
 

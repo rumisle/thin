@@ -481,6 +481,30 @@ impl Target {
     pub fn matrix_form(&self, mnemonic: &str) -> Option<crate::MatrixForm> {
         self.def.hooks.matrix_form(mnemonic)
     }
+
+    /// Whether this target's `fp8` / `bf8` instructions use FNUZ (`e4m3fnuz` / `e5m2fnuz`)
+    /// rather than OCP (`e4m3fn` / `e5m2`).
+    pub fn fnuz_fp8(&self) -> bool {
+        self.def.hooks.fnuz_fp8()
+    }
+
+    /// The `thin-formats` dtype name for this target's `fp8` (E4M3) encoding.
+    pub fn fp8_dtype(&self) -> &'static str {
+        if self.fnuz_fp8() {
+            "e4m3fnuz"
+        } else {
+            "e4m3fn"
+        }
+    }
+
+    /// The `thin-formats` dtype name for this target's `bf8` (E5M2) encoding.
+    pub fn bf8_dtype(&self) -> &'static str {
+        if self.fnuz_fp8() {
+            "e5m2fnuz"
+        } else {
+            "e5m2"
+        }
+    }
 }
 
 fn canon_in(spellings: &[(&str, &str)], mnemonic: &str) -> String {

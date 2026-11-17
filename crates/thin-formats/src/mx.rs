@@ -11,14 +11,16 @@ use crate::{Error, Result};
 pub const GROUP: usize = 32;
 
 /// The exponent of the largest finite element (emax) and the encode of an
-/// MX element dtype: saturating, and for e2m1 a NaN becomes ±6.
+/// MX element dtype: saturating, and for an encoding without NaN (`e2m1`,
+/// `e2m3`, `e3m2`) a NaN becomes ±max.
 fn element(dtype: &Dtype, what: &str) -> Result<(i32, Plan)> {
     let nan = match dtype.name {
-        "e2m1" => Some(7),
-        "e4m3fn" => None,
+        "e2m1" => Some(0x07),
+        "e2m3" | "e3m2" => Some(0x1F),
+        "e4m3fn" | "e5m2" => None,
         other => {
             return Err(Error::Value(format!(
-                "{what}: {other} is not an MX element dtype (e2m1 or e4m3fn)"
+                "{what}: {other} is not an MX element dtype (e2m1, e2m3, e3m2, e4m3fn or e5m2)"
             )))
         }
     };
@@ -139,13 +141,39 @@ mod tests {
     }
 
     #[test]
-    fn a_nan_saturates_to_six_with_its_sign_in_e2m1() {
-        let d = dtype("e2m1").unwrap();
-        let mut x = [1f32.to_bits(); 32];
-        x[3] = 0xFFC0_0000;
-        let (mut codes, mut scales) = ([0; 32], [0; 1]);
-        quantize(&x, &[32], d, &mut codes, &mut scales).unwrap();
-        assert_eq!(codes[3], 0xF);
+    fn a_nan_saturates_to_max_with_its_sign_in_fp4_and_fp6() {
+        for (name, want) in [("e2m1", 0x0F), ("e2m3", 0x3F), ("e3m2", 0x3F)] {
+            let d = dtype(name).unwrap();
+            let mut x = [1f32.to_bits(); 32];
+            x[3] = 0xFFC0_0000;
+            let (mut codes, mut scales) = ([0; 32], [0; 1]);
+            quantize(&x, &[32], d, &mut codes, &mut scales).unwrap();
+            assert_eq!(codes[3], want, "{name}");
+        }
+    }
+
+    #[test]
+    fn all_five_mx_element_dtypes_quantize() {
+        let mut x = [0u32; 32];
+        for (i, slot) in x.iter_mut().enumerate() {
+            *slot = ((i as f32 - 15.5) * 0.25).to_bits();
+        }
+        for (name, emax) in [
+            ("e2m1", 2),
+            ("e2m3", 2),
+            ("e3m2", 4),
+            ("e4m3fn", 8),
+            ("e5m2", 15),
+        ] {
+            let d = dtype(name).unwrap();
+            let (mut codes, mut scales) = ([0u8; 32], [0u8; 1]);
+            quantize(&x, &[32], d, &mut codes, &mut scales).unwrap();
+            let amax = 15.5f32 * 0.25;
+            let mut want_scale = [0u8; 1];
+            scale_bytes(&[amax.to_bits()], d, &mut want_scale).unwrap();
+            assert_eq!(scales, want_scale, "{name}");
+            assert_eq!(d.encoding.unwrap().emax(), emax, "{name}");
+        }
     }
 
     #[test]
@@ -155,7 +183,8 @@ mod tests {
         assert!(quantize(&x, &[48], dtype("e2m1").unwrap(), &mut codes, &mut scales).is_err());
         let (mut codes, mut scales) = ([0; 32], [0; 1]);
         let x = [0; 32];
-        assert!(quantize(&x, &[32], dtype("e5m2").unwrap(), &mut codes, &mut scales).is_err());
+        assert!(quantize(&x, &[32], dtype("e4m3fnuz").unwrap(), &mut codes, &mut scales).is_err());
+        assert!(quantize(&x, &[32], dtype("f16").unwrap(), &mut codes, &mut scales).is_err());
         let e2m1 = dtype("e2m1").unwrap();
         assert!(quantize(&[], &[3, 0], e2m1, &mut [], &mut []).is_ok());
         assert!(quantize(&[], &[], e2m1, &mut [], &mut []).is_err());

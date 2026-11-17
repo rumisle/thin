@@ -320,13 +320,14 @@ def test_quantize_refusals():
     assert formats.quantize(np.zeros((3, 0), np.float32), E2M1)[1].shape == (3, 0)
     with pytest.raises(ValueError):
         formats.quantize(np.zeros(48, np.float32), E2M1)
-    with pytest.raises(ValueError):
-        formats.quantize(np.zeros(32, np.float32), DTYPES["e5m2"])
+    for non_mx in ("e4m3fnuz", "e5m2fnuz", "f16", "bf16", "e8m0", "u8"):
+        with pytest.raises(ValueError):
+            formats.quantize(np.zeros(32, np.float32), DTYPES[non_mx])
     with pytest.raises(TypeError):
         formats.quantize(np.zeros(32, np.float64), E2M1)
 
 
-@pytest.mark.parametrize("dtype", [E2M1, E4M3])
+@pytest.mark.parametrize("dtype", [E2M1, DTYPES["e2m3"], DTYPES["e3m2"], E4M3, DTYPES["e5m2"]])
 def test_mx_dequantizes_to_a_nearest_value(dtype):
     rng = np.random.default_rng(1)
     x = (rng.standard_normal((64, 64)) * 10.0 ** rng.integers(-6, 6, (64, 1))).astype(np.float32)
@@ -339,6 +340,87 @@ def test_mx_dequantizes_to_a_nearest_value(dtype):
     nearest = np.abs(q[..., None] - grid).min(axis=-1)
     assert np.all(np.abs(q - dequantized / scale) <= nearest * (1 + 1e-12))
     assert np.all(np.abs(dequantized / scale) <= dtype.encoding.max)
+
+
+def test_fp6_fp4_and_e8m0_formats():
+    e2m3, e3m2, e8m0 = DTYPES["e2m3"], DTYPES["e3m2"], DTYPES["e8m0"]
+    assert (e2m3.width, e2m3.encoding.bias, e2m3.encoding.max_bits, e2m3.encoding.max) == (
+        6,
+        1,
+        0x1F,
+        7.5,
+    )
+    assert (e3m2.width, e3m2.encoding.bias, e3m2.encoding.max_bits, e3m2.encoding.max) == (
+        6,
+        3,
+        0x1F,
+        28.0,
+    )
+    assert (e8m0.width, e8m0.encoding.bias, e8m0.encoding.max_bits, e8m0.encoding.max) == (
+        8,
+        127,
+        0xFE,
+        2.0**127,
+    )
+
+    # E8M0 decodes 0x00..=0xFE as exact powers of two and 0xFF as quiet NaN.
+    e8_dec = formats.decode(np.array([0x00, 0x01, 0x7F, 0xFE, 0xFF], dtype=np.uint8), e8m0)
+    assert e8_dec[:4].tolist() == [float(np.float32(2.0**-127)), 2.0**-126, 1.0, 2.0**127]
+    assert int(e8_dec.view(np.uint32)[4]) == 0x7FC00000
+    assert formats.scale_bytes(np.float32([0.0, 256.0, 448.0, np.inf]), E4M3).tolist() == [
+        0,
+        127,
+        128,
+        247,
+    ]
+
+    # FP6 (e2m3 / e3m2) and FP4 (e2m1) subnormal/max boundaries and sub-byte packing.
+    assert formats.decode(np.array([0x01, 0x1F, 0x3F], dtype=np.uint8), e2m3).tolist() == [
+        0.125,
+        7.5,
+        -7.5,
+    ]
+    assert formats.decode(np.array([0x01, 0x1F, 0x3F], dtype=np.uint8), e3m2).tolist() == [
+        0.0625,
+        28.0,
+        -28.0,
+    ]
+    assert formats.decode(np.array([0x01, 0x07, 0x0F], dtype=np.uint8), E2M1).tolist() == [
+        0.5,
+        6.0,
+        -6.0,
+    ]
+    rm = formats.row_major()
+    for dt, cols, row_bytes in [(E2M1, 32, 16), (e2m3, 32, 24), (e3m2, 32, 24)]:
+        codes = (np.arange(64, dtype=np.uint8) & ((1 << dt.width) - 1)).reshape(1, 2, cols)
+        packed = formats.to_bytes(codes, rm, dt)
+        assert packed.shape == (2 * row_bytes,)
+        assert np.array_equal(formats.from_bytes(packed, rm, dt, (1, 2, cols)), codes)
+
+
+def test_target_selects_ocp_or_fnuz_fp8():
+    from thin.emu import numbers as emu_num
+    from thin.target import target, targeting
+
+    expect = {
+        "gfx1201": (False, "e4m3fn", "e5m2", 448.0),
+        "gfx942": (True, "e4m3fnuz", "e5m2fnuz", 240.0),
+        "gfx950": (False, "e4m3fn", "e5m2", 448.0),
+    }
+    for name, (fnuz, fp8_name, bf8_name, fp8_max) in expect.items():
+        t = target(name)
+        assert (t.fnuz_fp8, t.fp8, t.bf8) == (fnuz, fp8_name, bf8_name)
+        assert formats.fp8_dtype(name) is DTYPES[fp8_name]
+        assert formats.bf8_dtype(t) is DTYPES[bf8_name]
+        assert formats.fp8_dtype(name).encoding.max == fp8_max
+        with targeting(name):
+            assert formats.fp8_dtype() is DTYPES[fp8_name]
+            assert formats.bf8_dtype() is DTYPES[bf8_name]
+        vals = emu_num.code_values(range(256), t.fp8)
+        assert max(v for v in vals if not np.isnan(v)) == fp8_max
+
+    with pytest.raises(TypeError):
+        formats.fp8_dtype(123)
 
 
 def test_layout_constructors():

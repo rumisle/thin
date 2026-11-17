@@ -284,19 +284,26 @@ mod tests {
         assert_eq!(enc("e4m3fnuz").bias(), 8);
         assert_eq!(enc("e4m3fnuz").max_bits(), 0x7F);
         assert_eq!(enc("e2m1").max(), 6.0);
+        assert_eq!(enc("e2m3").max(), 7.5);
+        assert_eq!(enc("e3m2").max(), 28.0);
         assert_eq!(enc("e5m2").max(), 57344.0);
         assert_eq!(enc("e5m2fnuz").max(), 57344.0);
         assert_eq!(enc("e5m2fnuz").bias(), 16);
         assert_eq!(enc("e5m2fnuz").max_bits(), 0x7F);
         assert_eq!(enc("f32").max(), f64::from(f32::MAX));
         assert_eq!(enc("f16").max(), 65504.0);
+        assert_eq!(enc("e8m0").bias(), 127);
+        assert_eq!(enc("e8m0").max_bits(), 0xFE);
         assert_eq!(enc("e8m0").max(), 2f64.powi(127));
     }
 
     #[test]
     fn emax_of_the_mx_elements() {
         assert_eq!(enc("e2m1").emax(), 2);
+        assert_eq!(enc("e2m3").emax(), 2);
+        assert_eq!(enc("e3m2").emax(), 4);
         assert_eq!(enc("e4m3fn").emax(), 8);
+        assert_eq!(enc("e5m2").emax(), 15);
     }
 
     #[test]

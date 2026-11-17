@@ -253,10 +253,10 @@ pub enum Small {
 }
 
 impl Small {
-    /// The format of a name (`e4m3`, `e5m2`, `e4m3fnuz`, `e5m2fnuz`, `e2m1`, `e2m3`, `e3m2`).
+    /// The format of a name (`e4m3`, `e4m3fn`, `e5m2`, `e4m3fnuz`, `e5m2fnuz`, `e2m1`, `e2m3`, `e3m2`).
     pub fn named(s: &str) -> Option<Small> {
         Some(match s {
-            "e4m3" => Small::E4M3,
+            "e4m3" | "e4m3fn" => Small::E4M3,
             "e5m2" => Small::E5M2,
             "e4m3fnuz" => Small::E4M3Fnuz,
             "e5m2fnuz" => Small::E5M2Fnuz,
