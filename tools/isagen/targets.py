@@ -116,5 +116,53 @@ TARGETS = {
         saddr_default=127,
         soffset_default=0,
     ),
+    "gfx950": TargetRules(
+        member="amdgpu_isa_cdna4.xml",
+        arch="cdna4",
+        vector=(
+            "ENC_VOP",
+            "VOP",
+            "ENC_DS",
+            "ENC_FLAT",
+            "ENC_MUBUF",
+            "ENC_MTBUF",
+        ),
+        flat=("ENC_FLAT",),
+        rtn_encodings=("ENC_MUBUF", "ENC_MTBUF"),
+        tied=(
+            r"^(v_fmac_|v_mac_|v_dot\d+c_|v_pk_fmac_|v_smfmac_|v_cvt_pkaccum_|"
+            r"v_cvt_pk_(fp8|bf8)_f32|v_cvt_sr_(fp8|bf8|f16|bf16)_f32|"
+            r"v_cvt_scalef32_(f16_(fp8|bf8)|pk_(fp8|bf8|fp4)_|sr_(fp8|bf8)_|sr_pk_fp4_)|"
+            r"v_writelane_|s_bitset[01]_|s_(addk|mulk|cmovk)_i32|s_cmov_b|s_(buffer_)?atomic_)"
+        ),
+        no_exec=("v_readlane_b32", "v_writelane_b32"),
+        mask_dwords=2,
+        unwritten={},
+        skip=("ENC_MTBUF",),
+        hand=(("s_waitcnt", 0),),
+        renames={
+            "v_accvgpr_read": "v_accvgpr_read_b32",
+            "v_accvgpr_write": "v_accvgpr_write_b32",
+            "v_mad_mix_f32": "v_fma_mix_f32",
+            "v_mad_mixlo_f16": "v_fma_mixlo_f16",
+            "v_mad_mixhi_f16": "v_fma_mixhi_f16",
+        },
+        drop=(
+            ("s_set_valu_coexec_mode", "ENC_SOPP"),
+            ("v_readfirstlane_b32", "ENC_VOP3"),
+            ("v_swap_b32", "ENC_VOP3"),
+            ("v_accvgpr_mov_b32", "ENC_VOP3"),
+        ),
+        lds_dma=(
+            "buffer_load_dword",
+            "buffer_load_format_x",
+            "buffer_load_sbyte",
+            "buffer_load_sshort",
+            "buffer_load_ubyte",
+            "buffer_load_ushort",
+        ),
+        saddr_default=127,
+        soffset_default=0,
+    ),
 }
 """The targets the generator knows."""

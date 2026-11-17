@@ -64,6 +64,8 @@ class _Table:
         roles, widths, slots, defs, uses = [], [], [], set(), set()
         for operand in encoding.iterfind("Operands/Operand"):
             kind = _text(operand, "OperandType")
+            if _text(operand, "FieldName").lower().startswith("scale_src"):
+                kind = "OPR_SRC_VGPR"
             reads, writes = operand.get("Input") == "true", operand.get("Output") == "true"
             if operand.get("IsImplicit") == "true" or kind in rules.unwritten:
                 register = self.registers.get(kind)
@@ -89,7 +91,10 @@ class _Table:
             uses.add("m0")
         if roles and (self.tied.match(mnemonic) or mnemonic.endswith("_dpp")):
             roles[0] = "rw"
-        if roles and mnemonic.startswith("v_permlane") and mnemonic.endswith("_swap_b32"):
+        if roles and (
+            mnemonic == "v_swap_b32"
+            or (mnemonic.startswith("v_permlane") and mnemonic.endswith("_swap_b32"))
+        ):
             roles[0:2] = ["rw", "rw"]
         for key in [mnemonic, *([rules.alias[mnemonic]] if mnemonic in rules.alias else [])]:
             self._put_all(key, en, roles, widths, slots, sorted(defs), sorted(uses))

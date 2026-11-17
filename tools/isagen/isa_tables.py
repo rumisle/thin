@@ -135,11 +135,12 @@ def _encodings(isa: ET.Element) -> dict[str, tuple[list, int | None]]:
             continue
         fields = []
         for field in encoding.iterfind("MicrocodeFormat/BitMap/Field"):
-            bit_range = field.find("BitLayout/Range")
-            if bit_range is None:
-                continue
-            offset, count = int(_text(bit_range, "BitOffset")), int(_text(bit_range, "BitCount"))
-            fields.append((field_name(_text(field, "FieldName")), offset + count - 1, offset))
+            fname = field_name(_text(field, "FieldName"))
+            for idx, bit_range in enumerate(field.iterfind("BitLayout/Range")):
+                offset = int(_text(bit_range, "BitOffset"))
+                count = int(_text(bit_range, "BitCount"))
+                rname = "opsel_hi2" if fname == "opsel_hi" and idx == 1 else fname
+                fields.append((rname, offset + count - 1, offset))
         identifier = None
         first = encoding.find("EncodingIdentifiers/EncodingIdentifier")
         selector = next((f for f in fields if f[0] == "encoding"), None)
@@ -208,10 +209,16 @@ class _Instructions:
         for operand in encoding.iterfind("Operands/Operand"):
             field = _text(operand, "FieldName")
             if field and not ("_LOAD_LDS_" in name and field.lower() == "vdst"):
-                info[field.lower()] = (
+                low_field = field.lower()
+                op_type = (
+                    "OPR_SRC_VGPR"
+                    if low_field.startswith("scale_src")
+                    else _text(operand, "OperandType")
+                )
+                info[low_field] = (
                     _text(operand, "DataFormatName"),
                     int(_text(operand, "OperandSize") or 0),
-                    _text(operand, "OperandType"),
+                    op_type,
                 )
         empty_operands = operands is not None and operands.find("Operand") is None
         if (info or empty_operands) and not (fmt != bfmt and (name, bfmt) in self.types):
@@ -234,6 +241,8 @@ def _kind(field: tuple, fmt: str, identifier: int | None, rules: TargetRules) ->
 
     if name == "encoding" and identifier is not None:
         return kinded("fixed", identifier)
+    if name == "x2encoding" and b == "VOP3PX2":
+        return kinded("fixed", 0xD3AC)
     if name == "op" and fmt not in ("DPP", "SDWA"):
         return kinded("op")
     if name in VGPR_FIELDS and bits == 8:
@@ -248,7 +257,7 @@ def _kind(field: tuple, fmt: str, identifier: int | None, rules: TargetRules) ->
         (name.startswith("ssrc") and bits == 8, "ssrc", 0),
         (name == "soffset" and bits == 8 and b == "MUBUF", "ssrc", 128),
         (name in ("saddr", "soffset") and bits == 8, "ssrc", 124),
-        (name.startswith("src") and bits == 9, "src", 0),
+        ((name.startswith("src") or name.startswith("scale_src")) and bits == 9, "src", 0),
     ]
     for applies, kind, value in table:
         if applies:
@@ -257,6 +266,8 @@ def _kind(field: tuple, fmt: str, identifier: int | None, rules: TargetRules) ->
         return kinded("signed", 0, top=12)
     if name == "offset" and b == "SMEM":
         return kinded("signed")
+    if b == "VOP3PX2" and name == "abid":
+        return kinded("bits", 1)
     if b == "VOP3P" and name == "opsel_hi":
         return kinded("bits", 3)
     if b == "VOP3P" and name == "opsel_hi2":
