@@ -1546,3 +1546,119 @@ def test_gfx950_dsl_mfma_scale_transpose_read_and_wide_dma():
             O.global_load(tile942, v1_942, bytes=16)
         with pytest.raises(ValueError, match="has no buffer-to-LDS DMA"):
             O.buffer_load(tile942, v1_942, s4_942, bytes=16)
+
+
+def test_gfx950_hw_suite_compiles_and_emulates_cleanly() -> None:
+    """Preflight every kernel generator and probe in `tests/hw/test_gfx950_hw.py` on `thin.emu`."""
+    import thin
+    from tests.hw import test_gfx950_hw as hw
+    from thin import formats
+    from thin.target import targeting
+
+    before = thin.use_store(None)
+    try:
+        with targeting("gfx950"):
+            # 1) Doubled-K dense MFMA (AGPR + VGPR)
+            kd = thin.compile(hw.gen_cdna4_mfma_dense, shape="f32_16x16x32_bf16", acc_file="a")
+            kd.bind(
+                (1,),
+                {
+                    "a": np.zeros(64 * 4, dtype=np.uint32),
+                    "b": np.zeros(64 * 4, dtype=np.uint32),
+                    "c": np.zeros(64 * 4, dtype=np.uint32),
+                    "d": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+
+            # 2) Unscaled & MX-scaled `f8f6f4` (6-bit FP6 x 4-bit FP4 + E8M0 scales)
+            ks = thin.compile(
+                hw.gen_cdna4_f8f6f4,
+                shape="f32_16x16x128_f8f6f4",
+                fmt_a="fp6",
+                fmt_b="fp4",
+                scaled=True,
+                sel_a=2,
+                sel_b=3,
+            )
+            ks.bind(
+                (1,),
+                {
+                    "a": np.zeros(64 * 6, dtype=np.uint32),
+                    "b": np.zeros(64 * 4, dtype=np.uint32),
+                    "c": np.zeros(64 * 4, dtype=np.uint32),
+                    "sa": np.full(64, 127 << 16, dtype=np.uint32),
+                    "sb": np.full(64, 127 << 24, dtype=np.uint32),
+                    "d": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+
+            # 3) Doubled-K 4:2 sparse SMFMAC
+            k_sp = thin.compile(hw.gen_cdna4_smfmac, shape="f32_16x16x64_bf16", abid=1)
+            k_sp.bind(
+                (1,),
+                {
+                    "a": np.zeros(64 * 4, dtype=np.uint32),
+                    "b": np.zeros(64 * 8, dtype=np.uint32),
+                    "idx": np.full(64, 0x4444_4444, dtype=np.uint32),
+                    "c": np.zeros(64 * 4, dtype=np.uint32),
+                    "d": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+
+            # 4) `v_cvt_scalef32_*`, SR + PRNG, and new CDNA 4 VALU ops
+            k_cv = thin.compile(hw.gen_cdna4_scalef32_and_valu)
+            r_cv = k_cv.bind(
+                (1,),
+                {
+                    "in_f32": np.ones(64 * 4, dtype=np.float32),
+                    "in_seeds": np.full(64, 0xFFFF_FFFF, dtype=np.uint32),
+                    "out_cvt": np.zeros(64 * 4, dtype=np.uint32),
+                    "out_sr": np.zeros(64 * 2, dtype=np.uint32),
+                    "out_valu": np.zeros(64 * 4, dtype=np.uint32),
+                },
+            ).emulate()
+            # Chapter 7.3 unbiased add-and-truncate on exact 1.0 + 0xFFFFFFFF gives 0x38 (1.0):
+            assert (int(r_cv["out_sr"][1]) & 0xFF) == 0x38
+
+            # 5) Transpose LDS reads + wide b96/b128 LDS DMA + returning `buffer_atomic_pk_add_bf16`
+            k_tr = thin.compile(hw.gen_cdna4_transpose_lds_and_wide_dma)
+            r_tr = k_tr.bind(
+                (1,),
+                {
+                    "src16": np.arange(1, 257, dtype=np.uint32),
+                    "src12": np.arange(1, 193, dtype=np.uint32),
+                    "atom_buf": np.full(64, 0x4000_4000, dtype=np.uint32),
+                    "out_tr16": np.zeros(128, dtype=np.uint32),
+                    "out_tr8": np.zeros(128, dtype=np.uint32),
+                    "out_tr4": np.zeros(128, dtype=np.uint32),
+                    "out_tr6": np.zeros(192, dtype=np.uint32),
+                    "out_dma12": np.zeros(256, dtype=np.uint32),
+                    "out_prev": np.zeros(64, dtype=np.uint32),
+                },
+            ).emulate()
+            # `dwordx3` writes 3 dwords; every 4th dword keeps the `0xDEAD_0003` sentinel:
+            assert np.all(r_tr["out_dma12"][3::4] == 0xDEAD_0003)
+            assert np.all(r_tr["out_prev"] == 0x4000_4000)
+
+            # 6) Full 160 KB (`163,840` B) LDS ceiling + raw `s_nop` code object assembly
+            from thin.runtime.emulated import BankConflicts
+
+            k_lds = thin.compile(hw.gen_cdna4_160kb_lds_and_64bank_probe)
+            assert ".amdhsa_group_segment_fixed_size 163840" in k_lds.asm
+            with pytest.warns(BankConflicts, match="gfx950 bank model"):
+                r_lds = k_lds.bind(
+                    (1,),
+                    {
+                        "out_top": np.zeros(64, dtype=np.uint32),
+                        "out_clocks": np.zeros(4, dtype=np.uint32),
+                    },
+                ).emulate()
+            np.testing.assert_array_equal(
+                r_lds["out_top"], (np.arange(64, dtype=np.uint32)[::-1]) ^ np.uint32(0x9500_0000)
+            )
+
+            for ws in (0, 8, 24):
+                co = hw.build_raw_mfma_nop_code_object(ws)
+                assert formats.read(co).target == "gfx950"
+    finally:
+        thin.use_store(before)

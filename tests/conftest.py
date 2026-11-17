@@ -7,11 +7,12 @@ counted), or the process above its RSS ceiling. A test marked
 ``slow("<section>")`` is held to that section's ``seconds`` and
 ``peak_rss_mb`` instead.
 
-A test marked ``gfx1201`` or ``gfx942`` needs that GPU: it skips unless HIP
-has one, runs with the first matching device and ``targeting(...)`` current,
-and is held to the ``[gfx1201]`` / ``[gfx942]`` budgets as a slow test is to
-its section. ``pytest -m gfx1201`` or ``pytest -m gfx942`` runs that target's
-hardware suite alone.
+A test marked ``gfx1201``, ``gfx942`` or ``gfx950`` needs that GPU: it skips
+unless HIP has one, runs with the first matching device and ``targeting(...)``
+current, and is held to the ``[gfx1201]`` / ``[gfx942]`` / ``[gfx950]``
+budgets as a slow test is to its section. ``pytest -m gfx1201``,
+``pytest -m gfx942`` or ``pytest -m gfx950`` runs that target's hardware
+suite alone.
 
 ``THIN_BUDGET_SCALE`` multiplies the time budgets on a slower machine
 (tests/budgets.py); the header, the cost line and every time violation
@@ -94,7 +95,11 @@ def pytest_configure(config):
         "gfx942: needs a gfx942 (CDNA 3 / MI300X) GPU; runs on the first one, skips without",
     )
     config.addinivalue_line(
-        "markers", "gpu: a GPU cross-check; every gfx1201 or gfx942 test is one"
+        "markers",
+        "gfx950: needs a gfx950 (CDNA 4 / MI350X) GPU; runs on the first one, skips without",
+    )
+    config.addinivalue_line(
+        "markers", "gpu: a GPU cross-check; every gfx1201, gfx942 or gfx950 test is one"
     )
     config.addinivalue_line(
         "markers",
@@ -112,7 +117,7 @@ def pytest_runtest_logreport(report):
     DURATIONS[report.nodeid] += report.duration
 
 
-_HARDWARE_TARGETS = ("gfx1201", "gfx942")
+_HARDWARE_TARGETS = ("gfx1201", "gfx942", "gfx950")
 _GPUS: dict[str, int | None] = {}
 """HIP's index of the first GPU of each target arch, or None: asked once a session."""
 
@@ -138,6 +143,11 @@ def _gfx1201() -> int | None:
 def _gfx942() -> int | None:
     """HIP's index of the first gfx942, or None (none, or no torch to run on it)."""
     return _gpu("gfx942")
+
+
+def _gfx950() -> int | None:
+    """HIP's index of the first gfx950, or None (none, or no torch to run on it)."""
+    return _gpu("gfx950")
 
 
 @pytest.fixture(autouse=True)

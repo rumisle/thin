@@ -36,3 +36,11 @@ peak_rss_mb = 2048
 [gfx942-plain]
 seconds = 60
 peak_rss_mb = 2048
+
+[gfx950]
+seconds = 30
+peak_rss_mb = 2048
+
+[gfx950-plain]
+seconds = 60
+peak_rss_mb = 2048
