@@ -127,6 +127,9 @@ fn target_facts_and_resources_match_cdna4() {
     }
     let f96 = t.form("ds_read_b96_tr_b6", 2, false).expect("b96_tr_b6");
     assert_eq!(f96.mem_bytes, 12);
+
+    assert_eq!(def.hazards.window, 20);
+    assert_eq!(def.hazards.rules, 24);
 }
 
 #[test]
@@ -781,6 +784,486 @@ fn cdna4_lds_banks_hook_models_64_banks() {
             for q in 0..4usize {
                 assert!(phase[q * 16..(q + 1) * 16].iter().all(|&p| p == q as u32));
             }
+        }
+    }
+}
+
+fn llc_available() -> bool {
+    Command::new("llc")
+        .arg("--version")
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// Runs `llc -mtriple=amdgcn-amd-amdhsa -mcpu=gfx950 -x mir -run-pass=post-RA-hazard-rec`
+/// on a list of independent `(prev_mir, cur_mir)` pairs separated by `S_NOP 15 ; S_NOP 15`
+/// barriers and returns the total wait states (`sum(imm + 1)`) inserted between each pair.
+fn llc_mir_pair_wait_states(pairs: &[(&str, &str)]) -> Vec<u32> {
+    let mut body = String::from("---\nname: cdna4_hazards\nbody: |\n  bb.0:\n");
+    for (idx, (prev, cur)) in pairs.iter().enumerate() {
+        if idx > 0 {
+            body.push_str("    S_NOP 15\n    S_NOP 15\n");
+        }
+        body.push_str("    ");
+        body.push_str(prev);
+        body.push('\n');
+        body.push_str("    ");
+        body.push_str(cur);
+        body.push('\n');
+    }
+    body.push_str("    S_ENDPGM 0\n...\n");
+
+    let mut child = Command::new("llc")
+        .args([
+            "-mtriple=amdgcn-amd-amdhsa",
+            "-mcpu=gfx950",
+            "-x",
+            "mir",
+            "-run-pass=post-RA-hazard-rec",
+            "-o",
+            "-",
+            "-",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn llc");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(body.as_bytes())
+        .expect("write mir");
+    let out = child.wait_with_output().expect("wait llc");
+    assert!(
+        out.status.success(),
+        "llc MIR hazard pass failed:\n{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).expect("utf8");
+    let mut in_bb = false;
+    let mut insns: Vec<String> = Vec::new();
+    for raw in stdout.lines() {
+        let line = raw.trim();
+        if line == "bb.0:" {
+            in_bb = true;
+            continue;
+        }
+        if in_bb {
+            if line == "..." || line.starts_with("S_ENDPGM") {
+                break;
+            }
+            if !line.is_empty() {
+                insns.push(line.to_owned());
+            }
+        }
+    }
+    // Walk pairs separated by our two `S_NOP 15` barrier instructions:
+    let mut cursor = 0usize;
+    let mut waits = Vec::with_capacity(pairs.len());
+    for idx in 0..pairs.len() {
+        if idx > 0 {
+            assert_eq!(insns[cursor], "S_NOP 15", "barrier 0 before pair {idx}");
+            assert_eq!(insns[cursor + 1], "S_NOP 15", "barrier 1 before pair {idx}");
+            cursor += 2;
+        }
+        // `insns[cursor]` is `prev` (possibly prefixed with `early-clobber ` by MIR printer).
+        cursor += 1;
+        let mut total = 0u32;
+        while let Some(imm) = insns[cursor].strip_prefix("S_NOP ") {
+            total += imm.trim().parse::<u32>().expect("s_nop imm") + 1;
+            cursor += 1;
+        }
+        // `insns[cursor]` is `cur`.
+        cursor += 1;
+        waits.push(total);
+    }
+    waits
+}
+
+#[test]
+fn cdna4_hazard_rules_match_llvm_gfx950_wait_states() {
+    let t950 = thin_targets::get(ARCH).unwrap();
+    let m950 = thin_targets::hazards(ARCH).unwrap();
+    let t942 = thin_targets::get("gfx942").unwrap();
+    let m942 = thin_targets::hazards("gfx942").unwrap();
+
+    let states_of = |t, m, lines: &[&str]| -> Vec<u32> {
+        let snap =
+            thin_test_support::asm::snapshot(t, thin_test_support::asm::read(t, lines).unwrap());
+        thin_passes::hazards::needs(&snap, m)
+            .into_iter()
+            .map(|n| n.states)
+            .collect()
+    };
+
+    // 1. XDL +1 wait state on gfx950 when `NumPasses != 2` (5, 8, 12, 20 vs gfx942's 5, 7, 11, 19),
+    //    doubled-K dense/sparse MFMA, `f8f6f4` dynamic `cbsz`/`blgp` pass counts, MX-scaled `VOP3PX2`,
+    //    and `DMFMA 16x16` (`19` on VALU/SrcAB, `17` on non-XDL OverlappedSrcC, `18` on VMEM/DS).
+    let raw_cases: &[(&str, &str, u32)] = &[
+        // 2-pass XDL stays 5:
+        (
+            "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+            5,
+        ),
+        // 4-pass XDL -> 8 (both legacy `16x16x16` and new doubled-K `16x16x32` / `i8_16x16x64`):
+        (
+            "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_accvgpr_read_b32 v6, a0",
+            8,
+        ),
+        (
+            "v_mfma_f32_16x16x32_bf16 a[0:3], v[2:3], v[6:9], a[0:3]",
+            "v_accvgpr_read_b32 v10, a0",
+            8,
+        ),
+        (
+            "v_mfma_i32_16x16x64_i8 a[0:3], v[2:5], v[6:9], a[0:3]",
+            "global_store_dword v0, a0, s[0:1]",
+            8,
+        ),
+        // 8-pass XDL -> 12 (`32x32x16_bf16` and `v_smfmac_f32_32x32x64_fp8_fp8`):
+        (
+            "v_mfma_f32_32x32x16_bf16 a[0:15], v[2:5], v[6:9], a[0:15]",
+            "v_accvgpr_read_b32 v10, a0",
+            12,
+        ),
+        (
+            "v_smfmac_f32_32x32x64_fp8_fp8 a[0:15], v[2:5], v[6:13], v14",
+            "v_accvgpr_read_b32 v15, a0",
+            12,
+        ),
+        // 16-pass XDL -> 20 (`32x32x4_2b_f16`):
+        (
+            "v_mfma_f32_32x32x4_2b_f16 a[0:31], v[2:3], v[4:5], a[0:31]",
+            "v_accvgpr_read_b32 v6, a0",
+            20,
+        ),
+        // `f8f6f4` & `v_mfma_scale_*` pass count selected by `PredIsF8_MFMA_SCALE`:
+        // - Either A or B is FP8/BF8 (`cbsz <= 1 || blgp <= 1`): 8 / 16 passes -> 12 / 20 states.
+        // - Both A and B are FP6/BF6/FP4 (`cbsz >= 2 && blgp >= 2`): 4 / 8 passes -> 8 / 12 states.
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:15], a[0:3] cbsz:0 blgp:0",
+            "v_accvgpr_read_b32 v16, a0",
+            12,
+        ),
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:11], a[0:3] cbsz:1 blgp:4",
+            "v_accvgpr_read_b32 v16, a0",
+            12,
+        ),
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:5], v[8:13], a[0:3] cbsz:2 blgp:3",
+            "v_accvgpr_read_b32 v16, a0",
+            8,
+        ),
+        (
+            "v_mfma_scale_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[0:3], v8, v9 cbsz:4 blgp:4",
+            "v_accvgpr_read_b32 v16, a0",
+            8,
+        ),
+        (
+            "v_mfma_scale_f32_32x32x64_f8f6f4 a[0:15], v[0:7], v[8:15], a[0:15], v18, v19 cbsz:0 blgp:4",
+            "v_accvgpr_read_b32 v16, a0",
+            20,
+        ),
+        (
+            "v_mfma_scale_f32_32x32x64_f8f6f4 a[0:15], v[0:3], v[4:7], a[0:15], v18, v19 cbsz:4 blgp:4",
+            "v_accvgpr_read_b32 v16, a0",
+            12,
+        ),
+        // VALU / Matrix -> `v_mfma_scale_*` VGPR scale sources (`ops[4]`, `ops[5]`):
+        (
+            "v_mov_b32 v8, 0x7f7f7f7f",
+            "v_mfma_scale_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[0:3], v8, v9 cbsz:4 blgp:4",
+            2,
+        ),
+        (
+            "v_mov_b32 v9, 0x7f7f7f7f",
+            "v_mfma_scale_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[0:3], v8, v9 cbsz:4 blgp:4",
+            2,
+        ),
+        (
+            "v_mfma_f32_16x16x32_bf16 v[16:19], v[0:3], v[4:7], v[16:19]",
+            "v_mfma_scale_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[0:3], v16, v17 cbsz:4 blgp:4",
+            8,
+        ),
+        // DGEMM `16x16x4_f64`: 19 on VALU RAW/WAW & Matrix SrcAB, 18 on VMEM, 17 on non-XDL SrcC, 0 on XDL SrcC:
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "v_accvgpr_read_b32 v6, a0",
+            19,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "v_mfma_f32_16x16x32_bf16 a[8:11], a[0:3], v[4:7], a[8:11]",
+            19,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "global_store_dwordx4 v0, a[0:3], s[0:1]",
+            18,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "v_mfma_f32_16x16x4_f32 a[0:3], v2, v3, a[0:3]",
+            17,
+        ),
+        (
+            "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+            "v_mfma_f32_16x16x32_bf16 a[0:3], v[2:5], v[6:9], a[0:3]",
+            0,
+        ),
+        // Overlapped / cross-opcode XDL SrcC:
+        // - 2-pass XDL -> XDL is 4 on gfx950 (vs 3 on gfx942); 2-pass XDL -> SMFMA stays 3!
+        // - 4/8/16-pass XDL -> XDL/SMFMA/DGEMM is 6 / 10 / 18!
+        (
+            "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_mfma_f32_4x4x4_16b_bf16 a[0:3], v[6:7], v[8:9], a[0:3]",
+            4,
+        ),
+        (
+            "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+            "v_mfma_f32_16x16x4_f32 a[0:3], v6, v7, a[0:3]",
+            3,
+        ),
+        (
+            "v_mfma_f32_16x16x32_f16 a[0:3], v[2:5], v[6:9], a[0:3]",
+            "v_mfma_f32_16x16x32_bf16 a[0:3], v[10:13], v[14:17], a[0:3]",
+            6,
+        ),
+        // Same-op `f8f6f4` full SrcC: 0 states when pass count matches, 10 when 8-pass -> 4-pass:
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:15], a[0:3] cbsz:0 blgp:0",
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:15], a[0:3] cbsz:1 blgp:1",
+            0,
+        ),
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:15], a[0:3] cbsz:0 blgp:0",
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[0:3] cbsz:4 blgp:4",
+            10,
+        ),
+        // Late `SrcC` WAR on `f8f6f4` tracks dynamic pass count (`8 - 1 = 7` vs `4 - 1 = 3`):
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:15], a[4:7] cbsz:0 blgp:4",
+            "v_accvgpr_write_b32 a4, v0",
+            7,
+        ),
+        (
+            "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[4:7] cbsz:4 blgp:4",
+            "v_accvgpr_write_b32 a4, v0",
+            3,
+        ),
+        // CDNA 4 PERMLANE hazards (`VALU -> PERMLANE` = 2, `V_CMPX -> PERMLANE` = 4):
+        ("v_mov_b32 v2, 1", "v_permlane16_swap_b32 v2, v3", 2),
+        ("v_mov_b32 v3, 1", "v_permlane32_swap_b32 v2, v3", 2),
+        ("v_mov_b32 v2, 1", "v_permlane16_swap_b32_e64 v2, v3", 2),
+        (
+            "v_cmpx_eq_u32 vcc, v0, v1",
+            "v_permlane16_swap_b32 v2, v3",
+            4,
+        ),
+        (
+            "v_cmpx_eq_u32 vcc, v0, v1",
+            "v_permlane32_swap_b32_e64 v2, v3",
+            4,
+        ),
+        // `v_cvt_scalef32_sr_pk_fp4_*` (`HasFP4DstByteSel`) requires 1 state even for `op_sel:[0,0,0,0]`:
+        (
+            "v_cvt_scalef32_sr_pk_fp4_f32 v4, v[0:1], v2, s0 op_sel:[0,0,0,0]",
+            "v_add_u32 v5, v4, 1",
+            1,
+        ),
+        // `v_cvt_sr_fp8_f32` requires 0 on byte 0 and 1 on non-zero byte select:
+        (
+            "v_cvt_sr_fp8_f32 v4, v0, v1 op_sel:[0,0,0,0]",
+            "v_add_u32 v5, v4, 1",
+            0,
+        ),
+        (
+            "v_cvt_sr_fp8_f32 v4, v0, v1 op_sel:[0,0,1,0]",
+            "v_add_u32 v5, v4, 1",
+            1,
+        ),
+        // Legacy transcendentals (`Table 12`) and wide LDS DMA `M0` hazard:
+        ("v_exp_legacy_f32 v4, v0", "v_add_f32 v5, v4, 1.0", 1),
+        ("v_log_legacy_f32 v4, v0", "v_add_f32 v5, v4, 1.0", 1),
+        (
+            "s_mov_b32 m0, 0",
+            "global_load_lds_dwordx4 v0, s[0:1]",
+            1,
+        ),
+    ];
+
+    for &(prod, cons, expected) in raw_cases {
+        assert_eq!(
+            states_of(t950, m950, &[prod, cons]),
+            [0, expected],
+            "gfx950 {prod} -> {cons}"
+        );
+    }
+
+    // Verify gfx942 (CDNA 3) was NOT altered by CDNA 4 rules:
+    assert_eq!(
+        states_of(
+            t942,
+            m942,
+            &[
+                "v_mfma_f32_16x16x16_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+                "v_accvgpr_read_b32 v6, a0",
+            ],
+        ),
+        [0, 7]
+    );
+    assert_eq!(
+        states_of(
+            t942,
+            m942,
+            &[
+                "v_mfma_f64_16x16x4_f64 a[0:7], v[2:3], v[4:5], a[0:7]",
+                "v_accvgpr_read_b32 v6, a0",
+            ],
+        ),
+        [0, 11]
+    );
+    assert_eq!(
+        states_of(
+            t942,
+            m942,
+            &[
+                "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[2:3], v[4:5], a[0:3]",
+                "v_mfma_f32_4x4x4_16b_bf16 a[0:3], v[6:7], v[8:9], a[0:3]",
+            ],
+        ),
+        [0, 3]
+    );
+
+    // 2. Verify `apply` chunks 20 wait states into `s_nop 15` + `s_nop 3` (`16 + 4 = 20`) and clears cleanly.
+    let snap20 = thin_test_support::asm::snapshot(
+        t950,
+        thin_test_support::asm::read(
+            t950,
+            &[
+                "v_mfma_f32_32x32x64_f8f6f4 a[0:15], v[0:7], v[8:15], a[0:15] cbsz:0 blgp:0",
+                "v_accvgpr_read_b32 v16, a0",
+                "s_endpgm",
+            ],
+        )
+        .unwrap(),
+    );
+    let placed: Vec<_> =
+        thin_passes::hazards::apply(&snap20, &thin_passes::hazards::needs(&snap20, m950))
+            .into_iter()
+            .map(|p| p.0)
+            .collect();
+    let spelled: Vec<_> = placed
+        .iter()
+        .map(|i| thin_test_support::asm::spell(&snap20, i))
+        .collect();
+    assert_eq!(
+        spelled,
+        [
+            "v_mfma_f32_32x32x64_f8f6f4 a[0:15], v[0:7], v[8:15], a[0:15] cbsz:0 blgp:0",
+            "s_nop 15",
+            "s_nop 3",
+            "v_accvgpr_read_b32 v16, a0",
+            "s_endpgm",
+        ]
+    );
+    let placed_snap = thin_test_support::asm::snapshot(t950, placed);
+    assert!(thin_passes::hazards::clear(&placed_snap, m950).is_ok());
+
+    // 3. Direct oracle comparison against LLVM 22 `llc -mcpu=gfx950 -x mir -run-pass=post-RA-hazard-rec`.
+    if llc_available() {
+        let mir_oracle_cases: &[(&str, &str, &str, &str)] = &[
+            (
+                "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[0:1], v[2:3], a[0:3]",
+                "v_accvgpr_read_b32 v8, a0",
+                "$agpr0_agpr1_agpr2_agpr3 = V_MFMA_F32_4X4X4F16_e64 $vgpr0_vgpr1, $vgpr2_vgpr3, $agpr0_agpr1_agpr2_agpr3, 0, 0, 0, implicit $mode, implicit $exec",
+                "$vgpr8 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f32_16x16x32_bf16 a[0:3], v[0:3], v[4:7], a[0:3]",
+                "v_accvgpr_read_b32 v8, a0",
+                "$agpr0_agpr1_agpr2_agpr3 = V_MFMA_F32_16X16X32_BF16_e64 $vgpr0_vgpr1_vgpr2_vgpr3, $vgpr4_vgpr5_vgpr6_vgpr7, $agpr0_agpr1_agpr2_agpr3, 0, 0, 0, implicit $mode, implicit $exec",
+                "$vgpr8 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:7], v[8:15], a[0:3] cbsz:0 blgp:0",
+                "v_accvgpr_read_b32 v16, a0",
+                "$agpr0_agpr1_agpr2_agpr3 = V_MFMA_F32_16X16X128_F8F6F4_f8_f8_e64 $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, $vgpr8_vgpr9_vgpr10_vgpr11_vgpr12_vgpr13_vgpr14_vgpr15, $agpr0_agpr1_agpr2_agpr3, 0, 0, implicit $mode, implicit $exec",
+                "$vgpr16 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f32_16x16x128_f8f6f4 a[0:3], v[0:3], v[4:7], a[0:3] cbsz:4 blgp:4",
+                "v_accvgpr_read_b32 v16, a0",
+                "$agpr0_agpr1_agpr2_agpr3 = V_MFMA_F32_16X16X128_F8F6F4_f4_f4_e64 $vgpr0_vgpr1_vgpr2_vgpr3, $vgpr4_vgpr5_vgpr6_vgpr7, $agpr0_agpr1_agpr2_agpr3, 4, 4, implicit $mode, implicit $exec",
+                "$vgpr16 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f32_32x32x64_f8f6f4 a[0:15], v[0:7], v[8:15], a[0:15] cbsz:0 blgp:0",
+                "v_accvgpr_read_b32 v16, a0",
+                "early-clobber $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7_agpr8_agpr9_agpr10_agpr11_agpr12_agpr13_agpr14_agpr15 = V_MFMA_F32_32X32X64_F8F6F4_f8_f8_e64 $vgpr0_vgpr1_vgpr2_vgpr3_vgpr4_vgpr5_vgpr6_vgpr7, $vgpr8_vgpr9_vgpr10_vgpr11_vgpr12_vgpr13_vgpr14_vgpr15, $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7_agpr8_agpr9_agpr10_agpr11_agpr12_agpr13_agpr14_agpr15, 0, 0, implicit $mode, implicit $exec",
+                "$vgpr16 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f32_32x32x64_f8f6f4 a[0:15], v[0:3], v[4:7], a[0:15] cbsz:4 blgp:4",
+                "v_accvgpr_read_b32 v16, a0",
+                "early-clobber $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7_agpr8_agpr9_agpr10_agpr11_agpr12_agpr13_agpr14_agpr15 = V_MFMA_F32_32X32X64_F8F6F4_f4_f4_e64 $vgpr0_vgpr1_vgpr2_vgpr3, $vgpr4_vgpr5_vgpr6_vgpr7, $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7_agpr8_agpr9_agpr10_agpr11_agpr12_agpr13_agpr14_agpr15, 4, 4, implicit $mode, implicit $exec",
+                "$vgpr16 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f64_16x16x4_f64 a[0:7], v[0:1], v[2:3], a[0:7]",
+                "v_accvgpr_read_b32 v16, a0",
+                "early-clobber $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7 = V_MFMA_F64_16X16X4F64_e64 $vgpr0_vgpr1, $vgpr2_vgpr3, $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7, 0, 0, 0, implicit $mode, implicit $exec",
+                "$vgpr16 = V_ACCVGPR_READ_B32_e64 $agpr0, implicit $exec",
+            ),
+            (
+                "v_mfma_f64_16x16x4_f64 a[0:7], v[0:1], v[2:3], a[0:7]",
+                "v_mfma_f32_16x16x4_f32 a[0:3], v0, v1, a[0:3]",
+                "early-clobber $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7 = V_MFMA_F64_16X16X4F64_e64 $vgpr0_vgpr1, $vgpr2_vgpr3, $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7, 0, 0, 0, implicit $mode, implicit $exec",
+                "$agpr0_agpr1_agpr2_agpr3 = V_MFMA_F32_16X16X4F32_e64 $vgpr0, $vgpr1, $agpr0_agpr1_agpr2_agpr3, 0, 0, 0, implicit $mode, implicit $exec",
+            ),
+            (
+                "v_mfma_f32_32x32x16_bf16 a[0:15], v[0:3], v[4:7], a[0:15]",
+                "v_mfma_f32_16x16x32_bf16 a[0:3], v[0:3], v[4:7], a[0:3]",
+                "$agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7_agpr8_agpr9_agpr10_agpr11_agpr12_agpr13_agpr14_agpr15 = V_MFMA_F32_32X32X16_BF16_e64 $vgpr0_vgpr1_vgpr2_vgpr3, $vgpr4_vgpr5_vgpr6_vgpr7, $agpr0_agpr1_agpr2_agpr3_agpr4_agpr5_agpr6_agpr7_agpr8_agpr9_agpr10_agpr11_agpr12_agpr13_agpr14_agpr15, 0, 0, 0, implicit $mode, implicit $exec",
+                "$agpr0_agpr1_agpr2_agpr3 = V_MFMA_F32_16X16X32_BF16_e64 $vgpr0_vgpr1_vgpr2_vgpr3, $vgpr4_vgpr5_vgpr6_vgpr7, $agpr0_agpr1_agpr2_agpr3, 0, 0, 0, implicit $mode, implicit $exec",
+            ),
+            (
+                "v_mov_b32 v12, 1",
+                "v_permlane16_swap_b32 v12, v13",
+                "$vgpr12 = V_MOV_B32_e32 1, implicit $exec",
+                "$vgpr12, $vgpr13 = V_PERMLANE16_SWAP_B32_e32 $vgpr12(tied-def 0), $vgpr13(tied-def 1), implicit $exec",
+            ),
+            (
+                "v_cmpx_eq_u32 vcc, v0, v1",
+                "v_permlane32_swap_b32 v14, v15",
+                "V_CMPX_EQ_U32_nosdst_e32 $vgpr0, $vgpr1, implicit-def $exec, implicit $exec",
+                "$vgpr14, $vgpr15 = V_PERMLANE32_SWAP_B32_e32 $vgpr14(tied-def 0), $vgpr15(tied-def 1), implicit $exec",
+            ),
+            (
+                "v_cvt_scalef32_sr_pk_fp4_f32 v16, v[0:1], v2, s0 op_sel:[0,0,0,0]",
+                "v_add_u32 v17, 1, v16",
+                "early-clobber $vgpr16 = V_CVT_SCALEF32_SR_PK_FP4_F32_e64 0, $vgpr0_vgpr1, 0, $vgpr2, 0, $sgpr0, $vgpr16, 0, implicit $mode, implicit $exec",
+                "$vgpr17 = V_ADD_U32_e32 1, $vgpr16, implicit $exec",
+            ),
+        ];
+
+        let mir_pairs: Vec<(&str, &str)> = mir_oracle_cases
+            .iter()
+            .map(|&(_, _, pm, cm)| (pm, cm))
+            .collect();
+        let llc_waits = llc_mir_pair_wait_states(&mir_pairs);
+        for (i, &(pa, ca, _, _)) in mir_oracle_cases.iter().enumerate() {
+            let ours = states_of(t950, m950, &[pa, ca])[1];
+            assert_eq!(
+                ours, llc_waits[i],
+                "LLVM GCNHazardRecognizer mismatch on `{pa}` -> `{ca}`: thin={ours}, llc={}",
+                llc_waits[i]
+            );
         }
     }
 }

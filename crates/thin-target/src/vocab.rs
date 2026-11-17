@@ -450,7 +450,7 @@ pub fn dst_sel(flags: Flags, spelling: &str) -> DstSel {
     let starts = |prefixes: &[&str]| prefixes.iter().any(|p| spelling.starts_with(p));
     if !flags.has(Flags::VALU) {
         DstSel::Never
-    } else if starts(&["v_fma_mixlo", "v_fma_mixhi"]) {
+    } else if starts(&["v_fma_mixlo", "v_fma_mixhi", "v_cvt_scalef32_sr_pk_fp4_"]) {
         DstSel::Always
     } else if starts(&["v_pk_", "v_dot"]) || spelling.contains("_mix") {
         DstSel::Never

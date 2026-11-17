@@ -8,7 +8,7 @@ use thin_target::{Error, Form, MatrixForm, Target};
 use crate::cdna::{
     self,
     decoder::Decoder,
-    hazards::{cdna3_rule_count, Cdna3Model, CDNA3_WINDOW},
+    hazards::{cdna4_rule_count, Cdna4Model, CDNA4_WINDOW},
     Data, PhysicalFormCache, Spec, COMMON_HWREG, COMMON_SPECIALS,
 };
 use crate::decode::Instruction;
@@ -16,8 +16,8 @@ use crate::decode::Instruction;
 /// The target's name.
 pub const NAME: &str = "gfx950";
 
-/// gfx950's hazard model (upgraded to `Cdna4Model` in the hazards commit).
-pub static HAZARD_MODEL: Cdna3Model = Cdna3Model;
+/// gfx950's CDNA 4 hazard model.
+pub static HAZARD_MODEL: Cdna4Model = Cdna4Model;
 
 static EXTRA_SPELLINGS: [(&str, &str); 6] = [
     ("global.load.lds.b96", "global_load_lds_dwordx3"),
@@ -254,8 +254,8 @@ static SPEC: Spec = Spec {
     widths,
     lds_banks,
     data,
-    hazard_rules_len: cdna3_rule_count,
-    hazard_window: CDNA3_WINDOW,
+    hazard_rules_len: cdna4_rule_count,
+    hazard_window: CDNA4_WINDOW,
 };
 
 /// Builds gfx950 from its checked-in tables.

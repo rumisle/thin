@@ -1173,3 +1173,148 @@ def test_gfx950_wide_lds_dma_160kb_lds_64_banks_and_buffer_atomic_bf16():
                 stride_asm, {"wgsize": 64, "vgpr": 4, "lds": 16384}, m2, [ka2], grid=(1,)
             ).run()[0]
         assert list(r2.banks.values()) == [want_entry]
+
+
+def test_gfx950_cdna4_hazards_in_compiled_kernel():
+    """Compiled gfx950 kernels emit exact CDNA 4 wait states matching LLVM GCNHazardRecognizer."""
+    import thin
+    from thin.target import targeting
+
+    def make_cdna4_hazards():
+        from thin import KernelDef
+        from thin.dsl import Args, O, ptr
+        from thin.target import PHYS
+
+        vcc = PHYS["vcc"]
+        exec_reg = PHYS["exec"]
+
+        def body(b, k):
+            V, S, A = b.v, b.s, b.a  # noqa: N806
+            p_in, p_out = k.load()
+            lane = V.u32(k.tid, name="lane")
+            w4_a = V.u32(n=4)
+            w4_b = V.u32(n=4)
+            w8_a = V.u32(n=8)
+            w8_b = V.u32(n=8)
+            b.emit(O.global_load(w4_a, V.u32(lane * 16), p_in))
+            b.emit(O.global_load(w4_b, V.u32(lane * 16), p_in, offset=1024))
+            b.emit(O.global_load(w8_a[:4], V.u32(lane * 32), p_in, offset=2048))
+            b.emit(O.global_load(w8_a[4:], V.u32(lane * 32), p_in, offset=2064))
+            b.emit(O.global_load(w8_b[:4], V.u32(lane * 32), p_in, offset=3072))
+            b.emit(O.global_load(w8_b[4:], V.u32(lane * 32), p_in, offset=3088))
+            b.wait(w4_a, w4_b, w8_a, w8_b, comment="ready")
+
+            # 1) 4-pass XDL (`16x16x32_bf16`): same-op SrcC = 0, read_acc = 8 states (`s_nop 7`)
+            acc4 = A.f32(n=4)
+            b.emit(O.op("v_mfma_f32_16x16x32_bf16", acc4, w4_a, w4_b, 0))
+            b.emit(O.op("v_mfma_f32_16x16x32_bf16", acc4, w4_b, w4_a, acc4))
+            r_bf16 = V.f32()
+            b.emit(O.op("v_accvgpr_read_b32", r_bf16, acc4[0]))
+
+            # 2) `16x16x128_f8f6f4` FP8 (`cbsz:0 blgp:0` -> 8 passes -> 12 states = `s_nop 11`)
+            acc_f8 = A.f32(n=4)
+            b.emit(O.op("v_mfma_f32_16x16x128_f8f6f4", acc_f8, w8_a, w8_b, 0, cbsz=0, blgp=0))
+            r_f8 = V.f32()
+            b.emit(O.op("v_accvgpr_read_b32", r_f8, acc_f8[0]))
+
+            # 3) `16x16x128_f8f6f4` FP4 (`cbsz:4 blgp:4` -> 4 passes -> 8 states = `s_nop 7`)
+            acc_f4 = A.f32(n=4)
+            b.emit(O.op("v_mfma_f32_16x16x128_f8f6f4", acc_f4, w4_a, w4_b, 0, cbsz=4, blgp=4))
+            r_f4 = V.f32()
+            b.emit(O.op("v_accvgpr_read_b32", r_f4, acc_f4[0]))
+
+            # 4) `32x32x64_f8f6f4` FP8 (`cbsz:0 blgp:0` -> 16 passes -> 20 states = 15 + 3)
+            acc16 = A.f32(n=16)
+            b.emit(
+                O.op(
+                    "v_mfma_scale_f32_32x32x64_f8f6f4",
+                    acc16,
+                    w8_a,
+                    w8_b,
+                    0,
+                    w4_a[0],
+                    w4_b[0],
+                    cbsz=0,
+                    blgp=0,
+                )
+            )
+            r_16p = V.f32()
+            b.emit(O.op("v_accvgpr_read_b32", r_16p, acc16[0]))
+
+            # 5) `16x16x4_f64` DGEMM -> VALU read: 19 states (`s_nop 15; s_nop 2`)
+            acc_d = A.u32(n=8)
+            b.emit(O.op("v_mfma_f64_16x16x4_f64", acc_d, w4_a[:2], w4_b[:2], 0))
+            r_d = V.u32()
+            b.emit(O.op("v_accvgpr_read_b32", r_d, acc_d[0]))
+
+            # 6) CDNA 4 PERMLANE hazards: VALU -> swap = `s_nop 1`; CMPX -> swap = `s_nop 3`
+            p1 = V.u32(w4_b[0])
+            p0 = V.u32(w4_a[0] + 1)
+            b.emit(O.op("v_permlane16_swap_b32", p0, p1))
+            saved = S.u64()
+            with b.raw_exec("cmpx permlane hazard"):
+                b.emit(O.op("s_mov_b64", saved, exec_reg))
+                b.emit(O.op("v_cmpx_ne_u32", vcc, w4_a[0], -1))
+                b.emit(O.op("v_permlane32_swap_b32", p0, p1))
+                b.emit(O.op("s_mov_b64", exec_reg, saved))
+
+            # 7) `v_cvt_scalef32_sr_pk_fp4_f32` (`HasFP4DstByteSel`): `s_nop 0` even at `op_sel` 0
+            sr_dst = V.u32(0)
+            b.emit(
+                O.op(
+                    "v_cvt_scalef32_sr_pk_fp4_f32",
+                    sr_dst,
+                    w4_a[:2],
+                    w4_b[0],
+                    1.0,
+                    op_sel=[0, 0, 0, 0],
+                )
+            )
+            sr_use = V.u32()
+            b.emit(O.op("v_add_u32", sr_use, 1, sr_dst))
+
+            tot = V.f32(r_bf16 + r_f8 + r_f4 + r_16p)
+            tot_u = V.u32(r_d + p0 + p1 + sr_use)
+            b.emit(O.global_store(V.u32(lane * 4), tot, p_out))
+            b.emit(O.global_store(V.u32(lane * 4), tot_u, p_out, offset=256))
+
+        return KernelDef(
+            "cdna4_hazards_probe",
+            Args(p_in=ptr, p_out=ptr),
+            body,
+            wgsize=64,
+            max_grid=(1,),
+        )
+
+    with targeting("gfx950"):
+        kern = thin.compile(make_cdna4_hazards)
+
+    ins = [
+        ln.strip().split("//")[0].split(";")[0].strip()
+        for ln in kern.asm.splitlines()
+        if ln.startswith("\t") and not ln.strip().startswith((".", ";", "//"))
+    ]
+
+    def between(prefix_a: str, prefix_b: str, start: int = 0) -> tuple[int, list[str]]:
+        ia = next(i for i in range(start, len(ins)) if ins[i].startswith(prefix_a))
+        ib = next(i for i in range(ia + 1, len(ins)) if ins[i].startswith(prefix_b))
+        return ib, ins[ia + 1 : ib]
+
+    pos, mid = between("v_mfma_f32_16x16x32_bf16", "v_mfma_f32_16x16x32_bf16", 0)
+    assert mid == []
+    pos, mid = between("v_mfma_f32_16x16x32_bf16", "v_accvgpr_read_b32", pos)
+    assert mid == ["s_nop 7"]
+    pos, mid = between("v_mfma_f32_16x16x128_f8f6f4", "v_accvgpr_read_b32", pos)
+    assert mid == ["s_nop 11"]
+    pos, mid = between("v_mfma_f32_16x16x128_f8f6f4", "v_accvgpr_read_b32", pos)
+    assert mid == ["s_nop 7"]
+    pos, mid = between("v_mfma_scale_f32_32x32x64_f8f6f4", "v_accvgpr_read_b32", pos)
+    assert mid == ["s_nop 15", "s_nop 3"]
+    pos, mid = between("v_mfma_f64_16x16x4_f64", "v_accvgpr_read_b32", pos)
+    assert mid == ["s_nop 15", "s_nop 2"]
+    pos, mid = between("v_add_", "v_permlane16_swap_b32", pos)
+    assert mid == ["s_nop 1"]
+    pos, mid = between("v_cmpx_ne_u32", "v_permlane32_swap_b32", pos)
+    assert mid == ["s_nop 3"]
+    pos, mid = between("v_cvt_scalef32_sr_pk_fp4_f32", "v_add_u32", pos)
+    assert mid == ["s_nop 0"]

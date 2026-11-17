@@ -3,12 +3,15 @@
 
 use std::sync::OnceLock;
 
-use thin_ir::{Imm, ImmValue, Instr, Operand, Reg, Snapshot};
+use thin_ir::{FieldValue, Imm, ImmValue, Instr, Operand, Reg, Snapshot};
 use thin_passes::hazards::{Dep, DynamicStates, HazardModel, Rule, Side, States, Test};
 use thin_target::{phys_named, Elem, Flags, Kind};
 
-/// The largest wait-state count among CDNA 3 [`rules()`] (16-pass XDL -> VALU/VMEM/DS/SrcAB = 19).
+/// The largest wait-state count among CDNA 3 [`cdna3_rules()`] (16-pass XDL -> VALU/VMEM/DS/SrcAB = 19).
 pub const CDNA3_WINDOW: u32 = 19;
+
+/// The largest wait-state count among CDNA 4 [`cdna4_rules()`] (16-pass XDL -> VALU/VMEM/DS/SrcAB = 20).
+pub const CDNA4_WINDOW: u32 = 20;
 
 /// Shared CDNA 3 hazard model.
 pub struct Cdna3Model;
@@ -19,9 +22,23 @@ impl HazardModel for Cdna3Model {
     }
 }
 
+/// Shared CDNA 4 hazard model.
+pub struct Cdna4Model;
+
+impl HazardModel for Cdna4Model {
+    fn rules(&self) -> &[Rule] {
+        cdna4_rules()
+    }
+}
+
 pub fn cdna3_rules() -> &'static [Rule] {
     static RULES: OnceLock<Vec<Rule>> = OnceLock::new();
-    RULES.get_or_init(build_cdna3_rules)
+    RULES.get_or_init(|| build_cdna_rules(false))
+}
+
+pub fn cdna4_rules() -> &'static [Rule] {
+    static RULES: OnceLock<Vec<Rule>> = OnceLock::new();
+    RULES.get_or_init(|| build_cdna_rules(true))
 }
 
 /// Number of wait-state rules in CDNA 3's hazard table.
@@ -29,10 +46,15 @@ pub fn cdna3_rule_count() -> usize {
     cdna3_rules().len()
 }
 
+/// Number of wait-state rules in CDNA 4's hazard table.
+pub fn cdna4_rule_count() -> usize {
+    cdna4_rules().len()
+}
+
 /// CDNA matrix execution pipeline family and hardware pass count (`2, 4, 8, 16`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum MatClass {
-    /// CDNA XDL pipeline (`f16`, `bf16`, `xf32`, `fp8`/`bf8`, `i8`, and all `v_smfmac_*`).
+    /// CDNA XDL pipeline (`f16`, `bf16`, `xf32`, `fp8`/`bf8`, `f8f6f4`, `i8`, and all `v_smfmac_*`).
     Xdl(u32),
     /// Legacy SGEMM MAI pipeline (`f32`-input `v_mfma_f32_*_f32`).
     Smfma(u32),
@@ -43,7 +65,21 @@ enum MatClass {
 impl MatClass {
     fn of(s: &Snapshot, i: &Instr) -> Option<(MatClass, bool)> {
         let mf = s.target().matrix_form(&i.form().op)?;
-        let p = mf.passes;
+        // On CDNA 4 `*_f8f6f4` (`PredIsF8_MFMA_SCALE` in `SISchedule.td`), if either
+        // `cbsz <= 1` or `blgp <= 1` (FP8/BF8), the instruction takes `mf.passes`
+        // (`8` on `16x16x128`, `16` on `32x32x64`); when both inputs are FP6/BF6/FP4
+        // (`cbsz >= 2 && blgp >= 2`), it runs in half the passes (`4` or `8`).
+        let p = if mf.a == Elem::F8F6F4 {
+            let cbsz = i.field_named("cbsz").and_then(FieldValue::int).unwrap_or(0);
+            let blgp = i.field_named("blgp").and_then(FieldValue::int).unwrap_or(0);
+            if cbsz <= 1 || blgp <= 1 {
+                mf.passes
+            } else {
+                mf.passes / 2
+            }
+        } else {
+            mf.passes
+        };
         let cls = if mf.d == Elem::F64 {
             MatClass::Dgemm(p)
         } else if mf.a == Elem::F32 {
@@ -77,26 +113,48 @@ fn valu_to_mat(_: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
     }
 }
 
-/// Matrix -> VALU RAW/WAW and Matrix -> Matrix non-SrcC (`SrcA`/`SrcB`/`Idx`) RAW.
-fn mat_to_valu_or_ab(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+/// Matrix -> VALU RAW/WAW and Matrix -> Matrix non-SrcC (`SrcA`/`SrcB`/`Idx`/`Scale`) RAW.
+fn mat_to_valu_or_ab_for(s: &Snapshot, prev: &Instr, cdna4: bool) -> u32 {
     match MatClass::of(s, prev).map(|x| x.0) {
-        Some(MatClass::Xdl(p)) => p + 3,
+        Some(MatClass::Xdl(p)) => p + 3 + u32::from(cdna4 && p != 2),
         Some(MatClass::Smfma(p)) => p + 2,
         Some(MatClass::Dgemm(4)) => 6,
-        Some(MatClass::Dgemm(_)) => 11,
+        Some(MatClass::Dgemm(_)) => {
+            if cdna4 {
+                19
+            } else {
+                11
+            }
+        }
         None => 0,
     }
 }
 
+fn cdna3_mat_to_valu_or_ab(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+    mat_to_valu_or_ab_for(s, prev, false)
+}
+
+fn cdna4_mat_to_valu_or_ab(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+    mat_to_valu_or_ab_for(s, prev, true)
+}
+
 /// Matrix -> VMEM / DS RAW (`DGEMM` takes 9 / 18 states; `XDL` / `SMFMA` match VALU).
-fn mat_to_mem(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+fn mat_to_mem_for(s: &Snapshot, prev: &Instr, cdna4: bool) -> u32 {
     match MatClass::of(s, prev).map(|x| x.0) {
-        Some(MatClass::Xdl(p)) => p + 3,
+        Some(MatClass::Xdl(p)) => p + 3 + u32::from(cdna4 && p != 2),
         Some(MatClass::Smfma(p)) => p + 2,
         Some(MatClass::Dgemm(4)) => 9,
         Some(MatClass::Dgemm(_)) => 18,
         None => 0,
     }
+}
+
+fn cdna3_mat_to_mem(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+    mat_to_mem_for(s, prev, false)
+}
+
+fn cdna4_mat_to_mem(s: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
+    mat_to_mem_for(s, prev, true)
 }
 
 fn reg_extent(s: &Snapshot, r: &Reg) -> (char, u32, u32) {
@@ -249,18 +307,25 @@ fn setreg_vskip_to_vec(_: &Snapshot, prev: &Instr, _: &Instr) -> u32 {
 }
 
 /// Partial-overlap or cross-opcode `SrcC` wait states (`getMFMAOverlappedSrcCWaitStates`).
-fn overlapped_src_c(prev: MatClass, cur: MatClass) -> u32 {
+fn overlapped_src_c(prev: MatClass, cur: MatClass, cdna4: bool) -> u32 {
     match (prev, cur) {
         (MatClass::Smfma(_) | MatClass::Dgemm(_), MatClass::Xdl(_)) => 0,
         (MatClass::Dgemm(4), _) => 4,
-        (MatClass::Dgemm(_), _) => 9,
+        (MatClass::Dgemm(_), _) => {
+            if cdna4 {
+                17
+            } else {
+                9
+            }
+        }
         (MatClass::Smfma(p), _) => p,
-        (MatClass::Xdl(p), _) => p + 1,
+        (MatClass::Xdl(p), MatClass::Xdl(_)) => p + 1 + u32::from(cdna4),
+        (MatClass::Xdl(p), _) => p + 1 + u32::from(cdna4 && p != 2),
     }
 }
 
 /// Matrix -> Matrix `SrcC` RAW (`getMFMAReadWaitStates` with `IsSrcC = true`).
-fn mat_to_src_c(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
+fn mat_to_src_c_for(s: &Snapshot, prev: &Instr, cur: &Instr, cdna4: bool) -> u32 {
     let (Some((p_cls, _)), Some((c_cls, c_sparse))) = (MatClass::of(s, prev), MatClass::of(s, cur))
     else {
         return 0;
@@ -281,14 +346,22 @@ fn mat_to_src_c(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
         } else {
             0
         };
-        if prev.form().op == cur.form().op {
+        if prev.form().op == cur.form().op && p_cls == c_cls {
             base
         } else {
-            base.max(overlapped_src_c(p_cls, c_cls))
+            base.max(overlapped_src_c(p_cls, c_cls, cdna4))
         }
     } else {
-        overlapped_src_c(p_cls, c_cls)
+        overlapped_src_c(p_cls, c_cls, cdna4)
     }
+}
+
+fn cdna3_mat_to_src_c(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
+    mat_to_src_c_for(s, prev, cur, false)
+}
+
+fn cdna4_mat_to_src_c(s: &Snapshot, prev: &Instr, cur: &Instr) -> u32 {
+    mat_to_src_c_for(s, prev, cur, true)
 }
 
 /// Late `SrcC` read -> VALU/VMEM/DS write WAR (`SMFMAReadAsCWindow` on CDNA3: XDL only, `passes - 1`).
@@ -366,10 +439,28 @@ fn dyn_rule(
     }
 }
 
-/// CDNA3 architectural wait-state rules (AMD Instinct CDNA3 ISA Guide,
-/// Chapter 4 "Program Organization / Wait States", cross-checked against
-/// `GCNHazardRecognizers.cpp` and `llc -mcpu=gfx942`).
-fn build_cdna3_rules() -> Vec<Rule> {
+/// CDNA 3 / CDNA 4 architectural wait-state rules (AMD Instinct CDNA 3 & CDNA 4
+/// ISA Guides, Chapter 4.5 & Chapter 7.6, cross-checked against LLVM
+/// `GCNHazardRecognizer.cpp` and `SISchedule.td`).
+fn build_cdna_rules(cdna4: bool) -> Vec<Rule> {
+    let window = if cdna4 { CDNA4_WINDOW } else { CDNA3_WINDOW };
+    let mat_to_valu_or_ab: fn(&Snapshot, &Instr, &Instr) -> u32 = if cdna4 {
+        cdna4_mat_to_valu_or_ab
+    } else {
+        cdna3_mat_to_valu_or_ab
+    };
+    let mat_to_mem: fn(&Snapshot, &Instr, &Instr) -> u32 = if cdna4 {
+        cdna4_mat_to_mem
+    } else {
+        cdna3_mat_to_mem
+    };
+    let mat_to_src_c: fn(&Snapshot, &Instr, &Instr) -> u32 = if cdna4 {
+        cdna4_mat_to_src_c
+    } else {
+        cdna3_mat_to_src_c
+    };
+    let max_src_c = if cdna4 { 18 } else { 17 };
+
     let salu = || side(&[Kind::Salu], Flags::NONE, Flags::NONE, &[]);
     let valu = || side(&[Kind::Valu], Flags::NONE, Flags::NONE, &[]);
     let valu_or_mat = || side(&[Kind::Valu, Kind::Matrix], Flags::NONE, Flags::NONE, &[]);
@@ -391,7 +482,7 @@ fn build_cdna3_rules() -> Vec<Rule> {
             &[],
         )
     };
-    vec![
+    let mut rules = vec![
         // 1. VALU writing SGPR/VCC/EXEC -> VALU/Matrix reading it:
         //    4 wait states on v_div_fmas (VCC) or v_readlane/v_writelane (SGPR lane-select),
         //    2 wait states on general SGPR/VCC/explicit-EXEC constant read.
@@ -475,7 +566,7 @@ fn build_cdna3_rules() -> Vec<Rule> {
             Dep::Raw,
             1,
         ),
-        // 6. Partial-dst VALU (SDWA / D16 / op_sel hi-half / FP8 byte-sel) -> VALU RAW or WAW: 1 wait state (S_NOP 0).
+        // 6. Partial-dst VALU (SDWA / D16 / op_sel hi-half / FP8 byte-sel / SR PK FP4) -> VALU RAW or WAW: 1 wait state.
         rule(
             side(&[Kind::Valu], Flags::NONE, Flags::NONE, &[Test::PartialDst]),
             valu(),
@@ -506,38 +597,47 @@ fn build_cdna3_rules() -> Vec<Rule> {
             no_late,
         ),
         dyn_rule(valu(), valu_vmem_ds(), Dep::RawOrWaw, 3, dot_diff, no_late),
-        // 9. Matrix -> VALU RAW or WAW: pass-count-aware (XDL: p+3, SMFMA: p+2, DGEMM: 6/11).
+        // 9. Matrix -> VALU RAW or WAW: pass-count-aware
+        //    (CDNA3: XDL p+3, DGEMM 6/11; CDNA4: XDL p+3+(p!=2), DGEMM 6/19; SMFMA: p+2).
         dyn_rule(
             mat(),
             valu(),
             Dep::RawOrWaw,
-            CDNA3_WINDOW,
+            window,
             mat_to_valu_or_ab,
             no_late,
         ),
-        // 9b. Matrix -> VMEM / DS RAW: pass-count-aware (XDL: p+3, SMFMA: p+2, DGEMM: 9/18).
+        // 9b. Matrix -> VMEM / DS RAW: pass-count-aware
+        //     (CDNA3: XDL p+3; CDNA4: XDL p+3+(p!=2); SMFMA: p+2; DGEMM: 9/18).
         dyn_rule(
             mat(),
             vmem_ds(),
             Dep::Raw,
-            CDNA3_WINDOW,
+            window,
             mat_to_mem,
             no_late,
         ),
         // 9c. DGEMM -> v_fma_f64 / v_fmac_f64 pipeline hazard: 2 wait states.
         dyn_rule(mat(), valu(), Dep::None, 2, dgemm_to_fma64, no_late),
-        // 10. Matrix -> Matrix reading result as SrcA/SrcB/Idx (non-SrcC): pass-count-aware.
+        // 10. Matrix -> Matrix reading result as SrcA/SrcB/Idx/Scale (non-SrcC): pass-count-aware.
         dyn_rule(
             mat(),
             mat(),
             Dep::ReadsNotAsSrcC,
-            CDNA3_WINDOW,
+            window,
             mat_to_valu_or_ab,
             no_late,
         ),
-        // 11. Matrix -> Matrix reading result as SrcC: 0 on full same-op chain (2 on 2-pass, 4 on 4x4 f64),
-        //     pass-count-aware on cross-opcode or partial register overlap.
-        dyn_rule(mat(), mat(), Dep::ReadsAsSrcC, 17, mat_to_src_c, no_late),
+        // 11. Matrix -> Matrix reading result as SrcC: 0 on full same-op & same-pass chain
+        //     (2 on 2-pass, 4 on 4x4 f64), pass-count-aware on cross-opcode / partial overlap.
+        dyn_rule(
+            mat(),
+            mat(),
+            Dep::ReadsAsSrcC,
+            max_src_c,
+            mat_to_src_c,
+            no_late,
+        ),
         // 12. XDL Matrix reading SrcC late -> VALU/VMEM/DS overwriting SrcC: p-1 wait states (0 on SMFMA/DGEMM).
         dyn_rule(
             mat(),
@@ -559,5 +659,22 @@ fn build_cdna3_rules() -> Vec<Rule> {
             Dep::WritesWideData,
             2,
         ),
-    ]
+    ];
+    if cdna4 {
+        // 14a. CDNA 4 Table 11 / `checkPermlaneHazards`: VALU writing VGPR -> V_PERMLANE* reading it: 2 states.
+        rules.push(rule(
+            valu(),
+            side(&[Kind::Valu], Flags::PERMLANE, Flags::NONE, &[]),
+            Dep::Raw,
+            2,
+        ));
+        // 14b. CDNA 4 Table 11 / `checkPermlaneHazards`: V_CMPX writing EXEC -> V_PERMLANE*: 4 states.
+        rules.push(rule(
+            side(&[Kind::Valu], Flags::CMPX, Flags::NONE, &[]),
+            side(&[Kind::Valu], Flags::PERMLANE, Flags::NONE, &[]),
+            Dep::None,
+            4,
+        ));
+    }
+    rules
 }
