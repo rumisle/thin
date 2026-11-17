@@ -253,7 +253,7 @@ fn build_fields(
             return value(format!("{mnemonic}: does not take cbsz or abid"));
         }
         if mf.sparse {
-            let max_abid = i128::from(mf.a.bits() / 4 - 1);
+            let max_abid = i128::from(mf.sparse_sets().saturating_sub(1));
             if !(0..=3).contains(&opts.cbsz) {
                 return value(format!(
                     "{mnemonic}: cbsz {} out of range (0..=3)",

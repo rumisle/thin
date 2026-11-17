@@ -141,6 +141,17 @@ impl MatrixForm {
             _ => (self.m * self.n * self.blocks * self.d.bits()) / (self.wave * 32),
         }
     }
+
+    /// Number of sparse index sets packed into the 32-bit `src2` VGPR (`0` if dense).
+    /// Each lane holds `elems_contig = (k / 2) / (wave / (m * blocks))` active `A`
+    /// elements (`2 * elems_contig` index bits), so one 32-bit VGPR holds `16 / elems_contig` sets.
+    pub const fn sparse_sets(&self) -> u32 {
+        if !self.sparse {
+            return 0;
+        }
+        let elems_contig = (self.k / 2) / (self.wave / (self.m * self.blocks));
+        16 / elems_contig
+    }
 }
 
 /// How a clock is read into a scalar pair.

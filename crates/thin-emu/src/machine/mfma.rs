@@ -143,7 +143,24 @@ fn input_loc(
     } else {
         (k_dim, k, b)
     };
-    let elems_contig = k_eff_dim / (64 / (outer * blocks));
+    let lane_groups = 64 / (outer * blocks);
+    let elems_contig = k_eff_dim / lane_groups;
+    if !is_k && bits <= 16 && elems_contig * bits == 256 {
+        // 8-VGPR narrow operands (CDNA 4 SMFMAC dense B and F8F6F4 FP8/BF8)
+        // stack two 4-VGPR (128-bit) K-halves: v0..v3 holds 0..k_eff_dim/2
+        // and v4..v7 holds k_eff_dim/2..k_eff_dim.
+        let half_k = k_eff_dim / 2;
+        let half_idx = k_eff / half_k;
+        let k_in_half = k_eff % half_k;
+        let elems_half = half_k / lane_groups;
+        let local = k_in_half % elems_half;
+        let lane = blgp_lane(
+            b_eff * outer + (k_in_half / elems_half) * (outer * blocks) + i,
+            blgp,
+        );
+        let tot_bits = local * bits;
+        return (4 * half_idx + tot_bits / 32, tot_bits % 32, lane);
+    }
     let local = k_eff % elems_contig;
     let lane = blgp_lane(
         b_eff * outer + (k_eff / elems_contig) * (outer * blocks) + i,
@@ -152,7 +169,7 @@ fn input_loc(
     if is_k {
         let mut slot = local;
         if cbsz == 0 {
-            slot += (64 * abid) / bits;
+            slot += elems_contig * abid;
         }
         (0, (slot / 2) * 4, lane)
     } else {
@@ -224,7 +241,7 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, a_bits: usize) -> u32 {
         return num::DNAN32;
     }
     let cv = f64::from(f32_of(c_bits));
-    let mut products = [0.0f64; 32];
+    let mut products = [0.0f64; 128];
     let n = av.len();
     let mut has_pos_inf = cv == f64::INFINITY;
     let mut has_neg_inf = cv == f64::NEG_INFINITY;
@@ -349,7 +366,7 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                 ins.text
             )));
         }
-        let max_sets = i128::from(form.a.bits() / 4);
+        let max_sets = i128::from(form.sparse_sets());
         if !(0..max_sets).contains(&abid_i) {
             return Err(limit(format!(
                 "{}: abid {abid_i} out of range 0..{}",

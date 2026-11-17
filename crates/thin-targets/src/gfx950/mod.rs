@@ -102,7 +102,89 @@ static MATRIX: [&str; 68] = [
 /// CDNA 4 matrix form table (`provisional: true`, derived from the CDNA 4 ISA manual
 /// without MI350X/MI355X silicon confirmation; OCP `e4m3fn`/`e5m2` FP8/BF8).
 fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
-    cdna::common_mfma_form(mnemonic, false, true)
+    if let Some(mf) = cdna::common_mfma_form(mnemonic, false, true) {
+        return Some(mf);
+    }
+    use thin_target::{Elem::*, Summation};
+    if let Some(rest) = mnemonic.strip_prefix("v_mfma_") {
+        let (d, a, b, m, n, k, passes) = match rest {
+            "f32_16x16x32_bf16" => (F32, Bf16, Bf16, 16, 16, 32, 4),
+            "f32_16x16x32_f16" => (F32, F16, F16, 16, 16, 32, 4),
+            "f32_32x32x16_bf16" => (F32, Bf16, Bf16, 32, 32, 16, 8),
+            "f32_32x32x16_f16" => (F32, F16, F16, 32, 32, 16, 8),
+            "i32_16x16x64_i8" => (I32, I8, I8, 16, 16, 64, 4),
+            "i32_32x32x32_i8" => (I32, I8, I8, 32, 32, 32, 8),
+            _ => return None,
+        };
+        let sum = if d.integer() {
+            Summation::Ordered
+        } else {
+            Summation::Grouped {
+                group_half: 8,
+                group_byte: 16,
+                fraction: 24,
+            }
+        };
+        return Some(MatrixForm {
+            a,
+            b,
+            d,
+            m,
+            n,
+            k,
+            blocks: 1,
+            wave: 64,
+            passes,
+            sparse: false,
+            cbsz_abid: false,
+            blgp: false,
+            sum,
+            provisional: true,
+        });
+    }
+    let rest = mnemonic.strip_prefix("v_smfmac_")?;
+    let (d, a, b, m, n, k, passes) = match rest {
+        "f32_16x16x64_bf16" => (F32, Bf16, Bf16, 16, 16, 64, 4),
+        "f32_16x16x64_f16" => (F32, F16, F16, 16, 16, 64, 4),
+        "f32_32x32x32_bf16" => (F32, Bf16, Bf16, 32, 32, 32, 8),
+        "f32_32x32x32_f16" => (F32, F16, F16, 32, 32, 32, 8),
+        "f32_16x16x128_bf8_bf8" => (F32, Bf8, Bf8, 16, 16, 128, 4),
+        "f32_16x16x128_bf8_fp8" => (F32, Bf8, Fp8, 16, 16, 128, 4),
+        "f32_16x16x128_fp8_bf8" => (F32, Fp8, Bf8, 16, 16, 128, 4),
+        "f32_16x16x128_fp8_fp8" => (F32, Fp8, Fp8, 16, 16, 128, 4),
+        "f32_32x32x64_bf8_bf8" => (F32, Bf8, Bf8, 32, 32, 64, 8),
+        "f32_32x32x64_bf8_fp8" => (F32, Bf8, Fp8, 32, 32, 64, 8),
+        "f32_32x32x64_fp8_bf8" => (F32, Fp8, Bf8, 32, 32, 64, 8),
+        "f32_32x32x64_fp8_fp8" => (F32, Fp8, Fp8, 32, 32, 64, 8),
+        "i32_16x16x128_i8" => (I32, I8, I8, 16, 16, 128, 4),
+        "i32_32x32x64_i8" => (I32, I8, I8, 32, 32, 64, 8),
+        _ => return None,
+    };
+    let sum = if d.integer() {
+        Summation::Ordered
+    } else {
+        Summation::Grouped {
+            group_half: 8,
+            group_byte: 16,
+            fraction: 24,
+        }
+    };
+    Some(MatrixForm {
+        a,
+        b,
+        d,
+        m,
+        n,
+        k,
+        blocks: 1,
+        wave: 64,
+        passes,
+        sparse: true,
+        cbsz_abid: true,
+        blgp: false,
+        sum,
+        provisional: true,
+    })
 }
 
 /// Variable tuple widths on `*_f8f6f4` MFMA `src0` (slot 1, selected by `cbsz`)
