@@ -4,7 +4,7 @@
 
 thin is a Python DSL for writing AMD GPU kernels at the instruction level, with an emulator that models the hardware exactly.
 
-thin currently supports **gfx1201** (RDNA 4) and **gfx942** (CDNA 3 / Instinct MI300X).
+thin currently supports **gfx1201** (RDNA 4), **gfx942** (CDNA 3 / Instinct MI300X), and **gfx950** (CDNA 4 / Instinct MI350X & MI355X; offline-verified against AMD ISA XML, LLVM 22, and the CDNA 4 ISA manual, awaiting silicon confirmation).
 
 ## Install
 
@@ -52,7 +52,7 @@ assert np.array_equal(z, x + y)
 ```
 
 `emulate()` runs the kernel on the CPU, on numpy arrays. On a supported AMD GPU
-(`gfx1201` or `gfx942`), bind torch tensors and call `run()`:
+(`gfx1201`, `gfx942`, or `gfx950`), bind torch tensors and call `run()`:
 
 ```python
 import torch
@@ -81,6 +81,17 @@ to LDS DMA (`O.global_load(tile, ...)` / `O.buffer_load(tile, ...)`), GFX9 DPP
 broadcasts and wave shifts, packed `v_pk_*_f32` ops, and the 32-bank LDS
 conflict model.
 
+On `gfx950` (CDNA 4 / MI350X & MI355X), thin adds 128-bit `ENC_VOP3PX2`
+encoding/decoding, doubled-K dense `v_mfma_*` and sparse `v_smfmac_*` shapes,
+mixed-precision `v_mfma_f32_*_f8f6f4` (`b.mfma(..., fmt_a=..., fmt_b=...)`),
+MX E8M0 block-scaled `v_mfma_scale_f32_*_f8f6f4` (`b.mfma_scale`), OCP MX
+element formats (`e4m3fn`, `e5m2`, `e2m3`, `e3m2`, `e2m1`, `e8m0`),
+`v_cvt_scalef32_*` / stochastic-rounding conversions / `v_prng_b32`, transpose
+LDS reads (`O.ds_read_tr`), 96/128-bit direct-to-LDS DMA (`bytes=12 | 16`), the
+160 KB / 64-bank LDS model, and CDNA 4 wait-state hazards. New CDNA 4 matrix
+layouts and numerics are derived from the ISA manual (`provisional=True`) until
+validated on MI350X/MI355X hardware.
+
 ## Development
 
 With pip:
@@ -98,9 +109,9 @@ With uv:
 
 The first build compiles the Rust core; after that, a Rust edit rebuilds
 the extension in about a second (with pip, run `pip install -e .` again).
-Hardware tests run per target: `pytest -m gfx1201` on RDNA 4, or
-`pytest -m gfx942` on Instinct MI300X. The timing harness, `metron`, lives in
-`python/metron`.
+Hardware tests run per target: `pytest -m gfx1201` on RDNA 4,
+`pytest -m gfx942` on Instinct MI300X, or `pytest -m gfx950` on Instinct
+MI350X/MI355X. The timing harness, `metron`, lives in `python/metron`.
 
 Documentation is in [docs/](https://github.com/rumisle/thin/tree/main/docs).
 

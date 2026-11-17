@@ -7,6 +7,15 @@ Hardware suites run per target:
 - **CDNA 3 (`gfx942`)**: validated on an Instinct MI300X VF (304 CUs across
   8 XCDs in SPX partition, 192 GB HBM3) with ROCm 10.1 (`pytest -m gfx942`, see
   `tests/hw/test_gfx942_hw.py`).
+- **CDNA 4 (`gfx950`)**: **awaiting Instinct MI350X / MI355X silicon**.
+  Encoding/decoding (including 128-bit `ENC_VOP3PX2` and `EF_AMDGPU_MACH = 0x4F`
+  `e_flags = 0x54F`), instruction tables (`amdgpu_isa_cdna4.xml`, 1,242
+  instructions), OCP MX formats (`ml_dtypes`), and `Cdna4Model` hazards (`llc
+  -mcpu=gfx950`) are verified offline; derived CDNA 4 MFMA/F8F6F4/MX-scale/SMFMAC
+  layouts and numerics (`provisional = True`), stochastic rounding edge cases,
+  `ds_read_*_tr_*` lane mappings, `dwordx3` LDS DMA skipping dword 3, and 160 KB /
+  64-bank LDS behavior have a pre-built, CPU-preflighted probe suite ready in
+  `tests/hw/test_gfx950_hw.py` (`pytest -m gfx950`).
 
 Tests explicitly select the matching GPU, enter `targeting(<arch>)`, and skip
 cleanly when that GPU is absent.
@@ -15,6 +24,7 @@ cleanly when that GPU is absent.
 uv sync
 uv run pytest -m gfx1201   # on RDNA 4
 uv run pytest -m gfx942    # on MI300X / CDNA 3
+uv run pytest -m gfx950    # on MI350X or MI355X / CDNA 4
 ```
 
 Rebuild the extension after pulling Rust changes. Tests are held to
