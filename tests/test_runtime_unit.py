@@ -774,12 +774,14 @@ def test_the_examples_read_nothing_outside_their_folder():
         f"""
         import sys
         sys.path.insert(0, {ROOT!r})
-        import examples.gfx942.gemm_bf16, examples.vadd, examples.vadd_op
+        import examples.gfx942.gemm_bf16, examples.gfx950.gemm_bf16, examples.vadd, examples.vadd_op
         from thin import codegen
         from thin.target import targeting
         codegen.code_object(examples.vadd.build_vadd().compile().text)
         with targeting("gfx942"):
             codegen.code_object(examples.gfx942.gemm_bf16.build_gemm_bf16(2048).compile().text)
+        with targeting("gfx950"):
+            codegen.code_object(examples.gfx950.gemm_bf16.build_gemm_bf16(1024).compile().text)
         """
     )
     assert packages.outside(code, hashed, versions) == set()
