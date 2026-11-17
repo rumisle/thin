@@ -279,12 +279,12 @@ fn allocated_vgprs(py: Python<'_>, name: &str, vgpr: u32, agpr: u32) -> PyResult
     Ok(get(py, name)?.allocated_vgprs(vgpr, agpr))
 }
 
-/// A matrix form as Python receives it: `(a, b, d, (m, n, k, blocks, wave, passes), (sparse, scaled, cbsz_abid, blgp, provisional), (da, db, dc, dd))`.
+/// A matrix form as Python receives it: `(a, b, d, (m, n, k, blocks, wave, passes, scale_block), (sparse, scaled, cbsz_abid, blgp, provisional), (da, db, dc, dd))`.
 type MatrixRow = (
     &'static str,
     &'static str,
     &'static str,
-    (u32, u32, u32, u32, u32, u32),
+    (u32, u32, u32, u32, u32, u32, u32),
     (bool, bool, bool, bool, bool),
     (u32, u32, u32, u32),
 );
@@ -298,11 +298,25 @@ fn target_matrix_form(py: Python<'_>, name: &str, mnemonic: &str) -> PyResult<Op
             m.a.name(),
             m.b.name(),
             m.d.name(),
-            (m.m, m.n, m.k, m.blocks, m.wave, m.passes),
+            (m.m, m.n, m.k, m.blocks, m.wave, m.passes, m.scale_block()),
             (m.sparse, m.scaled, m.cbsz_abid, m.blgp, m.provisional),
             (m.dwords('a'), m.dwords('b'), m.dwords('c'), m.dwords('d')),
         )
     }))
+}
+
+/// Dwords per lane of `operand` (`'a'`, `'b'`, `'c'`, `'d'`, `'k'`, `'s'`) after `F8F6F4` resolution.
+#[pyfunction]
+fn target_matrix_operand_dwords(
+    py: Python<'_>,
+    name: &str,
+    mnemonic: &str,
+    operand: char,
+    cbsz: u32,
+    blgp: u32,
+) -> PyResult<Option<u32>> {
+    let mf = get(py, name)?.matrix_form(mnemonic);
+    Ok(mf.and_then(|m| m.operand_dwords(operand, cbsz, blgp)))
 }
 
 /// Adds this module's functions to `thin._native`.
@@ -321,6 +335,7 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
         wrap_pyfunction!(returning, m)?,
         wrap_pyfunction!(allocated_vgprs, m)?,
         wrap_pyfunction!(target_matrix_form, m)?,
+        wrap_pyfunction!(target_matrix_operand_dwords, m)?,
     ] {
         m.add_function(function)?;
     }

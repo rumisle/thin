@@ -158,6 +158,7 @@ class MatrixForm:
     """A hardware matrix-multiply-accumulate instruction's shape and operand layout."""
 
     __slots__ = (
+        "_target",
         "a",
         "b",
         "blgp",
@@ -171,18 +172,31 @@ class MatrixForm:
         "n",
         "passes",
         "provisional",
+        "scale_block",
         "scaled",
         "sparse",
         "wave",
     )
 
-    def __init__(self, mnemonic: str, row):
+    def __init__(self, target_name: str, mnemonic: str, row):
         a, b, d, dims, flags, dw = row
+        self._target = target_name
         self.mnemonic = mnemonic
         self.a, self.b, self.d = a, b, d
-        self.m, self.n, self.k, self.blocks, self.wave, self.passes = dims
+        self.m, self.n, self.k, self.blocks, self.wave, self.passes, self.scale_block = dims
         self.sparse, self.scaled, self.cbsz_abid, self.blgp, self.provisional = flags
         self.dwords = MappingProxyType({"a": dw[0], "b": dw[1], "c": dw[2], "d": dw[3]})
+
+    def operand_dwords(self, operand: str, cbsz: int = 0, blgp: int = 0) -> int:
+        """Dwords per lane of ``operand`` after resolving ``f8f6f4`` format codes."""
+        if len(operand) != 1:
+            raise ValueError(f"operand={operand!r}: expected 'a', 'b', 'c', 'd', 'k', or 's'")
+        n = _native.target_matrix_operand_dwords(self._target, self.mnemonic, operand, cbsz, blgp)
+        if n is None:
+            raise ValueError(
+                f"{self.mnemonic}: invalid f8f6f4 format code (cbsz={cbsz}, blgp={blgp})"
+            )
+        return n
 
     def __repr__(self) -> str:
         return f"MatrixForm({self.mnemonic}, {self.m}x{self.n}x{self.k})"
@@ -221,7 +235,7 @@ class Target:
     def matrix_form(self, mnemonic: str) -> MatrixForm | None:
         """The matrix form of a mnemonic, or None if not modelled."""
         row = _native.target_matrix_form(self.name, mnemonic)
-        return None if row is None else MatrixForm(mnemonic, row)
+        return None if row is None else MatrixForm(self.name, mnemonic, row)
 
     def spell(self, op: str) -> str:
         """The mnemonic of a dotted op; ValueError when the target has none."""

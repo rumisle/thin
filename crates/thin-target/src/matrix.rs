@@ -202,6 +202,15 @@ impl MatrixForm {
         let elems_contig = (self.k / 2) / (self.wave / (self.m * self.blocks));
         16 / elems_contig
     }
+
+    /// Reduction block size per E8M0 scale byte (`32` on OCP MX-scaled forms, `0` when unscaled).
+    pub const fn scale_block(&self) -> u32 {
+        if self.scaled {
+            32
+        } else {
+            0
+        }
+    }
 }
 
 /// How a clock is read into a scalar pair.

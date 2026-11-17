@@ -688,6 +688,8 @@ class Builder:
         acc: str | None = None,
         agpr: bool | None = None,
         name: str | None = None,
+        fmt_a: str | None = None,
+        fmt_b: str | None = None,
         cbsz: int = 0,
         abid: int = 0,
         blgp: int = 0,
@@ -702,8 +704,51 @@ class Builder:
         c_arg = None if c is None else operand(c)
         dst_in = None if dst is None else _acc_in(dst)
         cfg = (c_arg, c_acc, dst_in, acc, agpr, name, list(abl))
-        opts = _mfma_opts(cbsz, abid, blgp, neg, comment, tag, ())
+        opts = _mfma_opts(cbsz, abid, blgp, fmt_a, fmt_b, 0, 0, neg, comment, tag, ())
         return typed(_native.builder_mfma(self._n, form, operand(a), operand(b), cfg, opts))
+
+    def mfma_scale(
+        self,
+        form: str,
+        a,
+        b,
+        scale_a,
+        scale_b,
+        c=0,
+        *,
+        dst=None,
+        acc: str | None = None,
+        agpr: bool | None = None,
+        name: str | None = None,
+        fmt_a: str | None = None,
+        fmt_b: str | None = None,
+        cbsz: int = 0,
+        blgp: int = 0,
+        sel_a: int = 0,
+        sel_b: int = 0,
+        comment: str = "",
+        tag=(),
+        abl=(),
+    ) -> TypedValue:
+        """Emits an MX-scaled ``v_mfma_scale_*`` instruction and returns the accumulator."""
+        self._at()
+        c_acc = _maybe_acc_in(c)
+        c_arg = None if c is None else operand(c)
+        dst_in = None if dst is None else _acc_in(dst)
+        cfg = (c_arg, c_acc, dst_in, acc, agpr, name, list(abl))
+        opts = _mfma_opts(cbsz, 0, blgp, fmt_a, fmt_b, sel_a, sel_b, None, comment, tag, ())
+        return typed(
+            _native.builder_mfma_scale(
+                self._n,
+                form,
+                operand(a),
+                operand(b),
+                operand(scale_a),
+                operand(scale_b),
+                cfg,
+                opts,
+            )
+        )
 
     def smfmac(
         self,
@@ -723,7 +768,7 @@ class Builder:
     ) -> TypedValue:
         """Emits a sparse 4:2 SMFMAC instruction updating ``c`` in-place."""
         self._at()
-        opts = _mfma_opts(cbsz, abid, 0, None, comment, tag, ())
+        opts = _mfma_opts(cbsz, abid, 0, None, None, 0, 0, None, comment, tag, ())
         return typed(
             _native.builder_smfmac(
                 self._n,

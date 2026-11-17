@@ -1318,3 +1318,231 @@ def test_gfx950_cdna4_hazards_in_compiled_kernel():
     assert mid == ["s_nop 3"]
     pos, mid = between("v_cvt_scalef32_sr_pk_fp4_f32", "v_add_u32", pos)
     assert mid == ["s_nop 0"]
+
+
+def test_gfx950_dsl_mfma_scale_transpose_read_and_wide_dma():
+    """DSL builders support f8f6f4 formats, b.mfma_scale, O.ds_read_tr, and wide 12/16B LDS DMA."""
+    import thin
+    from thin import formats
+    from thin.dsl import Builder, O
+    from thin.ir import MemError
+    from thin.target import target, targeting
+
+    t950 = target("gfx950")
+    mf_sc = t950.matrix_form("v_mfma_scale_f32_16x16x128_f8f6f4")
+    mf_un = t950.matrix_form("v_mfma_f32_16x16x128_f8f6f4")
+    assert mf_sc is not None and mf_un is not None
+    assert mf_sc.scale_block == 32 and mf_un.scale_block == 0
+    assert [mf_sc.operand_dwords("a", cbsz=c) for c in range(5)] == [8, 8, 6, 6, 4]
+    assert [mf_sc.operand_dwords("b", blgp=c) for c in range(5)] == [8, 8, 6, 6, 4]
+    assert mf_sc.operand_dwords("s") == 1
+
+    # 1) End-to-end DSL MXFP4 tile kernel: wide 16B global-to-LDS DMA -> transpose `ds_read_tr` ->
+    #    `b.mfma_scale` with `fmt_a="fp4", fmt_b="fp4", sel_a=1, sel_b=2`, verified on emulator!
+    rng = np.random.default_rng(95010)
+    a_f32 = rng.choice([-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 4.0], size=(16, 128)).astype(
+        np.float32
+    )
+    b_f32 = rng.choice([-2.0, -1.0, -0.5, 0.0, 0.5, 1.0, 2.0, 4.0], size=(128, 16)).astype(
+        np.float32
+    )
+    # Per-block E8M0 scales: 4 blocks along K=128 (`k_blk in 0..4`).
+    # Put A scales in byte 1 (`sel_a=1`) and B scales in byte 2 (`sel_b=2`) of each scale VGPR!
+    exp_a = rng.integers(126, 130, size=(4, 16), dtype=np.uint32)  # 2^{-1} .. 2^2
+    exp_b = rng.integers(126, 130, size=(4, 16), dtype=np.uint32)
+    sa_lanes = (exp_a.reshape(64) << 8).astype(np.uint32)
+    sb_lanes = (exp_b.reshape(64) << 16).astype(np.uint32)
+
+    # Pack 16x128 -> col-major 128x16 so each K-column is 16 FP4 = 8 B (2 cols = 16 B/lane).
+    # `ds_read_b64_tr_b4` transposes a 16x16 subtile; two reads fill K=[0..64) and K=[64..128).
+    def pack_col_major_fp4(mat_16x128: np.ndarray) -> np.ndarray:
+        # Store 16-K chunks in `[0, 2, 1, 3, 4, 6, 5, 7]` order so half-wave `row=0,1`
+        # hits disjoint 128B halves (`banks 0..31` and `32..63`) -> ZERO bank conflicts!
+        col_major = np.ascontiguousarray(mat_16x128.T.reshape(2, 2, 2, 16, 16).swapaxes(1, 2))
+        codes = formats.encode(col_major.reshape(-1), formats.DTYPES["e2m1"], saturate=True, nan=0)
+        lo = codes[0::2] & 0xF
+        hi = (codes[1::2] & 0xF) << 4
+        return (lo | hi).view(np.uint32)  # 256 dwords = 1024 bytes = 64 lanes * 16 bytes!
+
+    a_packed = pack_col_major_fp4(a_f32)  # (256,) uint32 = 1024 B
+    b_packed = pack_col_major_fp4(b_f32.T)  # B is (K=128, N=16) -> B.T is (N=16, K=128), 1024 B!
+
+    # Reference MX-scaled result:
+    a_scaled = a_f32.astype(np.float64).copy()
+    b_scaled = b_f32.astype(np.float64).copy()
+    for kb in range(4):
+        s_a = np.ldexp(1.0, exp_a[kb].astype(np.int32) - 127)[:, None]  # (16, 1)
+        s_b = np.ldexp(1.0, exp_b[kb].astype(np.int32) - 127)[None, :]  # (1, 16)
+        a_scaled[:, kb * 32 : (kb + 1) * 32] *= s_a
+        b_scaled[kb * 32 : (kb + 1) * 32, :] *= s_b
+    ref_c = (a_scaled @ b_scaled).astype(np.float32)
+
+    def make_mxfp4_dsl_kernel():
+        from thin import KernelDef
+        from thin.dsl import Args, O, ptr
+
+        def body(b, k):
+            V = b.v  # noqa: N806
+            p_a, p_b, p_sa, p_sb, p_c = k.load()
+            lds = b.lds()
+            lds_a = lds.region("lds_a", nbytes=1024, align=16)
+            lds_b = lds.region("lds_b", nbytes=1024, align=16)
+
+            lane = V.u32(k.tid, name="lane")
+            # Wide 16-byte global-to-LDS DMA: 64 lanes * 16 B = 1024 B per matrix!
+            b.emit(O.global_load(lds_a, V.u32(lane * 16), p_a, bytes=16))
+            b.emit(O.global_load(lds_b, V.u32(lane * 16), p_b, bytes=16))
+            sa = V.u32()
+            sb = V.u32()
+            b.emit(O.global_load(sa, V.u32(lane * 4), p_sa))
+            b.emit(O.global_load(sb, V.u32(lane * 4), p_sb))
+            b.wait(lds_a, lds_b, sa, sb, comment="tiles + scales ready")
+
+            # Transpose LDS reads (`ds_read_b64_tr_b4`): half-wave lanes 0..31 read contiguous
+            # 0..256 B (64 distinct banks, zero conflicts!); +256 B reads the second 16-K half!
+            tr_off = V.u32(((lane >> 5) * 64 + ((lane >> 4) & 1) * 16 + (lane & 15)) * 8)
+
+            a_frag = V.u32(n=4)
+            b_frag = V.u32(n=4)
+            b.emit(O.ds_read_tr(a_frag[:2], lds_a + tr_off, "fp4"))
+            b.emit(O.ds_read(a_frag[2:], lds_a + tr_off, offset=256, tr=4))
+            b.emit(O.ds_read_tr(b_frag[:2], lds_b + tr_off, 4))
+            b.emit(O.ds_read_tr(b_frag[2:], lds_b + tr_off, "b4", offset=256))
+            b.wait(a_frag, b_frag, comment="transposed fragments ready")
+
+            acc = b.mfma_acc("scale_f32_16x16x128_f8f6f4", 0)
+            b.mfma_scale(
+                "f32_16x16x128_f8f6f4",
+                a_frag,
+                b_frag,
+                sa,
+                sb,
+                acc,
+                dst=acc,
+                fmt_a="fp4",
+                fmt_b="e2m1",
+                sel_a=1,
+                sel_b=2,
+            )
+            c_out = b.read_acc(acc)
+            # 16x16 f32 output: col = `lane & 15`, rows = `4*(lane>>4) + d`.
+            col = V.u32(lane & 15)
+            row0 = V.u32((lane >> 4) * 4)
+            for d in range(4):
+                elem_idx = V.u32((row0 + d) * 16 + col)
+                b.emit(O.global_store(V.u32(elem_idx * 4), c_out[d], p_c))
+
+        return KernelDef(
+            "mxfp4_dsl_gemm16",
+            Args(p_a=ptr, p_b=ptr, p_sa=ptr, p_sb=ptr, p_c=ptr),
+            body,
+            wgsize=64,
+            max_grid=(1,),
+        )
+
+    with targeting("gfx950"):
+        kern = thin.compile(make_mxfp4_dsl_kernel)
+        assert "global_load_lds_dwordx4" in kern.asm
+        assert "ds_read_b64_tr_b4" in kern.asm
+        assert "v_mfma_scale_f32_16x16x128_f8f6f4" in kern.asm
+        assert "op_sel:[1,0,0]" in kern.asm and "op_sel_hi:[0,1,0]" in kern.asm
+        assert "cbsz:4" in kern.asm and "blgp:4" in kern.asm
+
+    c_got = np.zeros((16, 16), dtype=np.float32)
+    kern.bind(
+        (1,),
+        {
+            "p_a": a_packed,
+            "p_b": b_packed,
+            "p_sa": sa_lanes,
+            "p_sb": sb_lanes,
+            "p_c": c_got.reshape(-1),
+        },
+    ).emulate()
+    np.testing.assert_allclose(c_got, ref_c, rtol=0, atol=0)
+
+    # 2) Multi-wave wide 16-byte DMA race check (`64 * 16 = 1024` B per wave -> stride 256 races!).
+    def make_wide_dma_race():
+        from thin import KernelDef
+        from thin.dsl import Args, O, ptr
+
+        def body(b, k):
+            src, _ = k.load()
+            tile = b.lds().region("tile", nbytes=2048, align=16)
+            b.emit(O.global_load(tile + k.wave * 256, b.v.u32(k.tid * 16), src, bytes=16))
+            b.wait(tile, "landed")
+            b.barrier("done")
+
+        return KernelDef("wide_dma_race", Args(src=ptr, out=ptr), body, wgsize=128, max_grid=(1,))
+
+    with targeting("gfx950"), pytest.raises(MemError, match="may touch the same bytes"):
+        thin.compile(make_wide_dma_race)
+
+    # 3) Builder & Maker coverage for FP6 (`b96_tr_b6` + 12B buffer DMA) and clean refusals.
+    with targeting("gfx950"):
+        b = Builder()
+        v6 = b.v.u32(n=6)
+        v8 = b.v.u32(n=8)
+        v3 = b.v.u32(n=3)
+        v2 = b.v.u32(n=2)
+        v1 = b.v.u32()
+        a4 = b.a.f32(n=4)
+        s4 = b.s.u32(n=4)
+        s1 = b.s.u32()
+        lds = b.lds()
+        reg_b6 = lds.region("reg_b6", nbytes=1024, align=16)
+
+        # 12-byte buffer DMA (`buffer_load_dwordx3 ... lds`) and `ds_read_b96_tr_b6` (3 dwords):
+        b.emit(O.buffer_load(reg_b6, v1, s4, bytes=12))
+        b.emit(O.ds_read_tr(v3, reg_b6 + v1, "fp6"))
+        # Mixed FP6 x BF8 `b.mfma` (6 x 8 dwords -> `cbsz:2 blgp:1`) and `O.mfma_scale`:
+        acc = b.mfma("f32_16x16x128_f8f6f4", v6, v8, 0, fmt_a="fp6", fmt_b="bf8")
+        ins_sc = O.mfma_scale(
+            "f32_16x16x128_f8f6f4",
+            acc,
+            v6,
+            v6,
+            v1,
+            v1,
+            fmt_a="e2m3",
+            fmt_b="e3m2",
+            sel_a=3,
+            sel_b=0,
+        )
+        assert ins_sc.op == "v_mfma_scale_f32_16x16x128_f8f6f4"
+
+        # Validation refusals on gfx950:
+        with pytest.raises(ValueError, match="MX-scaled matrix op — use mfma_scale"):
+            O.mfma("scale_f32_16x16x128_f8f6f4", a4, v8, v8, a4)
+        with pytest.raises(ValueError, match="disagree"):
+            O.mfma("f32_16x16x128_f8f6f4", a4, v6, v8, a4, fmt_a="fp6", cbsz=4)
+        with pytest.raises(ValueError, match="does not take abid"):
+            O.mfma("f32_16x16x128_f8f6f4", a4, v8, v8, a4, abid=1)
+        with pytest.raises(ValueError, match="form takes 4"):
+            O.mfma("f32_16x16x128_f8f6f4", a4, v8, v8, a4, fmt_a="fp4")
+        with pytest.raises(ValueError, match="takes 'v' \\(VGPR\\)"):
+            O.mfma_scale("f32_16x16x128_f8f6f4", a4, v8, v8, s1, v1, a4)
+        with pytest.raises(ValueError, match="sel_a 4 out of range"):
+            O.mfma_scale("f32_16x16x128_f8f6f4", a4, v8, v8, v1, v1, a4, sel_a=4)
+        with pytest.raises(ValueError, match="6-bit transpose read takes 3 dwords"):
+            O.ds_read_tr(v2, v1, 6)
+        with pytest.raises(ValueError, match="bytes=8: 1, 2, 4, 12, or 16"):
+            O.global_load(reg_b6, v1, bytes=8)
+
+    # Target capability refusals on gfx942 (CDNA 3):
+    with targeting("gfx942"):
+        b942 = Builder()
+        v2_942 = b942.v.u32(n=2)
+        v8_942 = b942.v.u32(n=8)
+        v1_942 = b942.v.u32()
+        a4_942 = b942.a.f32(n=4)
+        s4_942 = b942.s.u32(n=4)
+        tile942 = b942.lds().region("t", nbytes=1024, align=16)
+        with pytest.raises(ValueError, match="has no such MX-scaled MFMA form"):
+            O.mfma_scale("f32_16x16x128_f8f6f4", a4_942, v8_942, v8_942, v1_942, v1_942, a4_942)
+        with pytest.raises(ValueError, match="has no transpose LDS read"):
+            O.ds_read_tr(v2_942, v1_942, 16)
+        with pytest.raises(ValueError, match="has no global-to-LDS DMA"):
+            O.global_load(tile942, v1_942, bytes=16)
+        with pytest.raises(ValueError, match="has no buffer-to-LDS DMA"):
+            O.buffer_load(tile942, v1_942, s4_942, bytes=16)

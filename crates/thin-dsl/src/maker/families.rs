@@ -293,7 +293,7 @@ pub fn buffer(
     buffer_op(c, &name, store, data, voffset, desc, soffset, o).map(Family::Made)
 }
 
-/// Width word for a 1-dword or sub-dword VMEM-to-LDS DMA.
+/// Width word for a VMEM-to-LDS DMA (`1`, `2`, `4`, `12`, or `16` bytes per lane).
 fn dma_width(fam: &str, o: &Opts) -> Result<String> {
     match &o.bytes {
         Some(Ok(b @ (1 | 2))) => {
@@ -304,12 +304,16 @@ fn dma_width(fam: &str, o: &Opts) -> Result<String> {
                 format!("u{bits}")
             })
         }
-        Some(Ok(b)) => value(format!(
-            "{fam}: bytes={b}: 1 or 2 (a whole dword: no bytes=)"
-        )),
-        Some(Err(r)) => value(format!(
-            "{fam}: bytes={r}: 1 or 2 (a whole dword: no bytes=)"
-        )),
+        Some(Ok(b @ (4 | 12 | 16))) => {
+            if o.signed {
+                return value(format!(
+                    "{fam}: signed= is a 1- or 2-byte load's (bytes=1 or 2)"
+                ));
+            }
+            Ok(format!("b{}", b * 8))
+        }
+        Some(Ok(b)) => value(format!("{fam}: bytes={b}: 1, 2, 4, 12, or 16")),
+        Some(Err(r)) => value(format!("{fam}: bytes={r}: 1, 2, 4, 12, or 16")),
         None if o.signed => value(format!(
             "{fam}: signed= is a 1- or 2-byte load's (bytes=1 or 2)"
         )),
@@ -374,9 +378,9 @@ fn buffer_dma(
 }
 
 /// A memory family by name: `s_load`, `s_store`, `global_load`,
-/// `global_store`, `buffer_load`, `buffer_store`, `ds_read`, `ds_write`;
-/// `xs` its operands after the data in the table's order (a scalar's and
-/// an LDS access's offset last).
+/// `global_store`, `buffer_load`, `buffer_store`, `ds_read`, `ds_read_tr`,
+/// `ds_write`; `xs` its operands after the data in the table's order (a
+/// scalar's and an LDS access's offset last).
 pub fn family(c: &Ctx<'_>, name: &str, data: Val, xs: Vec<Val>, o: Opts) -> Result<Family> {
     let store = name.ends_with("store") || name == "ds_write";
     let at = |k: usize| xs.get(k).cloned().unwrap_or(Val::None);
@@ -392,6 +396,7 @@ pub fn family(c: &Ctx<'_>, name: &str, data: Val, xs: Vec<Val>, o: Opts) -> Resu
             "s_load" | "s_store" => scalar(c, store, data, at(0), Opts { offset: at(1), ..o }),
             "global_load" | "global_store" => global(c, store, data, at(0), at(1), o),
             "buffer_load" | "buffer_store" => buffer(c, store, data, at(0), at(1), at(2), o),
+            "ds_read_tr" => ds_read_tr(c, data, at(0), at(1), Opts { offset: at(2), ..o }),
             _ => ds(c, store, data, at(0), Opts { offset: at(1), ..o }),
         },
         _ => value(format!("{name}: expected a register or an LDS address")),
@@ -514,6 +519,73 @@ pub fn ds(c: &Ctx<'_>, store: bool, data: &Reg, addr: Val, o: Opts) -> Result<Fa
         fields.push(("ordered".into(), FArg::Str(o.ordered.clone())));
     }
     op(c, &name, args, fields, notes(&o)).map(Family::Made)
+}
+
+/// `ds_read_tr(dst, addr, elem_bits, offset)`: transpose LDS read (`ds.load.b64.tr.b{4,8,16}`
+/// or `ds.load.b96.tr.b6`).
+pub fn ds_read_tr(
+    c: &Ctx<'_>,
+    data: &Reg,
+    addr: Val,
+    elem_bits: Val,
+    o: Opts,
+) -> Result<Family> {
+    let bits = match elem_bits {
+        Val::Int(v) => v,
+        Val::Str(s) => match s.trim().to_ascii_lowercase().as_str() {
+            "b4" | "fp4" | "e2m1" | "e2m1fn" => 4,
+            "b6" | "fp6" | "bf6" | "e2m3" | "e2m3fn" | "e3m2" | "e3m2fn" => 6,
+            "b8" | "fp8" | "bf8" | "e4m3" | "e4m3fn" | "e5m2" | "i8" | "u8" => 8,
+            "b16" | "f16" | "bf16" | "i16" | "u16" => 16,
+            _ => {
+                return value(format!(
+                    "ds_read_tr: element format {}: expected 4, 6, 8, or 16 bits (or 'b4'/'b6'/'b8'/'b16')",
+                    super::py_repr(&s)
+                ))
+            }
+        },
+        _ => {
+            return value(
+                "ds_read_tr: element bits must be 4, 6, 8, or 16 (or 'b4'/'b6'/'b8'/'b16')",
+            )
+        }
+    };
+    let (name, expected_dwords) = match bits {
+        4 => ("ds.load.b64.tr.b4", 2u32),
+        6 => ("ds.load.b96.tr.b6", 3u32),
+        8 => ("ds.load.b64.tr.b8", 2u32),
+        16 => ("ds.load.b64.tr.b16", 2u32),
+        _ => {
+            return value(format!(
+                "ds_read_tr: element bits {bits}: expected 4, 6, 8, or 16"
+            ))
+        }
+    };
+    if c.t.spell(name).is_none() {
+        return value(format!(
+            "ds_read_tr ({name}): {} has no transpose LDS read",
+            c.t.name()
+        ));
+    }
+    if data.n != expected_dwords {
+        let repr = crate::values::reg_repr(c.values, data);
+        return value(format!(
+            "ds_read_tr ({name}): {repr} is {} dword(s); {bits}-bit transpose read takes {expected_dwords} dwords",
+            data.n
+        ));
+    }
+    let mut fields = offset_field(&o);
+    if matches!(addr, Val::Addr(_)) && !o.ordered.is_empty() {
+        fields.push(("ordered".into(), FArg::Str(o.ordered.clone())));
+    }
+    op(
+        c,
+        name,
+        vec![Arg::Reg(*data, 0), addr.arg()],
+        fields,
+        notes(&o),
+    )
+    .map(Family::Made)
 }
 
 /// The native stage an instruction carries.

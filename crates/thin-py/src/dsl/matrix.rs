@@ -17,6 +17,10 @@ type MfmaOptsIn<'py> = (
     i128,
     i128,
     i128,
+    Option<String>,
+    Option<String>,
+    i128,
+    i128,
     Option<Vec<i128>>,
     String,
     Option<Bound<'py, PyAny>>,
@@ -24,11 +28,15 @@ type MfmaOptsIn<'py> = (
 );
 
 fn mfma_opts(o: MfmaOptsIn<'_>) -> PyResult<MfmaOpts> {
-    let (cbsz, abid, blgp, neg, comment, t, abl) = o;
+    let (cbsz, abid, blgp, fmt_a, fmt_b, sel_a, sel_b, neg, comment, t, abl) = o;
     Ok(MfmaOpts {
         cbsz,
         abid,
         blgp,
+        fmt_a,
+        fmt_b,
+        sel_a,
+        sel_b,
         neg,
         notes: Notes {
             comment,
@@ -73,6 +81,41 @@ fn maker_mfma(
         arg(&dst)?,
         arg(&a)?,
         arg(&rhs)?,
+        c_arg,
+        mfma_opts(opts)?,
+    ))?;
+    Ok(out(target, Family::Made(made)))
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
+fn maker_mfma_scale(
+    py: Python<'_>,
+    target: &str,
+    b: Option<PyRef<'_, DslBuilder>>,
+    form: &str,
+    dst: Bound<'_, PyTuple>,
+    a: Bound<'_, PyTuple>,
+    rhs: Bound<'_, PyTuple>,
+    scale_a: Bound<'_, PyTuple>,
+    scale_b: Bound<'_, PyTuple>,
+    c_in: Option<Bound<'_, PyTuple>>,
+    opts: MfmaOptsIn<'_>,
+) -> PyResult<Out> {
+    let target = get(py, target)?;
+    let ctx = Ctx {
+        t: target,
+        values: values(&b),
+    };
+    let c_arg = c_in.map(|x| arg(&x)).transpose()?;
+    let made = ok(mx::mfma_scale(
+        &ctx,
+        form,
+        arg(&dst)?,
+        arg(&a)?,
+        arg(&rhs)?,
+        arg(&scale_a)?,
+        arg(&scale_b)?,
         c_arg,
         mfma_opts(opts)?,
     ))?;
@@ -173,6 +216,40 @@ fn builder_mfma(
 
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
+fn builder_mfma_scale(
+    mut b: PyRefMut<'_, DslBuilder>,
+    form: &str,
+    a: Bound<'_, PyTuple>,
+    rhs: Bound<'_, PyTuple>,
+    scale_a: Bound<'_, PyTuple>,
+    scale_b: Bound<'_, PyTuple>,
+    cfg: BuilderMfmaCfg<'_>,
+    opts: MfmaOptsIn<'_>,
+) -> PyResult<DslTyped> {
+    let (c_arg, c_acc, dst, acc, agpr, name, abl) = cfg;
+    let c_arg = c_arg.map(|x| arg(&x)).transpose()?;
+    let c_acc = c_acc.map(|x| acc_in(&x)).transpose()?;
+    let dst = dst.map(|x| acc_in(&x)).transpose()?;
+    let t = ok(b.b.mfma_scale_emit(
+        form,
+        arg(&a)?,
+        arg(&rhs)?,
+        arg(&scale_a)?,
+        arg(&scale_b)?,
+        c_arg,
+        c_acc,
+        dst,
+        acc.as_deref(),
+        agpr,
+        name,
+        mfma_opts(opts)?,
+        &abl,
+    ))?;
+    Ok(DslTyped { t })
+}
+
+#[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn builder_smfmac(
     mut b: PyRefMut<'_, DslBuilder>,
     form: &str,
@@ -232,9 +309,11 @@ fn builder_write_acc(
 
 pub(super) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(maker_mfma, m)?)?;
+    m.add_function(wrap_pyfunction!(maker_mfma_scale, m)?)?;
     m.add_function(wrap_pyfunction!(maker_smfmac, m)?)?;
     m.add_function(wrap_pyfunction!(builder_mfma_acc, m)?)?;
     m.add_function(wrap_pyfunction!(builder_mfma, m)?)?;
+    m.add_function(wrap_pyfunction!(builder_mfma_scale, m)?)?;
     m.add_function(wrap_pyfunction!(builder_smfmac, m)?)?;
     m.add_function(wrap_pyfunction!(builder_read_acc, m)?)?;
     m.add_function(wrap_pyfunction!(builder_write_acc, m)?)

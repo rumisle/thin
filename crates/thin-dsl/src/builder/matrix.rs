@@ -7,8 +7,8 @@ use super::{Builder, Make};
 use crate::error::{schedule, value, Result};
 use crate::expr::node::{leaf, Leafish, Tree};
 use crate::maker::matrix::{
-    acc_shape, choose_acc_file, mfma, resolve_matrix_form, resolve_mfma, resolve_smfmac, smfmac,
-    MfmaOpts,
+    acc_shape, choose_acc_file, mfma, mfma_scale, resolve_matrix_form, resolve_mfma,
+    resolve_mfma_scale, resolve_smfmac, smfmac, MfmaOpts,
 };
 use crate::maker::{Arg, Ctx, Made};
 use crate::types::Ty;
@@ -200,6 +200,90 @@ impl Builder {
                 Arg::Reg(out.reg(), 0),
                 a,
                 b,
+                Some(c_final),
+                opts,
+            )? {
+                Made::Instr(i) => *i,
+                Made::Lds(_) => unreachable!(),
+            }
+        };
+        self.emit(ins, abl)?;
+        Ok(out)
+    }
+
+    /// Emits an MX-scaled `v_mfma_scale_*` instruction and returns the destination
+    /// `Typed` accumulator (`'a'` or `'v'`).
+    #[allow(clippy::too_many_arguments)]
+    pub fn mfma_scale_emit(
+        &mut self,
+        form: &str,
+        a: Arg,
+        b: Arg,
+        scale_a: Arg,
+        scale_b: Arg,
+        c_arg: Option<Arg>,
+        c_acc: Option<AccIn>,
+        dst: Option<AccIn>,
+        acc: Option<&str>,
+        agpr: Option<bool>,
+        name: Option<String>,
+        opts: MfmaOpts,
+        abl: &[String],
+    ) -> Result<Typed> {
+        let (mnemonic, mf) = resolve_mfma_scale(self.t, form)?;
+        let (ty, count) = acc_shape(&mf);
+        let c_typed = c_acc.map(|x| self.resolve_acc_in(x, ty)).transpose()?;
+        let dst_typed = dst.map(|x| self.resolve_acc_in(x, ty)).transpose()?;
+
+        let (out, c_final) = if let Some(d) = dst_typed {
+            if acc.is_some() || agpr.is_some() {
+                let expected = choose_acc_file(self.t, acc, agpr)?;
+                if d.file != expected {
+                    return value(format!(
+                        "{mnemonic}: dst {} is in '{}', but acc='{}' was requested",
+                        d.repr(),
+                        d.file,
+                        expected
+                    ));
+                }
+            }
+            let cf = c_arg.unwrap_or_else(|| Arg::Reg(d.reg(), 0));
+            (d, cf)
+        } else if let Some(ct) =
+            c_typed.filter(|_| acc.is_none() && agpr.is_none() && name.is_none())
+        {
+            let reg = ct.reg();
+            (ct, Arg::Reg(reg, 0))
+        } else {
+            let file = choose_acc_file(self.t, acc, agpr)?;
+            let d = self.make_value(
+                file,
+                ty,
+                Make {
+                    n: Some(i64::from(count)),
+                    n_repr: count.to_string(),
+                    name,
+                    where_: self.where_text.clone(),
+                    ..Make::default()
+                },
+            )?;
+            let cf = c_arg.unwrap_or(Arg::Int(0));
+            (d, cf)
+        };
+
+        let ins = {
+            let ctx = Ctx {
+                t: self.t,
+                values: &self.values,
+            };
+            match mfma_scale(
+                &ctx,
+                form,
+                Arg::Reg(out.reg(), 0),
+                a,
+                b,
+                scale_a,
+                scale_b,
                 Some(c_final),
                 opts,
             )? {

@@ -342,11 +342,32 @@ class Maker:
         return self._family("buffer_store", data, [voffset, desc, soffset], o)
 
     def ds_read(
-        self, dst, addr, offset=0, *, comment="", tag=(), ordered="", bytes=None, signed=False
+        self,
+        dst,
+        addr,
+        offset=0,
+        *,
+        tr=None,
+        comment="",
+        tag=(),
+        ordered="",
+        bytes=None,
+        signed=False,
     ):
-        """An LDS load."""
+        """An LDS load (or transpose load when ``tr=4|6|8|16`` is set)."""
+        if tr is not None:
+            if bytes is not None or signed:
+                raise ValueError("ds_read(tr=...): cannot combine tr= with bytes= or signed=")
+            return self.ds_read_tr(dst, addr, tr, offset, comment=comment, tag=tag, ordered=ordered)
         o = _opts(0, (None, None), comment, tag, bytes, signed, ordered)
         return self._family("ds_read", dst, [addr, offset], o)
+
+    def ds_read_tr(self, dst, addr, bits=16, offset=0, *, comment="", tag=(), ordered=""):
+        """A transpose LDS load (``bits`` in ``{4, 6, 8, 16}`` or ``'b4'/'b6'/'b8'/'b16'``)."""
+        if isinstance(bits, bool) or not isinstance(bits, (int, str)):
+            raise TypeError(f"ds_read_tr(..., bits={bits!r}): an int (4, 6, 8, 16) or format str")
+        o = _opts(0, (None, None), comment, tag, None, False, ordered)
+        return self._family("ds_read_tr", dst, [addr, bits, offset], o)
 
     def ds_write(self, addr, data, offset=0, *, comment="", tag=(), ordered="", bytes=None):
         """An LDS store."""
@@ -361,6 +382,8 @@ class Maker:
         b,
         c=None,
         *,
+        fmt_a: str | None = None,
+        fmt_b: str | None = None,
         cbsz: int = 0,
         abid: int = 0,
         blgp: int = 0,
@@ -372,7 +395,7 @@ class Maker:
         """Makes a dense MFMA instruction (``c=None`` accumulates in-place into ``dst``)."""
         b_ctx = _builder([dst, a, b, c])
         c_op = None if c is None else operand(c)
-        opts = _mfma_opts(cbsz, abid, blgp, neg, comment, tag, abl)
+        opts = _mfma_opts(cbsz, abid, blgp, fmt_a, fmt_b, 0, 0, neg, comment, tag, abl)
         result = _native.maker_mfma(
             target().name,
             b_ctx and b_ctx._n,
@@ -380,6 +403,44 @@ class Maker:
             operand(dst),
             operand(a),
             operand(b),
+            c_op,
+            opts,
+        )
+        return _out(b_ctx, result)
+
+    def mfma_scale(
+        self,
+        form: str,
+        dst,
+        a,
+        b,
+        scale_a,
+        scale_b,
+        c=None,
+        *,
+        fmt_a: str | None = None,
+        fmt_b: str | None = None,
+        cbsz: int = 0,
+        blgp: int = 0,
+        sel_a: int = 0,
+        sel_b: int = 0,
+        comment: str = "",
+        tag=(),
+        abl=(),
+    ):
+        """Makes an MX-scaled ``v_mfma_scale_*`` instruction (``c=None`` updates ``dst``)."""
+        b_ctx = _builder([dst, a, b, scale_a, scale_b, c])
+        c_op = None if c is None else operand(c)
+        opts = _mfma_opts(cbsz, 0, blgp, fmt_a, fmt_b, sel_a, sel_b, None, comment, tag, abl)
+        result = _native.maker_mfma_scale(
+            target().name,
+            b_ctx and b_ctx._n,
+            form,
+            operand(dst),
+            operand(a),
+            operand(b),
+            operand(scale_a),
+            operand(scale_b),
             c_op,
             opts,
         )
@@ -401,7 +462,7 @@ class Maker:
     ):
         """Makes a sparse 4:2 SMFMAC instruction updating ``dst`` in-place."""
         b_ctx = _builder([dst, a, b, idx])
-        opts = _mfma_opts(cbsz, abid, 0, None, comment, tag, abl)
+        opts = _mfma_opts(cbsz, abid, 0, None, None, 0, 0, None, comment, tag, abl)
         result = _native.maker_smfmac(
             target().name,
             b_ctx and b_ctx._n,
@@ -415,19 +476,39 @@ class Maker:
         return _out(b_ctx, result)
 
 
-def _mfma_opts(cbsz, abid, blgp, neg, comment, tag, abl) -> tuple:
+def _mfma_opts(cbsz, abid, blgp, fmt_a, fmt_b, sel_a, sel_b, neg, comment, tag, abl) -> tuple:
     if isinstance(cbsz, bool) or not isinstance(cbsz, int):
         raise TypeError(f"cbsz={cbsz!r}: an int")
     if isinstance(abid, bool) or not isinstance(abid, int):
         raise TypeError(f"abid={abid!r}: an int")
     if isinstance(blgp, bool) or not isinstance(blgp, int):
         raise TypeError(f"blgp={blgp!r}: an int")
+    if fmt_a is not None and not isinstance(fmt_a, str):
+        raise TypeError(f"fmt_a={fmt_a!r}: a format str")
+    if fmt_b is not None and not isinstance(fmt_b, str):
+        raise TypeError(f"fmt_b={fmt_b!r}: a format str")
+    if isinstance(sel_a, bool) or not isinstance(sel_a, int):
+        raise TypeError(f"sel_a={sel_a!r}: an int")
+    if isinstance(sel_b, bool) or not isinstance(sel_b, int):
+        raise TypeError(f"sel_b={sel_b!r}: an int")
     neg_list = None
     if neg is not None:
         if not isinstance(neg, (list, tuple)):
             raise TypeError(f"neg={neg!r}: a 3-element tuple or list")
         neg_list = [int(x) for x in neg]
-    return (cbsz, abid, blgp, neg_list, comment, _tag(tag), list(abl))
+    return (
+        cbsz,
+        abid,
+        blgp,
+        fmt_a,
+        fmt_b,
+        sel_a,
+        sel_b,
+        neg_list,
+        comment,
+        _tag(tag),
+        list(abl),
+    )
 
 
 def _stage(stage):
