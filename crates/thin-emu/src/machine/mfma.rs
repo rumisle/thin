@@ -221,22 +221,33 @@ fn decode_elem(dwords: &[u32; MAX_DWORDS], ty: Elem, dw: usize, bit_lo: usize) -
         Elem::Bf8 => Small::E5M2.value((dwords[dw] >> bit_lo) & 0xFF),
         Elem::Fp8Fnuz => Small::E4M3Fnuz.value((dwords[dw] >> bit_lo) & 0xFF),
         Elem::Bf8Fnuz => Small::E5M2Fnuz.value((dwords[dw] >> bit_lo) & 0xFF),
+        Elem::Fp6 | Elem::Bf6 => {
+            // 6-bit packed elements straddle dword boundaries at bit_lo == 28 and 30.
+            let word64 =
+                u64::from(dwords[dw]) | (u64::from(*dwords.get(dw + 1).unwrap_or(&0)) << 32);
+            let raw = ((word64 >> bit_lo) & 0x3F) as u32;
+            if ty == Elem::Fp6 {
+                Small::E2M3.value(raw)
+            } else {
+                Small::E3M2.value(raw)
+            }
+        }
+        Elem::Fp4 => Small::E2M1.value((dwords[dw] >> bit_lo) & 0xF),
+        Elem::F8F6F4 => Small::E4M3.value((dwords[dw] >> bit_lo) & 0xFF),
         Elem::Iu8 => f64::from((dwords[dw] >> bit_lo) & 0xFF),
         Elem::Iu4 => f64::from((dwords[dw] >> bit_lo) & 0xF),
     }
 }
 
-/// Evaluates a CDNA 3 XDLOP `f32`-accumulating dot product (`f16`, `bf16`,
-/// `xf32`, `fp8`, `bf8`, dense and sparse `v_smfmac_*`) using the MI300X-measured
-/// 128-bit grouped dot model:
+/// Evaluates an XDLOP `f32`-accumulating dot product (`f16`, `bf16`, `xf32`,
+/// `fp8`, `bf8`, `f8f6f4`, dense and sparse `v_smfmac_*`) using the grouped dot model:
 /// - Any `NaN` in `A`, `B`, or `C`, or `0 * Inf` / `+Inf + (-Inf)`, returns `0xFFC0_0000`.
-/// - Active reduction terms are processed sequentially in contiguous groups of
-///   `g = (128 / a_bits).min(active_terms)`.
+/// - Active reduction terms are processed sequentially in contiguous groups of `group_size`.
 /// - Within each group, `top = max_q (floor_log2(|a[q]|) + floor_log2(|b[q]|))` over
 ///   non-zero products sets `qe = top - 24`; products are truncated toward zero at `2^qe`,
 ///   combined with `acc` (exact if `lsb_exp(acc) >= qe`, floored at `2^qe` below), and
 ///   rounded RNE to `f32` after every group.
-fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, a_bits: usize) -> u32 {
+fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, group_size: usize) -> u32 {
     if num::is_nan32(c_bits) || av.iter().chain(bv).any(|v| v.is_nan()) {
         return num::DNAN32;
     }
@@ -267,7 +278,7 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, a_bits: usize) -> u32 {
         return 0xFF80_0000;
     }
 
-    let g = (128 / a_bits).min(n).max(1);
+    let g = group_size.min(n).max(1);
     let mut acc = cv;
     for s0 in (0..n).step_by(g) {
         let end = (s0 + g).min(n);
@@ -351,7 +362,10 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
     let blgp_i = int_field(ins, "blgp", 0);
 
     let is_f64 = form.d == Elem::F64;
+    let is_f8f6f4 = form.a == Elem::F8F6F4 || form.b == Elem::F8F6F4;
     let mut neg_f64 = [false; 3];
+    let mut a_ty = form.a;
+    let mut b_ty = form.b;
 
     if form.sparse {
         if blgp_i != 0 || ins.field("neg").is_some() {
@@ -374,6 +388,31 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                 max_sets - 1
             )));
         }
+    } else if is_f8f6f4 {
+        if abid_i != 0 || ins.field("neg").is_some() {
+            return Err(limit(format!(
+                "{}: abid/neg is not supported on f8f6f4 MFMA",
+                ins.text
+            )));
+        }
+        a_ty = u32::try_from(cbsz_i)
+            .ok()
+            .and_then(Elem::from_f8f6f4)
+            .ok_or_else(|| {
+                limit(format!(
+                    "{}: cbsz {cbsz_i} out of range 0..4 for f8f6f4 A format",
+                    ins.text
+                ))
+            })?;
+        b_ty = u32::try_from(blgp_i)
+            .ok()
+            .and_then(Elem::from_f8f6f4)
+            .ok_or_else(|| {
+                limit(format!(
+                    "{}: blgp {blgp_i} out of range 0..4 for f8f6f4 B format",
+                    ins.text
+                ))
+            })?;
     } else if is_f64 {
         if cbsz_i != 0 || abid_i != 0 {
             return Err(limit(format!(
@@ -427,11 +466,21 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
         }
     }
 
-    let cbsz = cbsz_i as usize;
+    let cbsz = if is_f8f6f4 { 0 } else { cbsz_i as usize };
     let abid = abid_i as usize;
-    let blgp = if is_f64 { 0 } else { blgp_i as usize };
+    let blgp = if is_f64 || is_f8f6f4 {
+        0
+    } else {
+        blgp_i as usize
+    };
 
     let d_dwords = form.dwords('d');
+    let a_dwords = form
+        .operand_dwords('a', cbsz_i as u32, blgp_i as u32)
+        .unwrap_or_else(|| form.dwords('a'));
+    let b_dwords = form
+        .operand_dwords('b', cbsz_i as u32, blgp_i as u32)
+        .unwrap_or_else(|| form.dwords('b'));
     let dst = ins
         .operands
         .first()
@@ -447,8 +496,8 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
         }
     };
 
-    let (_, a_regs) = reg_lanes(w, ins, 1, form.dwords('a'), false)?;
-    let (_, b_regs) = reg_lanes(w, ins, 2, form.dwords('b'), false)?;
+    let (_, a_regs) = reg_lanes(w, ins, 1, a_dwords, false)?;
+    let (_, b_regs) = reg_lanes(w, ins, 2, b_dwords, false)?;
     let (c_regs, k_regs) = if form.sparse {
         let (_, c) = reg_lanes(w, ins, 0, d_dwords, false)?;
         let (_, k) = reg_lanes(w, ins, 3, 1, true)?;
@@ -457,15 +506,27 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
         let c = c_lanes(w, ins, d_dwords, form.d, &dst_file)?;
         (c, None)
     };
+    let scale_regs = if form.scaled {
+        let (_, sa) = reg_lanes(w, ins, 4, 1, true)?;
+        let (_, sb) = reg_lanes(w, ins, 5, 1, true)?;
+        let sel_a =
+            (((list_at(ins, "op_sel_hi", 0, 0) as usize) & 1) << 1) | ((list_at(ins, "op_sel", 0, 0) as usize) & 1);
+        let sel_b =
+            (((list_at(ins, "op_sel_hi", 1, 0) as usize) & 1) << 1) | ((list_at(ins, "op_sel", 1, 0) as usize) & 1);
+        Some((sa, sb, sel_a, sel_b))
+    } else {
+        None
+    };
 
     let m = form.m as usize;
     let n = form.n as usize;
     let k = form.k as usize;
     let blocks = form.blocks as usize;
-    let a_bits = form.a.bits() as usize;
-    let b_bits = form.b.bits() as usize;
+    let a_bits = a_ty.bits() as usize;
+    let b_bits = b_ty.bits() as usize;
     let d_bits = form.d.bits() as usize;
     let is_int = form.d.integer();
+    let dot_group = if is_f8f6f4 { 32 } else { 128 / a_bits };
 
     let mut out = [[0u32; MAX_W]; MAX_DWORDS];
 
@@ -545,12 +606,26 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                             }
                             a_raw64[kk] = xa;
                             b_raw64[kk] = yb;
-                        } else if form.a == Elem::F32 && form.b == Elem::F32 {
+                        } else if a_ty == Elem::F32 && b_ty == Elem::F32 {
                             a_raw32[kk] = a_regs[a_lane][a_dw];
                             b_raw32[kk] = b_regs[b_lane][b_dw];
                         } else {
-                            av[kk] = decode_elem(&a_regs[a_lane], form.a, a_dw, a_lo);
-                            bv[kk] = decode_elem(&b_regs[b_lane], form.b, b_dw, b_lo);
+                            let mut xa = decode_elem(&a_regs[a_lane], a_ty, a_dw, a_lo);
+                            let mut yb = decode_elem(&b_regs[b_lane], b_ty, b_dw, b_lo);
+                            if let Some((sa, sb, sel_a, sel_b)) = scale_regs.as_ref() {
+                                let k_blk = kk / 32;
+                                let sa_byte = (sa[k_blk * m + i][0] >> (8 * sel_a)) & 0xFF;
+                                let sb_byte = (sb[k_blk * n + j][0] >> (8 * sel_b)) & 0xFF;
+                                if sa_byte == 0xFF || sb_byte == 0xFF {
+                                    xa = f64::NAN;
+                                    yb = f64::NAN;
+                                } else {
+                                    xa *= 2f64.powi(sa_byte as i32 - 127);
+                                    yb *= 2f64.powi(sb_byte as i32 - 127);
+                                }
+                            }
+                            av[kk] = xa;
+                            bv[kk] = yb;
                         }
                     }
                 }
@@ -570,12 +645,12 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                         acc = acc.wrapping_add((x as i64) * (y as i64));
                     }
                     out[d_dw][d_lane] = acc as i32 as u32;
-                } else if form.a == Elem::F32 && form.b == Elem::F32 {
+                } else if a_ty == Elem::F32 && b_ty == Elem::F32 {
                     let c_bits = c_regs[d_lane][d_dw];
                     out[d_dw][d_lane] = eval_sgemm_fma(&a_raw32, &b_raw32, c_bits);
                 } else {
                     let c_bits = c_regs[d_lane][d_dw];
-                    out[d_dw][d_lane] = eval_xdlop_dot(&av, &bv, c_bits, a_bits);
+                    out[d_dw][d_lane] = eval_xdlop_dot(&av, &bv, c_bits, dot_group);
                 }
             }
         }
@@ -603,6 +678,9 @@ pub fn check_matrix(
         )));
     }
     if form.sparse
+        || form.scaled
+        || form.a == Elem::F8F6F4
+        || form.b == Elem::F8F6F4
         || form.blocks != 1
         || form.m != form.n
         || form.d.bits() != 32

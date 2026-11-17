@@ -90,6 +90,7 @@ fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
         wave: 64,
         passes,
         sparse: false,
+        scaled: false,
         cbsz_abid: false,
         blgp: false,
         sum: Summation::Grouped {

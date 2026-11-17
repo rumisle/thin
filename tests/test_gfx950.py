@@ -42,13 +42,16 @@ def test_gfx950_target_facts_and_160kb_lds_granules():
     matrix_forms = [f for f in t.forms() if f.flags & Flags.MATRIX]
     assert len(matrix_forms) == 68
     modelled = [f.mnemonic for f in matrix_forms if t.matrix_form(f.mnemonic) is not None]
-    assert len(modelled) == 64
+    assert len(modelled) == 68
 
     # Common FP8/BF8 MFMA forms on gfx950 use OCP e4m3fn/e5m2 (not FNUZ) and are marked provisional.
     fp8_mf = t.matrix_form("v_mfma_f32_16x16x32_fp8_bf8")
     assert fp8_mf is not None
-    assert (fp8_mf.a, fp8_mf.b) == ("e4m3fn", "e5m2")
+    assert (fp8_mf.a, fp8_mf.b, fp8_mf.scaled) == ("e4m3fn", "e5m2", False)
     assert fp8_mf.provisional is True
+    scale_mf = t.matrix_form("v_mfma_scale_f32_16x16x128_f8f6f4")
+    assert scale_mf is not None
+    assert (scale_mf.a, scale_mf.b, scale_mf.scaled) == ("f8f6f4", "f8f6f4", True)
 
     # Variable tuple widths on f8f6f4 MFMA and VOP3PX2 scaled MFMA forms.
     scale_form = t.form("v_mfma_scale_f32_16x16x128_f8f6f4", 6)
@@ -168,7 +171,11 @@ def _pack_cdna4_input(mat: np.ndarray, outer: int, k_dim: int, bits: int) -> np.
             local = k % elems_per_lane
             lane = (k // elems_per_lane) * outer + i
             tot = local * bits
-            out[lane, tot // 32] |= (int(mat[i, k]) & mask) << (tot % 32)
+            dw, bit_lo = tot // 32, tot % 32
+            val = int(mat[i, k]) & mask
+            out[lane, dw] |= (val << bit_lo) & 0xFFFFFFFF
+            if bit_lo + bits > 32:
+                out[lane, dw + 1] |= val >> (32 - bit_lo)
     return out
 
 
@@ -195,23 +202,31 @@ def _run_cdna4_mfma(
     use_agpr: bool = True,
     sparse: bool = False,
     sparse_init: int = 0,
+    scale_lanes: tuple[np.ndarray, np.ndarray] | None = None,
     target_name: str = "gfx950",
 ) -> np.ndarray:
     from thin.emu import Cluster, Memory
     from thin.target import targeting
 
     na, nb = a_lanes.shape[1], b_lanes.shape[1]
-    lines = [
-        "\ts_load_dwordx8 s[4:11], s[0:1], 0x0",
-        "\ts_waitcnt lgkmcnt(0)",
-        "\tv_lshlrev_b32 v1, 2, v0",
-        f"\tv_mul_lo_u32 v2, v0, {na * 4}",
-    ]
+    lines = ["\ts_load_dwordx8 s[4:11], s[0:1], 0x0"]
+    if scale_lanes is not None:
+        lines.append("\ts_load_dwordx4 s[12:15], s[0:1], 0x20")
+    lines.extend(
+        [
+            "\ts_waitcnt lgkmcnt(0)",
+            "\tv_lshlrev_b32 v1, 2, v0",
+            f"\tv_mul_lo_u32 v2, v0, {na * 4}",
+        ]
+    )
     for d in range(na):
         lines.append(f"\tglobal_load_dword v{16 + d}, v2, s[4:5] offset:{d * 4}")
     lines.append(f"\tv_mul_lo_u32 v3, v0, {nb * 4}")
     for d in range(nb):
         lines.append(f"\tglobal_load_dword v{48 + d}, v3, s[6:7] offset:{d * 4}")
+    if scale_lanes is not None:
+        lines.append("\tglobal_load_dword v76, v1, s[12:13]")
+        lines.append("\tglobal_load_dword v77, v1, s[14:15]")
 
     c_is_buf = isinstance(c_lanes, np.ndarray)
     if sparse:
@@ -248,8 +263,9 @@ def _run_cdna4_mfma(
     )
     a_op = "v16" if na == 1 else f"v[16:{16 + na - 1}]"
     b_op = "v48" if nb == 1 else f"v[48:{48 + nb - 1}]"
+    scale_ops = ", v76, v77" if scale_lanes is not None else ""
     suffix = f" {mods}" if mods else ""
-    lines.append(f"\t{mnemonic} {dst_op}, {a_op}, {b_op}, {src2_op}{suffix}")
+    lines.append(f"\t{mnemonic} {dst_op}, {a_op}, {b_op}, {src2_op}{scale_ops}{suffix}")
     lines.append(f"\tv_mul_lo_u32 v5, v0, {d_dwords * 4}")
     for d in range(d_dwords):
         if use_agpr:
@@ -269,11 +285,16 @@ def _run_cdna4_mfma(
     buf_b.write(0, np.ascontiguousarray(b_lanes, dtype=np.uint32).tobytes())
     if c_is_buf:
         buf_c.write(0, np.ascontiguousarray(c_lanes, dtype=np.uint32).tobytes())
-    ka = mem.alloc("ka", 32, tagged=False)
-    ka.write(
-        0,
-        np.array([buf_a.base, buf_b.base, buf_c.base, buf_d.base], dtype=np.uint64).tobytes(),
-    )
+    ptrs = [buf_a.base, buf_b.base, buf_c.base, buf_d.base]
+    if scale_lanes is not None:
+        sa_arr, sb_arr = scale_lanes
+        buf_sa = mem.alloc("sa", 256, tagged=False)
+        buf_sb = mem.alloc("sb", 256, tagged=False)
+        buf_sa.write(0, np.ascontiguousarray(sa_arr, dtype=np.uint32).tobytes())
+        buf_sb.write(0, np.ascontiguousarray(sb_arr, dtype=np.uint32).tobytes())
+        ptrs.extend([buf_sa.base, buf_sb.base])
+    ka = mem.alloc("ka", 8 * len(ptrs), tagged=False)
+    ka.write(0, np.array(ptrs, dtype=np.uint64).tobytes())
     with targeting(target_name):
         Cluster(
             asm,
@@ -473,3 +494,169 @@ def test_gfx950_new_sparse_smfmac_shapes():
             n,
         ).view(np.int32)
         assert np.array_equal(got_i8, a_full @ b_int + 7), mnem_i8
+
+
+def test_gfx950_f8f6f4_all_25_format_pairs_and_mx_scale_mfma():
+    from thin import formats
+
+    rng = np.random.default_rng(2950)
+    f8f6f4_table = [
+        (0, "e4m3fn", 8, {}),
+        (1, "e5m2", 8, {}),
+        (2, "e2m3", 6, {"nan": 0x1F}),
+        (3, "e3m2", 6, {"nan": 0x1F}),
+        (4, "e2m1", 4, {"nan": 0x07}),
+    ]
+
+    # Pre-pack all 5 formats for A[16, 128] and B[128, 16] using small exact half-integers
+    # (-1.5..1.5 in 0.5 steps are exact in every one of e4m3fn, e5m2, e2m3, e3m2, e2m1!).
+    a_val16 = (rng.integers(-3, 4, (16, 128)) * 0.5).astype(np.float32)
+    b_val16 = (rng.integers(-3, 4, (128, 16)) * 0.5).astype(np.float32)
+    want16 = a_val16 @ b_val16
+    packed_a16 = {}
+    packed_b16 = {}
+    rm = formats.row_major()
+    for code, dt_name, bits, kw in f8f6f4_table:
+        dt = formats.DTYPES[dt_name]
+        ac = formats.encode(a_val16, dt, saturate=True, **kw)
+        bc = formats.encode(b_val16, dt, saturate=True, **kw)
+        al = _pack_cdna4_input(ac, 16, 128, bits)
+        bl = _pack_cdna4_input(bc.T, 16, 128, bits)
+        # Verify 6-bit and 4-bit lane packing agrees bit-for-bit with thin-formats sub-byte packing:
+        if bits < 8:
+            lane0 = formats.to_bytes(ac[0:1, :32].reshape(1, 1, 32), rm, dt).view(np.uint32)
+            assert np.array_equal(al[0], lane0), dt_name
+        packed_a16[code] = al
+        packed_b16[code] = bl
+
+    # Exercise all 25 (cbsz, blgp) format combinations on v_mfma_f32_16x16x128_f8f6f4!
+    for cbsz in range(5):
+        for blgp in range(5):
+            mods = f"cbsz:{cbsz} blgp:{blgp}" if (cbsz or blgp) else ""
+            got_lanes = _run_cdna4_mfma(
+                "v_mfma_f32_16x16x128_f8f6f4",
+                packed_a16[cbsz],
+                packed_b16[blgp],
+                "0",
+                4,
+                mods=mods,
+                use_agpr=((cbsz + blgp) % 2 == 0),
+            )
+            got = _unpack_cdna4_output(got_lanes, 16, 16).view(np.float32)
+            assert np.array_equal(got, want16), f"cbsz={cbsz} blgp={blgp}"
+
+    # Also verify 32x32x64 unscaled mixed formats (FP6xFP4 and BF8xBF6):
+    a_val32 = (rng.integers(-3, 4, (32, 64)) * 0.5).astype(np.float32)
+    b_val32 = (rng.integers(-3, 4, (64, 32)) * 0.5).astype(np.float32)
+    want32 = a_val32 @ b_val32
+    for cbsz, blgp in [(2, 4), (1, 3)]:
+        _, da_n, ba, kwa = f8f6f4_table[cbsz]
+        _, db_n, bb, kwb = f8f6f4_table[blgp]
+        al = _pack_cdna4_input(
+            formats.encode(a_val32, formats.DTYPES[da_n], saturate=True, **kwa), 32, 64, ba
+        )
+        bl = _pack_cdna4_input(
+            formats.encode(b_val32, formats.DTYPES[db_n], saturate=True, **kwb).T, 32, 64, bb
+        )
+        got32 = _unpack_cdna4_output(
+            _run_cdna4_mfma(
+                "v_mfma_f32_32x32x64_f8f6f4", al, bl, "0", 16, mods=f"cbsz:{cbsz} blgp:{blgp}"
+            ),
+            32,
+            32,
+        ).view(np.float32)
+        assert np.array_equal(got32, want32), (cbsz, blgp)
+
+    # MX block-scaled v_mfma_scale_f32_{16x16x128,32x32x64}_f8f6f4 using formats.quantize
+    # with non-zero byte selectors (sel_a = {op_sel_hi[0], op_sel[0]}).
+    for mnem, m, n, k, cbsz, blgp, sel_a, sel_b in [
+        ("v_mfma_scale_f32_16x16x128_f8f6f4", 16, 16, 128, 0, 4, 2, 3),  # e4m3fn x e2m1
+        ("v_mfma_scale_f32_16x16x128_f8f6f4", 16, 16, 128, 2, 3, 1, 0),  # e2m3 x e3m2
+        ("v_mfma_scale_f32_32x32x64_f8f6f4", 32, 32, 64, 1, 4, 3, 1),  # e5m2 x e2m1
+    ]:
+        dt_a = formats.DTYPES[f8f6f4_table[cbsz][1]]
+        dt_b = formats.DTYPES[f8f6f4_table[blgp][1]]
+        bits_a, bits_b = f8f6f4_table[cbsz][2], f8f6f4_table[blgp][2]
+        # Construct exact MX-representable inputs with wide per-block dynamic range (2^-6 .. 2^8):
+        raw_a = (
+            rng.standard_normal((m, k))
+            * np.repeat(2.0 ** rng.integers(-6, 9, (m, k // 32)), 32, axis=1)
+        ).astype(np.float32)
+        raw_b = (
+            rng.standard_normal((n, k))
+            * np.repeat(2.0 ** rng.integers(-6, 9, (n, k // 32)), 32, axis=1)
+        ).astype(np.float32)
+        ac, sa_bytes = formats.quantize(raw_a, dt_a)
+        bc, sb_bytes = formats.quantize(raw_b, dt_b)
+        al = _pack_cdna4_input(ac, m, k, bits_a)
+        bl = _pack_cdna4_input(bc, n, k, bits_b)
+
+        # Pack scale bytes into byte `sel_a` / `sel_b` of lane `(k_blk * m + i)`,
+        # filling unused bytes with 0xFF (NaN) so reading the wrong byte immediately fails!
+        sa_lanes = np.full(64, 0xFFFFFFFF, dtype=np.uint32)
+        sb_lanes = np.full(64, 0xFFFFFFFF, dtype=np.uint32)
+        for k_blk in range(k // 32):
+            for i in range(m):
+                lane = k_blk * m + i
+                sa_lanes[lane] = (
+                    sa_lanes[lane] & np.uint32(~(0xFF << (8 * sel_a)) & 0xFFFFFFFF)
+                ) | (np.uint32(sa_bytes[i, k_blk]) << (8 * sel_a))
+            for j in range(n):
+                lane = k_blk * n + j
+                sb_lanes[lane] = (
+                    sb_lanes[lane] & np.uint32(~(0xFF << (8 * sel_b)) & 0xFFFFFFFF)
+                ) | (np.uint32(sb_bytes[j, k_blk]) << (8 * sel_b))
+
+        mods_parts = []
+        if sel_a & 1 or sel_b & 1:
+            mods_parts.append(f"op_sel:[{sel_a & 1},{sel_b & 1},0]")
+        if (sel_a >> 1) or (sel_b >> 1):
+            mods_parts.append(f"op_sel_hi:[{sel_a >> 1},{sel_b >> 1},0]")
+        if cbsz:
+            mods_parts.append(f"cbsz:{cbsz}")
+        if blgp:
+            mods_parts.append(f"blgp:{blgp}")
+        d_dw = (m * n) // 64
+        got_scaled = _unpack_cdna4_output(
+            _run_cdna4_mfma(
+                mnem,
+                al,
+                bl,
+                "0",
+                d_dw,
+                mods=" ".join(mods_parts),
+                scale_lanes=(sa_lanes, sb_lanes),
+            ),
+            m,
+            n,
+        ).view(np.float32)
+
+        # Dequantize reference in float64 and compare:
+        deq_a = formats.decode(ac, dt_a).astype(np.float64) * np.repeat(
+            np.exp2(sa_bytes.astype(np.float64) - 127.0), 32, axis=1
+        )
+        deq_b = formats.decode(bc, dt_b).astype(np.float64) * np.repeat(
+            np.exp2(sb_bytes.astype(np.float64) - 127.0), 32, axis=1
+        )
+        ref = (deq_a @ deq_b.T).astype(np.float32)
+        assert np.allclose(got_scaled, ref, rtol=2e-6, atol=1e-5), mnem
+
+    # Inject 0xFF (E8M0 NaN scale) into row 2, block 1 of A -> only row 2 becomes 0xFFC00000!
+    sa_nan = np.full(64, 0x7F7F7F7F, dtype=np.uint32)
+    sb_ok = np.full(64, 0x7F7F7F7F, dtype=np.uint32)
+    sa_nan[1 * 16 + 2] = 0x7F7F7FFF  # byte 0 = 0xFF in lane 18 (k_blk=1, m=2)
+    nan_out = _unpack_cdna4_output(
+        _run_cdna4_mfma(
+            "v_mfma_scale_f32_16x16x128_f8f6f4",
+            packed_a16[4],
+            packed_b16[4],
+            "0",
+            4,
+            mods="cbsz:4 blgp:4",
+            scale_lanes=(sa_nan, sb_ok),
+        ),
+        16,
+        16,
+    )
+    assert np.all(nan_out[2, :] == 0xFFC00000)
+    assert np.all(nan_out[:2, :] != 0xFFC00000) and np.all(nan_out[3:, :] != 0xFFC00000)

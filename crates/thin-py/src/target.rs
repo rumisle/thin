@@ -279,13 +279,13 @@ fn allocated_vgprs(py: Python<'_>, name: &str, vgpr: u32, agpr: u32) -> PyResult
     Ok(get(py, name)?.allocated_vgprs(vgpr, agpr))
 }
 
-/// A matrix form as Python receives it: `(a, b, d, (m, n, k, blocks, wave, passes), (sparse, cbsz_abid, blgp, provisional), (da, db, dc, dd))`.
+/// A matrix form as Python receives it: `(a, b, d, (m, n, k, blocks, wave, passes), (sparse, scaled, cbsz_abid, blgp, provisional), (da, db, dc, dd))`.
 type MatrixRow = (
     &'static str,
     &'static str,
     &'static str,
     (u32, u32, u32, u32, u32, u32),
-    (bool, bool, bool, bool),
+    (bool, bool, bool, bool, bool),
     (u32, u32, u32, u32),
 );
 
@@ -299,7 +299,7 @@ fn target_matrix_form(py: Python<'_>, name: &str, mnemonic: &str) -> PyResult<Op
             m.b.name(),
             m.d.name(),
             (m.m, m.n, m.k, m.blocks, m.wave, m.passes),
-            (m.sparse, m.cbsz_abid, m.blgp, m.provisional),
+            (m.sparse, m.scaled, m.cbsz_abid, m.blgp, m.provisional),
             (m.dwords('a'), m.dwords('b'), m.dwords('c'), m.dwords('d')),
         )
     }))

@@ -564,22 +564,28 @@ fn check_waits(def: &Definition) -> Result<(), Error> {
                     form.name, mf.wave, def.wave
                 ));
             }
-            if form.slots.len() == 4 {
-                let want = [
+            let want_slots = if mf.scaled {
+                vec![
                     mf.dwords('d'),
                     mf.dwords('a'),
                     mf.dwords('b'),
                     mf.dwords('c'),
-                ];
-                let got = [
-                    form.slots[0].dwords,
-                    form.slots[1].dwords,
-                    form.slots[2].dwords,
-                    form.slots[3].dwords,
-                ];
-                if got != want {
+                    1,
+                    1,
+                ]
+            } else {
+                vec![
+                    mf.dwords('d'),
+                    mf.dwords('a'),
+                    mf.dwords('b'),
+                    mf.dwords('c'),
+                ]
+            };
+            if form.slots.len() == want_slots.len() {
+                let got: Vec<u32> = form.slots.iter().map(|s| s.dwords).collect();
+                if got != want_slots {
                     return fail(format!(
-                        "{}: matrix form dwords {want:?} != ISA slots {got:?}",
+                        "{}: matrix form dwords {want_slots:?} != ISA slots {got:?}",
                         form.name
                     ));
                 }

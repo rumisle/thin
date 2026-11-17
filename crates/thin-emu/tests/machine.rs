@@ -687,7 +687,11 @@ fn wave64_all_matrix_forms_execute_in_agpr_and_vgpr() {
             } else {
                 dst.clone()
             };
-            let asm = format!("\t{mnemonic} {dst}, {src0}, {src1}, {src2}\n\ts_endpgm\n");
+            let asm = if form.scaled {
+                format!("\t{mnemonic} {dst}, {src0}, {src1}, {src2}, v56, v57\n\ts_endpgm\n")
+            } else {
+                format!("\t{mnemonic} {dst}, {src0}, {src1}, {src2}\n\ts_endpgm\n")
+            };
             let prog = read_program(&asm, w64_target).expect(&asm);
             let mut m = Machine::new(prog, f.clone(), 64, 64, 0).unwrap();
             let mut mem = Memory::default();
@@ -699,7 +703,7 @@ fn wave64_all_matrix_forms_execute_in_agpr_and_vgpr() {
                     thin_target::Elem::F32 | thin_target::Elem::Xf32 => 1.0f32.to_bits(),
                     thin_target::Elem::F64 => 0,
                     thin_target::Elem::I8 => 0x0201_0201,
-                    thin_target::Elem::Fp8 => 0x3838_3838,
+                    thin_target::Elem::Fp8 | thin_target::Elem::F8F6F4 => 0x3838_3838,
                     thin_target::Elem::Bf8 => 0x3C3C_3C3C,
                     thin_target::Elem::Fp8Fnuz | thin_target::Elem::Bf8Fnuz => 0x4040_4040,
                     _ => 1,
@@ -738,6 +742,10 @@ fn wave64_all_matrix_forms_execute_in_agpr_and_vgpr() {
                         }
                         if form.sparse {
                             w.v[48 * 64..49 * 64].fill(0xDDDD_DDDD); // nibbles 0b11_01 -> idx0=1, idx1=3
+                        }
+                        if form.scaled {
+                            w.v[56 * 64..57 * 64].fill(0x7F7F_7F7F); // 1.0 E8M0 scale
+                            w.v[57 * 64..58 * 64].fill(0x7F7F_7F7F);
                         }
                     }),
                 )

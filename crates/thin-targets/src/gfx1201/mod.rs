@@ -604,6 +604,7 @@ fn wmma_form(mnemonic: &str) -> Option<MatrixForm> {
         wave: 32,
         passes: 1,
         sparse: false,
+        scaled: false,
         cbsz_abid: false,
         blgp: false,
         // Measured on an RX 9070 XT for fp8 and bf8

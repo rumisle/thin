@@ -40,6 +40,10 @@ fn element(dwords: &[u32], ty: Elem, e: usize, signed: bool) -> f64 {
         Elem::Bf8 => Small::E5M2.value(raw),
         Elem::Fp8Fnuz => Small::E4M3Fnuz.value(raw),
         Elem::Bf8Fnuz => Small::E5M2Fnuz.value(raw),
+        Elem::Fp6 => Small::E2M3.value(raw),
+        Elem::Bf6 => Small::E3M2.value(raw),
+        Elem::Fp4 => Small::E2M1.value(raw),
+        Elem::F8F6F4 => Small::E4M3.value(raw),
     }
 }
 

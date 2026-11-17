@@ -171,6 +171,7 @@ class MatrixForm:
         "n",
         "passes",
         "provisional",
+        "scaled",
         "sparse",
         "wave",
     )
@@ -180,7 +181,7 @@ class MatrixForm:
         self.mnemonic = mnemonic
         self.a, self.b, self.d = a, b, d
         self.m, self.n, self.k, self.blocks, self.wave, self.passes = dims
-        self.sparse, self.cbsz_abid, self.blgp, self.provisional = flags
+        self.sparse, self.scaled, self.cbsz_abid, self.blgp, self.provisional = flags
         self.dwords = MappingProxyType({"a": dw[0], "b": dw[1], "c": dw[2], "d": dw[3]})
 
     def __repr__(self) -> str:

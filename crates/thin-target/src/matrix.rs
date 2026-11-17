@@ -30,17 +30,32 @@ pub enum Elem {
     Fp8Fnuz,
     /// The CDNA3 FNUZ 8-bit float with 5 exponent bits (`e5m2fnuz`).
     Bf8Fnuz,
+    /// The OCP 6-bit float with 2 exponent bits (`e2m3`).
+    Fp6,
+    /// The OCP 6-bit float with 3 exponent bits (`e3m2`).
+    Bf6,
+    /// The OCP 4-bit float with 2 exponent bits (`e2m1`).
+    Fp4,
+    /// Runtime-selected CDNA4 small float (`fp8`/`bf8`/`fp6`/`bf6`/`fp4` via `cbsz`/`blgp`).
+    F8F6F4,
 }
 
 impl Elem {
-    /// Its bits.
+    /// Its bits (default 8 for `F8F6F4`, whose default `cbsz`/`blgp` code 0 is `e4m3fn`).
     pub fn bits(self) -> u32 {
         match self {
             Elem::F16 | Elem::Bf16 => 16,
             Elem::F32 | Elem::Xf32 | Elem::I32 => 32,
             Elem::F64 => 64,
-            Elem::I8 | Elem::Iu8 | Elem::Fp8 | Elem::Bf8 | Elem::Fp8Fnuz | Elem::Bf8Fnuz => 8,
-            Elem::Iu4 => 4,
+            Elem::I8
+            | Elem::Iu8
+            | Elem::Fp8
+            | Elem::Bf8
+            | Elem::Fp8Fnuz
+            | Elem::Bf8Fnuz
+            | Elem::F8F6F4 => 8,
+            Elem::Fp6 | Elem::Bf6 => 6,
+            Elem::Iu4 | Elem::Fp4 => 4,
         }
     }
 
@@ -65,6 +80,23 @@ impl Elem {
             Elem::Bf8 => "e5m2",
             Elem::Fp8Fnuz => "e4m3fnuz",
             Elem::Bf8Fnuz => "e5m2fnuz",
+            Elem::Fp6 => "e2m3",
+            Elem::Bf6 => "e3m2",
+            Elem::Fp4 => "e2m1",
+            Elem::F8F6F4 => "f8f6f4",
+        }
+    }
+
+    /// Resolves the concrete element type of an `f8f6f4` operand from its
+    /// 3-bit `cbsz` (A) or `blgp` (B) selector (`0..=4`).
+    pub const fn from_f8f6f4(code: u32) -> Option<Elem> {
+        match code {
+            0 => Some(Elem::Fp8),
+            1 => Some(Elem::Bf8),
+            2 => Some(Elem::Fp6),
+            3 => Some(Elem::Bf6),
+            4 => Some(Elem::Fp4),
+            _ => None,
         }
     }
 }
@@ -117,9 +149,11 @@ pub struct MatrixForm {
     pub passes: u32,
     /// Whether A uses 4:2 structured sparsity (`vdst` is C+D, `src2` holds indices).
     pub sparse: bool,
-    /// Whether `cbsz` and `abid` modifiers are supported.
+    /// Whether the instruction takes per-block E8M0 `scale_src0` and `scale_src1` VGPRs.
+    pub scaled: bool,
+    /// Whether `cbsz` and `abid` modifiers are supported (or `cbsz` selects A format on `F8F6F4`).
     pub cbsz_abid: bool,
-    /// Whether `blgp` (or `neg` on CDNA3 f64) is supported.
+    /// Whether `blgp` (or `neg` on CDNA3 f64, or B format on `F8F6F4`) is supported.
     pub blgp: bool,
     /// The summation model.
     pub sum: Summation,
@@ -128,7 +162,7 @@ pub struct MatrixForm {
 }
 
 impl MatrixForm {
-    /// Dwords per lane of A (`'a'`), B (`'b'`), sparse index (`'k'`), or C/D.
+    /// Dwords per lane of A (`'a'`), B (`'b'`), sparse index (`'k'`), scale (`'s'`), or C/D.
     pub fn dwords(&self, operand: char) -> u32 {
         match operand {
             'a' => {
@@ -137,8 +171,24 @@ impl MatrixForm {
             }
             'b' => (self.n * self.blocks * self.k * self.b.bits()) / (self.wave * 32),
             'k' => u32::from(self.sparse),
+            's' => u32::from(self.scaled),
             'c' if self.sparse => 1,
             _ => (self.m * self.n * self.blocks * self.d.bits()) / (self.wave * 32),
+        }
+    }
+
+    /// Dwords per lane of A (`'a'`) or B (`'b'`) after resolving `F8F6F4` format codes.
+    pub fn operand_dwords(&self, operand: char, cbsz: u32, blgp: u32) -> Option<u32> {
+        match operand {
+            'a' if self.a == Elem::F8F6F4 => {
+                let elem = Elem::from_f8f6f4(cbsz)?;
+                Some((self.m * self.blocks * self.k * elem.bits()) / (self.wave * 32))
+            }
+            'b' if self.b == Elem::F8F6F4 => {
+                let elem = Elem::from_f8f6f4(blgp)?;
+                Some((self.n * self.blocks * self.k * elem.bits()) / (self.wave * 32))
+            }
+            other => Some(self.dwords(other)),
         }
     }
 

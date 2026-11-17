@@ -107,13 +107,17 @@ fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
     }
     use thin_target::{Elem::*, Summation};
     if let Some(rest) = mnemonic.strip_prefix("v_mfma_") {
-        let (d, a, b, m, n, k, passes) = match rest {
-            "f32_16x16x32_bf16" => (F32, Bf16, Bf16, 16, 16, 32, 4),
-            "f32_16x16x32_f16" => (F32, F16, F16, 16, 16, 32, 4),
-            "f32_32x32x16_bf16" => (F32, Bf16, Bf16, 32, 32, 16, 8),
-            "f32_32x32x16_f16" => (F32, F16, F16, 32, 32, 16, 8),
-            "i32_16x16x64_i8" => (I32, I8, I8, 16, 16, 64, 4),
-            "i32_32x32x32_i8" => (I32, I8, I8, 32, 32, 32, 8),
+        let (d, a, b, m, n, k, passes, scaled, f8f6f4) = match rest {
+            "f32_16x16x32_bf16" => (F32, Bf16, Bf16, 16, 16, 32, 4, false, false),
+            "f32_16x16x32_f16" => (F32, F16, F16, 16, 16, 32, 4, false, false),
+            "f32_32x32x16_bf16" => (F32, Bf16, Bf16, 32, 32, 16, 8, false, false),
+            "f32_32x32x16_f16" => (F32, F16, F16, 32, 32, 16, 8, false, false),
+            "i32_16x16x64_i8" => (I32, I8, I8, 16, 16, 64, 4, false, false),
+            "i32_32x32x32_i8" => (I32, I8, I8, 32, 32, 32, 8, false, false),
+            "f32_16x16x128_f8f6f4" => (F32, F8F6F4, F8F6F4, 16, 16, 128, 8, false, true),
+            "f32_32x32x64_f8f6f4" => (F32, F8F6F4, F8F6F4, 32, 32, 64, 16, false, true),
+            "scale_f32_16x16x128_f8f6f4" => (F32, F8F6F4, F8F6F4, 16, 16, 128, 8, true, true),
+            "scale_f32_32x32x64_f8f6f4" => (F32, F8F6F4, F8F6F4, 32, 32, 64, 16, true, true),
             _ => return None,
         };
         let sum = if d.integer() {
@@ -121,7 +125,7 @@ fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
         } else {
             Summation::Grouped {
                 group_half: 8,
-                group_byte: 16,
+                group_byte: if f8f6f4 { 32 } else { 16 },
                 fraction: 24,
             }
         };
@@ -136,8 +140,9 @@ fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
             wave: 64,
             passes,
             sparse: false,
-            cbsz_abid: false,
-            blgp: false,
+            scaled,
+            cbsz_abid: f8f6f4,
+            blgp: f8f6f4,
             sum,
             provisional: true,
         });
@@ -180,6 +185,7 @@ fn mfma_form(mnemonic: &str) -> Option<MatrixForm> {
         wave: 64,
         passes,
         sparse: true,
+        scaled: false,
         cbsz_abid: true,
         blgp: false,
         sum,
