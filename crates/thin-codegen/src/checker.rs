@@ -284,7 +284,8 @@ fn op_counter(op: &str, rest: &str, unified: bool) -> Option<(u8, bool, bool)> {
         .find_map(|u| op.strip_prefix(u).map(|r| (*u, r)));
     if let Some((u, r)) = unit {
         if r.starts_with("load") {
-            let dma = u == "buffer_" && rest.split_whitespace().any(|t| t == "lds");
+            let dma = r.starts_with("load_lds_")
+                || (u == "buffer_" && rest.split_whitespace().any(|t| t == "lds"));
             return Some((if unified { VM } else { 0 }, !dma, false));
         }
         if r.starts_with("store") || r == "wbl2" || r == "inv" {
@@ -443,6 +444,7 @@ pub fn counter_waits(text: &str) -> Vec<(Record, String)> {
         "global_load_sbyte",
         "global_load_ushort",
         "global_load_sshort",
+        "global_load_lds_",
         "buffer_load_dword",
         "ds_read_",
         "ds_write_",

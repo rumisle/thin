@@ -901,4 +901,44 @@ fn cdna4_valu_and_all_49_scalef32_ops_execute() {
         // v2 in-place swaps 0..31 with 32..63:
         assert_eq!(w.v[2 * 64 + l], 0x300 + (l ^ 32) as u32);
     }
+
+    // 4. Transpose LDS load requires full EXEC mask and aligned LDS addresses:
+    let bad_exec_prog = read_program(
+        "\ts_mov_b32 exec_hi, 0\n\tds_read_b64_tr_b16 v[0:1], v2\n\ts_endpgm\n",
+        target,
+    )
+    .unwrap();
+    let mut m_exec = Machine::new(bad_exec_prog, f.clone(), 8, 0, 4096).unwrap();
+    let err = m_exec
+        .run_wg(
+            &mut Memory::default(),
+            &mut Tables::default(),
+            0,
+            (0, 0),
+            1,
+            0,
+            Some(&mut |w| w.v.fill(0)),
+        )
+        .err()
+        .expect("EXEC fault");
+    assert_eq!(err.cause, Some(Cause::Fault));
+    assert!(err.message.contains("EXEC all ones"), "{}", err.message);
+
+    let bad_align_prog =
+        read_program("\tds_read_b64_tr_b8 v[0:1], v2\n\ts_endpgm\n", target).unwrap();
+    let mut m_align = Machine::new(bad_align_prog, f, 8, 0, 4096).unwrap();
+    let err = m_align
+        .run_wg(
+            &mut Memory::default(),
+            &mut Tables::default(),
+            0,
+            (0, 0),
+            1,
+            0,
+            Some(&mut |w| w.v.fill(4)),
+        )
+        .err()
+        .expect("alignment fault");
+    assert_eq!(err.cause, Some(Cause::Fault));
+    assert!(err.message.contains("8-byte aligned"), "{}", err.message);
 }

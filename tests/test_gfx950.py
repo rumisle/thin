@@ -302,7 +302,7 @@ def _run_cdna4_mfma(
             mem,
             [ka],
             grid=(1,),
-        ).run()
+        ).run()[0]
     return np.frombuffer(buf_d.read(0, 64 * d_dwords * 4), dtype=np.uint32).reshape(64, d_dwords)
 
 
@@ -686,7 +686,7 @@ def _run_lanes(asm_body: str, n_out: int, target_name: str = "gfx950") -> np.nda
             mem,
             [ka],
             grid=(1,),
-        ).run()
+        ).run()[0]
     return np.frombuffer(out_buf.read(0, 64 * n_out * 4), dtype=np.uint32).reshape(64, n_out)
 
 
@@ -836,3 +836,340 @@ def test_gfx950_new_valu_ops():
     assert np.all(leg[:, 0].view(np.float32) == 8.0)
     assert np.all(leg[:, 1] == 0xFF7FFFFF)
     assert np.all(leg[:, 2].view(np.float32) == 3.0)
+
+
+def _pack_col_major_subbytes(mat: np.ndarray, bits: int) -> bytes:
+    """Pack a column-major (M, K) code matrix (M contiguous) into raw LDS bytes."""
+    flat = np.ascontiguousarray(mat.T).reshape(-1)  # (K, M) -> M fastest!
+    if bits == 16:
+        return flat.astype(np.uint16).tobytes()
+    if bits == 8:
+        return flat.astype(np.uint8).tobytes()
+    if bits == 4:
+        lo = flat[0::2].astype(np.uint8) & 0xF
+        hi = (flat[1::2].astype(np.uint8) & 0xF) << 4
+        return (lo | hi).tobytes()
+    # bits == 6: pack every 4 elements (24 bits) into 3 bytes:
+    c = flat.astype(np.uint32) & 0x3F
+    w24 = c[0::4] | (c[1::4] << 6) | (c[2::4] << 12) | (c[3::4] << 18)
+    out = np.empty(w24.size * 3, dtype=np.uint8)
+    out[0::3] = w24 & 0xFF
+    out[1::3] = (w24 >> 8) & 0xFF
+    out[2::3] = (w24 >> 16) & 0xFF
+    return out.tobytes()
+
+
+def test_gfx950_transpose_lds_reads_feed_mfma_across_all_4_widths():
+    """Verify DS_READ_B64_TR_B{16,8,4} and DS_READ_B96_TR_B6 feed directly into MFMA."""
+    from thin import formats
+    from thin.emu import Cluster, Memory
+    from thin.target import targeting
+
+    rng = np.random.default_rng(9508)
+
+    cases = [
+        # (tr_op, mfma_op, m, n, k, bits, dt_name, mods, a_reg0, a_reg1, a_mfma, second_off)
+        (
+            "ds_read_b64_tr_b16",
+            "v_mfma_f32_32x32x16_bf16",
+            32,
+            32,
+            16,
+            16,
+            "bf16",
+            "",
+            "v[16:17]",
+            "v[18:19]",
+            "v[16:19]",
+            256,
+        ),
+        (
+            "ds_read_b64_tr_b8",
+            "v_mfma_i32_16x16x64_i8",
+            16,
+            16,
+            64,
+            8,
+            None,
+            "",
+            "v[16:17]",
+            "v[18:19]",
+            "v[16:19]",
+            128,
+        ),
+        (
+            "ds_read_b64_tr_b4",
+            "v_mfma_f32_32x32x64_f8f6f4",
+            32,
+            32,
+            64,
+            4,
+            "e2m1",
+            "cbsz:4 blgp:4",
+            "v[16:17]",
+            "v[18:19]",
+            "v[16:19]",
+            256,
+        ),
+        # Odd VGPR tuple v[17:19] + v[20:22] -> v[17:22] for 96-bit 6-bit transpose!
+        (
+            "ds_read_b96_tr_b6",
+            "v_mfma_f32_32x32x64_f8f6f4",
+            32,
+            32,
+            64,
+            6,
+            "e2m3",
+            "cbsz:2 blgp:2",
+            "v[17:19]",
+            "v[20:22]",
+            "v[17:22]",
+            384,
+        ),
+    ]
+
+    for tr_op, mfma_op, m, n, k, bits, dt_name, mods, r0, r1, a_op, off2 in cases:
+        if dt_name is None:
+            a_i8 = rng.integers(-8, 8, (m, k), dtype=np.int8)
+            b_i8 = rng.integers(-8, 8, (n, k), dtype=np.int8)
+            a_codes = a_i8.view(np.uint8)
+            b_codes = b_i8.view(np.uint8)
+            want = a_i8.astype(np.int32) @ b_i8.astype(np.int32).T
+        else:
+            dt = formats.DTYPES[dt_name]
+            a_f32 = (rng.integers(-3, 4, (m, k)) * 0.5).astype(np.float32)
+            b_f32 = (rng.integers(-3, 4, (n, k)) * 0.5).astype(np.float32)
+            kw = {"nan": 0} if bits < 8 else {}
+            a_codes = formats.encode(a_f32, dt, saturate=True, **kw)
+            b_codes = formats.encode(b_f32, dt, saturate=True, **kw)
+            want = (
+                formats.decode(a_codes, dt).astype(np.float64)
+                @ formats.decode(b_codes, dt).astype(np.float64).T
+            ).astype(np.float32)
+
+        lds_blob = _pack_col_major_subbytes(a_codes, bits)
+        b_lanes = _pack_cdna4_input(b_codes, n, k, bits)
+        nb = b_lanes.shape[1]
+        d_dw = (m * n) // 64
+
+        # Per-lane LDS address for `ds_read_*_tr_*`:
+        col_bytes = (m * bits) // 8
+        lds_read_bytes = 12 if bits == 6 else 8
+        n_elems = (8 * lds_read_bytes) // bits
+        lanes_per_k = 16 // n_elems
+        addrs = np.zeros(64, dtype=np.uint32)
+        for lane in range(64):
+            row, col = divmod(lane, 16)
+            k_local = col // lanes_per_k
+            m_grp = col % lanes_per_k
+            if m == 16:
+                k_col = (k // 4) * row + k_local
+                m_byte = m_grp * lds_read_bytes
+            else:
+                k_col = (k // 2) * (row // 2) + k_local
+                m_byte = ((row % 2) * 16 + m_grp * n_elems) * bits // 8
+            addrs[lane] = k_col * col_bytes + m_byte
+
+        # Stage `lds_blob` into LDS via global_load_lds_dwordx4 (`64 * 16 = 1024` or 2x):
+        padded = lds_blob + b"\x00" * ((-len(lds_blob)) % 1024)
+        n_dma = len(padded) // 1024
+        lines = [
+            "\ts_load_dwordx8 s[4:11], s[0:1], 0x0",
+            "\ts_waitcnt lgkmcnt(0)",
+            "\tv_lshlrev_b32 v2, 4, v0",  # 16 * lane
+        ]
+        for step in range(n_dma):
+            lines.append(f"\ts_mov_b32 m0, {step * 1024}")
+            lines.append(f"\tglobal_load_lds_dwordx4 v2, s[4:5] offset:{step * 1024}")
+        lines.extend(
+            [
+                "\tv_lshlrev_b32 v3, 2, v0",
+                "\tglobal_load_dword v4, v3, s[6:7]",
+                f"\tv_mul_lo_u32 v5, v0, {nb * 4}",
+                *(f"\tglobal_load_dword v{48 + d}, v5, s[8:9] offset:{d * 4}" for d in range(nb)),
+                "\ts_waitcnt vmcnt(0)",
+                f"\t{tr_op} {r0}, v4",
+                f"\t{tr_op} {r1}, v4 offset:{off2}",
+                "\ts_waitcnt lgkmcnt(0)",
+                f"\t{mfma_op} a[0:{d_dw - 1}], {a_op}, v[48:{48 + nb - 1}], 0"
+                + (f" {mods}" if mods else ""),
+                f"\tv_mul_lo_u32 v6, v0, {d_dw * 4}",
+                *(
+                    f"\tv_accvgpr_read_b32 v7, a{d}\n"
+                    f"\tglobal_store_dword v6, v7, s[10:11] offset:{d * 4}"
+                    for d in range(d_dw)
+                ),
+                "\ts_endpgm\n",
+            ]
+        )
+
+        mem = Memory()
+        buf_lds = mem.alloc("lds_src", len(padded), tagged=False)
+        buf_addr = mem.alloc("addrs", 256, tagged=False)
+        buf_b = mem.alloc("b", b_lanes.nbytes, tagged=False)
+        buf_d = mem.alloc("d", 64 * d_dw * 4, tagged=False)
+        buf_lds.write(0, padded)
+        buf_addr.write(0, addrs.tobytes())
+        buf_b.write(0, np.ascontiguousarray(b_lanes, dtype=np.uint32).tobytes())
+        ka = mem.alloc("ka", 32, tagged=False)
+        ka.write(
+            0,
+            np.array(
+                [buf_lds.base, buf_addr.base, buf_b.base, buf_d.base], dtype=np.uint64
+            ).tobytes(),
+        )
+        with targeting("gfx950"):
+            cl = Cluster(
+                "\n".join(lines),
+                {
+                    "wgsize": 64,
+                    "vgpr": 80,
+                    "agpr": 32,
+                    "lds": 4096,
+                    "user_sgprs": 2,
+                },
+                mem,
+                [ka],
+                grid=(1,),
+            )
+            rep = cl.run()[0]
+        got_u32 = np.frombuffer(buf_d.read(0, 64 * d_dw * 4), dtype=np.uint32).reshape(64, d_dw)
+        got = _unpack_cdna4_output(got_u32, m, n)
+        if dt_name is None:
+            assert np.array_equal(got.view(np.int32), want), tr_op
+        else:
+            assert np.array_equal(got.view(np.float32), want), tr_op
+            # For 32x32 B16 and B4 without swizzle, 64-bank LDS achieves ZERO bank conflicts!
+            if bits in (16, 4):
+                assert all(v[2] == 0 for v in rep.banks.values()), (tr_op, rep.banks)
+
+
+def test_gfx950_wide_lds_dma_160kb_lds_64_banks_and_buffer_atomic_bf16():
+    """Verify b96/b128 LDS DMA (dwordx3 skips dword 3), 160 KB LDS, 64 banks, and pk_add_bf16."""
+    from thin.emu import Cluster, Memory
+    from thin.target import targeting
+
+    # 160 KB LDS = 163_840 bytes; place b128 DMA at top 1 KB (162_816..163_840) and
+    # b96 DMA over pre-filled 0xdeadbeef at 161_792..162_816: dwordx3 leaves dword 3 untouched.
+    src_x4 = np.arange(1, 257, dtype=np.uint32)  # 64 * 4 dwords = 1024 B
+    src_x3 = (0x1000 + np.arange(64 * 3, dtype=np.uint32)).reshape(64, 3)  # 64 * 12 B = 768 B
+    buf_x3 = (0x2000 + np.arange(64 * 3, dtype=np.uint32)).reshape(64, 3)
+
+    asm = "\n".join(
+        [
+            "\ts_load_dwordx8 s[4:11], s[0:1], 0x0",
+            "\ts_load_dwordx2 s[12:13], s[0:1], 0x20",
+            "\ts_waitcnt lgkmcnt(0)",
+            # Pre-fill LDS[161792..162816] and LDS[0..1024] with 0xdeadbeef (dword 3 must survive):
+            "\tv_lshlrev_b32 v1, 4, v0",
+            "\tv_mov_b32 v2, 0xdeadbeef",
+            "\tv_mov_b32 v3, 0xdeadbeef",
+            "\tv_mov_b32 v4, 0xdeadbeef",
+            "\tv_mov_b32 v5, 0xdeadbeef",
+            "\tv_add_u32 v6, 161792, v1",
+            "\tds_write_b128 v6, v[2:5]",
+            "\tds_write_b128 v1, v[2:5]",
+            "\ts_waitcnt lgkmcnt(0)",
+            # 1) global_load_lds_dwordx4 into top 1 KB of 160 KB LDS (162816..163840):
+            "\ts_mov_b32 m0, 162816",
+            "\tglobal_load_lds_dwordx4 v1, s[4:5]",
+            # 2) global_load_lds_dwordx3 into 161792..162816 (stride 12 B global, 16 B LDS):
+            "\tv_mul_lo_u32 v7, v0, 12",
+            "\ts_mov_b32 m0, 161792",
+            "\tglobal_load_lds_dwordx3 v7, s[6:7]",
+            # 3) buffer_load_dwordx3 ... lds into 0..1024 via MUBUF descriptor s[16:19]:
+            "\ts_mov_b32 s16, s8",
+            "\ts_mov_b32 s17, s9",
+            "\ts_mov_b32 s18, 768",
+            "\ts_mov_b32 s19, 0x00020000",
+            "\ts_mov_b32 m0, 0",
+            "\tbuffer_load_dwordx3 v7, s[16:19], 0 offen lds",
+            "\ts_waitcnt vmcnt(0)",
+            # Read back all 3 regions (and test 64-bank conflict-free 64-lane b32 read at 162816):
+            "\tv_lshlrev_b32 v8, 2, v0",
+            "\tv_add_u32 v9, 162816, v8",
+            "\tds_read_b32 v20, v9",  # 64 distinct dwords -> 0 bank conflicts on 64-bank LDS!
+            "\tds_read_b128 v[24:27], v6",
+            "\tds_read_b128 v[28:31], v1",
+            "\ts_waitcnt lgkmcnt(0)",
+            # 4) buffer_atomic_pk_add_bf16 with sc0 (returning original value):
+            "\ts_mov_b32 s20, s10",
+            "\ts_mov_b32 s21, s11",
+            "\ts_mov_b32 s22, 256",
+            "\ts_mov_b32 s23, 0x00020000",
+            "\tv_mov_b32 v32, 0x40003f80",  # add [1.0, 2.0] in BF16
+            "\tbuffer_atomic_pk_add_bf16 v32, v8, s[20:23], 0 offen sc0",
+            "\ts_waitcnt vmcnt(0)",
+            # Store [v20, v24..27, v28..31, v32] (10 dwords/lane) to out buffer:
+            "\tv_mul_lo_u32 v40, v0, 40",
+            "\tglobal_store_dword v40, v20, s[12:13] offset:0",
+            *(
+                f"\tglobal_store_dword v40, v{24 + d}, s[12:13] offset:{4 + 4 * d}"
+                for d in range(4)
+            ),
+            *(
+                f"\tglobal_store_dword v40, v{28 + d}, s[12:13] offset:{20 + 4 * d}"
+                for d in range(4)
+            ),
+            "\tglobal_store_dword v40, v32, s[12:13] offset:36",
+            "\ts_endpgm\n",
+        ]
+    )
+
+    mem = Memory()
+    b_gx4 = mem.alloc("gx4", src_x4.nbytes, tagged=False)
+    b_gx3 = mem.alloc("gx3", src_x3.nbytes, tagged=False)
+    b_bx3 = mem.alloc("bx3", buf_x3.nbytes, tagged=False)
+    b_atm = mem.alloc("atm", 256, tagged=False)
+    b_out = mem.alloc("out", 64 * 40, tagged=False)
+    b_gx4.write(0, src_x4.tobytes())
+    b_gx3.write(0, src_x3.tobytes())
+    b_bx3.write(0, buf_x3.tobytes())
+    init_bf16 = np.full(64, 0x3F004040, dtype=np.uint32)  # [3.0, 0.5] in BF16
+    b_atm.write(0, init_bf16.tobytes())
+    ka = mem.alloc("ka", 40, tagged=False)
+    ka.write(
+        0,
+        np.array(
+            [b_gx4.base, b_gx3.base, b_bx3.base, b_atm.base, b_out.base], dtype=np.uint64
+        ).tobytes(),
+    )
+
+    with targeting("gfx950"):
+        rep = Cluster(
+            asm,
+            {"wgsize": 64, "vgpr": 48, "agpr": 0, "lds": 163_840, "user_sgprs": 2},
+            mem,
+            [ka],
+            grid=(1,),
+        ).run()[0]
+
+    got = np.frombuffer(b_out.read(0, 64 * 40), dtype=np.uint32).reshape(64, 10)
+    # 1) Top of 160 KB LDS (162816..163072) read via 64-lane ds_read_b32:
+    assert np.array_equal(got[:, 0], src_x4[:64])
+    # 2) global_load_lds_dwordx3 copied 3 dwords and left the 4th dword untouched:
+    assert np.array_equal(got[:, 1:4], src_x3)
+    assert np.all(got[:, 4] == 0xDEADBEEF)
+    # 3) buffer_load_dwordx3 ... lds copied 3 dwords and left the 4th dword untouched:
+    assert np.array_equal(got[:, 5:8], buf_x3)
+    assert np.all(got[:, 8] == 0xDEADBEEF)
+    # 4) Returning buffer_atomic_pk_add_bf16 returned [3.0, 0.5] and wrote [4.0, 2.5]:
+    assert np.all(got[:, 9] == 0x3F004040)
+    atm_after = np.frombuffer(b_atm.read(0, 256), dtype=np.uint32)
+    assert np.all(atm_after == 0x40204080)  # lo=4.0 (0x4080), hi=2.5 (0x4020)
+    # 5) Zero bank conflicts across all 64-bank aligned LDS ops:
+    assert all(v[2] == 0 for v in rep.banks.values()), rep.banks
+    # Contrast 64-bank vs 32-bank on stride-32-dword (128 B) access:
+    # On 64-bank gfx950, lane*128 hits banks 0 and 32 (32-way conflict -> 31 conflict cycles),
+    # whereas on 32-bank gfx942, lane*128 hits bank 0 for all 64 lanes (63 conflict cycles)!
+    stride_asm = (
+        "\tv_lshlrev_b32 v1, 7, v0\n\tds_write_b32 v1, v0\n\ts_waitcnt lgkmcnt(0)\n\ts_endpgm\n"
+    )
+    for tname, want_entry in [("gfx950", [1, 32, 31]), ("gfx942", [1, 64, 62])]:
+        m2 = Memory()
+        ka2 = m2.alloc("ka", 8, tagged=False)
+        with targeting(tname):
+            r2 = Cluster(
+                stride_asm, {"wgsize": 64, "vgpr": 4, "lds": 16384}, m2, [ka2], grid=(1,)
+            ).run()[0]
+        assert list(r2.banks.values()) == [want_entry]

@@ -356,7 +356,8 @@ pub fn vmem(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, canon: &str) -> Result<bo
     };
     match parts.as_slice() {
         ["global", "load", "lds", last] => {
-            let Some((n, signed)) = width(last).filter(|(n, _)| *n <= 4) else {
+            let Some((n, signed)) = width(last).filter(|(n, _)| matches!(*n, 1 | 2 | 4 | 12 | 16))
+            else {
                 return Ok(false);
             };
             let addrs = global_addrs(w, ins, &ops[0], ops.get(1))?;
@@ -370,7 +371,8 @@ pub fn vmem(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, canon: &str) -> Result<bo
             load(e, w, ins, &addrs, n, signed, None, &ops[0])?;
         }
         ["buffer", "load", last] if is_lds => {
-            let Some((n, signed)) = width(last).filter(|(n, _)| *n <= 4) else {
+            let Some((n, signed)) = width(last).filter(|(n, _)| matches!(*n, 1 | 2 | 4 | 12 | 16))
+            else {
                 return Ok(false);
             };
             let (base, num, offs) = buffer_addrs(w, ins, &ops[0], &ops[1], ops.get(2))?;
@@ -590,9 +592,12 @@ fn load(
 }
 
 /// A VMEM-to-LDS DMA (`buffer_load_* ... lds` or `global_load_lds_*`):
-/// reads `n` (1, 2, or 4) bytes per active lane from global/buffer memory,
-/// zero- or sign-extends sub-dword values to 32 bits, writes 4 bytes per
-/// active lane to `LDS[m0 + 4*lane .. +4]`, and counts on `vmcnt`.
+/// reads `n` (`1`, `2`, `4`, `12`, or `16`) bytes per active lane from
+/// global/buffer memory, zero- or sign-extends sub-dword values to 32 bits,
+/// writes them to `LDS[m0 + stride*lane ..]` with a 4-byte stride (16 bytes
+/// for `dwordx3`/`dwordx4`), and counts on `vmcnt`. A `dwordx3` transfer
+/// writes 3 dwords and leaves the 4th dword of its 16-byte slot untouched
+/// (CDNA 4 ISA manual §9.1.9).
 #[allow(clippy::too_many_arguments)]
 fn load_lds(
     e: &mut Exec<'_>,
@@ -619,30 +624,37 @@ fn load_lds(
             w.wid, ins.text
         )));
     }
+    let lds_stride: u64 = if n <= 4 { 4 } else { 16 };
+    let lds_written: u64 = if n <= 4 { 4 } else { u64::from(n) };
+    let lds_dwords = (lds_written / 4) as usize;
     let lds_size = e.lds.size() as u64;
     for l in active(exec, wn) {
-        let dst = m0_base + (l as u64) * 4;
-        if dst + 4 > lds_size {
+        let dst = m0_base + (l as u64) * lds_stride;
+        if dst + lds_written > lds_size {
             return Err(fault(format!(
                 "wave {} {}: LDS write out of range (max {}, LDS {})",
                 w.wid,
                 ins.text,
-                dst + 4,
+                dst + lds_written,
                 lds_size
             )));
         }
     }
-    let mut vals = [0u32; MAX_W];
-    let mut tags = [[0 as Tag; 4]; MAX_W];
-    let in_range = |l: usize| -> bool {
+    let mut vals = vec![[0u32; MAX_W]; lds_dwords];
+    let mut tags = vec![[[0 as Tag; 4]; MAX_W]; lds_dwords];
+    let elem = n.min(4) as u64;
+    let in_range = |l: usize, k: u64| -> bool {
         match &range {
-            Some((num, offs)) => offs[l] + u64::from(n) <= *num,
+            Some((num, offs)) => offs[l] + k + elem <= *num,
             None => true,
         }
     };
     let mut lanes: Vec<Option<(usize, u64)>> = vec![None; wn];
     for l in active(exec, wn) {
-        if in_range(l) {
+        let any = (0..u64::from(n))
+            .step_by(elem as usize)
+            .any(|k| in_range(l, k));
+        if any {
             lanes[l] = Some(e.mem.access(addrs[l], u64::from(n), false)?);
         }
     }
@@ -656,7 +668,9 @@ fn load_lds(
             if let Some((bb, o)) = lanes[l] {
                 if bb == b {
                     for k in 0..u64::from(n) {
-                        offs.push(o + k);
+                        if in_range(l, k - k % elem) {
+                            offs.push(o + k);
+                        }
                     }
                 }
             }
@@ -683,33 +697,39 @@ fn load_lds(
                 if bb != b {
                     continue;
                 }
-                for byte in 0..n as usize {
-                    vals[l] |= u32::from(data[k]) << (8 * byte);
-                    tags[l][byte] = t[k];
+                for j in 0..n as usize {
+                    if !in_range(l, (j as u64) - (j as u64) % elem) {
+                        continue;
+                    }
+                    let (d, byte) = (j / 4, j % 4);
+                    vals[d][l] |= u32::from(data[k]) << (8 * byte);
+                    tags[d][l][byte] = t[k];
                     k += 1;
                 }
                 if n < 4 && signed {
                     let bits = 8 * n;
-                    let v = vals[l];
-                    vals[l] = (((v << (32 - bits)) as i32) >> (32 - bits)) as u32;
+                    let v = vals[0][l];
+                    vals[0][l] = (((v << (32 - bits)) as i32) >> (32 - bits)) as u32;
                 }
             }
         }
     }
     let lds_bytes: Vec<u32> = active(exec, wn)
         .flat_map(|l| {
-            let a = m0_base + (l as u64) * 4;
-            (0..4).map(move |k| (a + k) as u32)
+            let a = m0_base + (l as u64) * lds_stride;
+            (0..lds_written).map(move |k| (a + k) as u32)
         })
         .collect();
     e.lds
         .check_write(w.wid, e.epoch, pc, &lds_bytes, false, e.texts, &ins.text)?;
     for l in active(exec, wn) {
-        let base_j = (m0_base + (l as u64) * 4) as usize;
-        let le = vals[l].to_le_bytes();
-        for k in 0..4 {
-            e.lds.data[base_j + k] = le[k];
-            e.lds.tags[base_j + k] = tags[l][k];
+        let base_j = (m0_base + (l as u64) * lds_stride) as usize;
+        for d in 0..lds_dwords {
+            let le = vals[d][l].to_le_bytes();
+            for k in 0..4 {
+                e.lds.data[base_j + 4 * d + k] = le[k];
+                e.lds.tags[base_j + 4 * d + k] = tags[d][l][k];
+            }
         }
     }
     let count = active(exec, wn).count() as u64;
@@ -1060,7 +1080,10 @@ fn pk_add_bf16(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins) -> Result<(), EmuError
     let bufs = bufs_of(&lanes);
     e.check_ipc(ins, &bufs, None)?;
     let site = e.site(w);
+    let returns = e.facts.scope.returns.is_some_and(|f| ins.field(f).is_some())
+        || matches!(ins.field("th"), Some(Field::Int(1)));
     let mut records = Vec::new();
+    let mut old_vals = [0u32; MAX_W];
     for &b in &bufs {
         let lane_ids: Vec<usize> = (0..wn)
             .filter(|l| lanes[*l].is_some_and(|x| x.0 == b))
@@ -1077,6 +1100,9 @@ fn pk_add_bf16(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins) -> Result<(), EmuError
         let uncached = e.mem.bufs[b].uncached();
         if let (false, Some(s)) = (uncached, &mut e.mem.scope) {
             s.atomic(b, size, &name, &offs, site, &ins.text)?;
+        }
+        if returns {
+            let _ = e.read_global(w, ins, b, &offs);
         }
         records.push(e.record_write(w, ins, b, offs.clone(), true, true, false));
         let o: Vec<Vec<u64>> = lane_ids
@@ -1163,10 +1189,16 @@ fn pk_add_bf16(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins) -> Result<(), EmuError
             }
             buf.data[off..off + 4].copy_from_slice(&new.to_le_bytes());
             buf.version += 1;
+            old_vals[*l] = cur;
         }
     }
     w.progress += 1;
-    e.vm_issue(w, true, records);
+    let returns = e.facts.scope.returns.is_some_and(|f| ins.field(f).is_some())
+        || matches!(ins.field("th"), Some(Field::Int(1)));
+    if returns {
+        w.vwrite(&ops[0], 0, &old_vals, None, exec)?;
+    }
+    e.vm_issue(w, !returns, records);
     Ok(())
 }
 
@@ -1334,6 +1366,133 @@ pub fn ds(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins, canon: &str) -> Result<bool
                     d as u32,
                     &vals[d],
                     tagged.then_some(tags[d].as_slice()),
+                    exec,
+                )?;
+            }
+            let seq = w.seq[2];
+            w.seq[2] += 1;
+            e.reports.stats.ds_read_bytes += bytes.len() as u64;
+            e.lds.record_read(w.wid, e.epoch, pc, seq, bytes);
+        }
+        // CDNA 4 MFMA transpose LDS loads (`ds_read_b64_tr_b{4,8,16}`, `ds_read_b96_tr_b6`;
+        // derived from CDNA 4 ISA manual §11.4 and §7.1.5 without MI350X/MI355X silicon):
+        // within each 16-lane row, `16 / n_elems` lanes per K column read `n_elems`
+        // consecutive M/N elements (`lds_bytes` bytes per lane) and transpose them so
+        // destination lane `row * 16 + m` receives `n_elems` consecutive K elements.
+        ["ds", "load", load_ty @ ("b64" | "b96"), "tr", elem_ty] => {
+            let (lds_bytes, dwords, elem_bits) = match (*load_ty, *elem_ty) {
+                ("b64", "b4") => (8u32, 2usize, 4usize),
+                ("b64", "b8") => (8u32, 2usize, 8usize),
+                ("b64", "b16") => (8u32, 2usize, 16usize),
+                ("b96", "b6") => (12u32, 3usize, 6usize),
+                _ => return Ok(false),
+            };
+            if wn != 64 || exec != w.all() {
+                return Err(fault(format!(
+                    "wave {} {}: transpose LDS load requires wave64 with EXEC all ones (got {exec:#x})",
+                    w.wid, ins.text
+                )));
+            }
+            let align = if lds_bytes == 8 { 8u64 } else { 4u64 };
+            let a = w.vread(&ops[1], 0)?;
+            let mut addrs = vec![0u64; wn];
+            for l in 0..wn {
+                addrs[l] = u64::from(a.v[l]) + off;
+                if addrs[l] % align != 0 {
+                    return Err(fault(format!(
+                        "wave {} {}: lane {l} LDS transpose address {:#x} is not {align}-byte aligned",
+                        w.wid, ins.text, addrs[l]
+                    )));
+                }
+                if addrs[l] + u64::from(lds_bytes) > size {
+                    return Err(fault(format!(
+                        "wave {} {}: LDS read out of range (max {})",
+                        w.wid, ins.text, size
+                    )));
+                }
+            }
+            count_banks(e, true, lds_bytes, &addrs, exec, wn);
+            let bytes: Vec<u32> = (0..wn)
+                .flat_map(|l| {
+                    let base = addrs[l];
+                    (0..u64::from(lds_bytes)).map(move |k| (base + k) as u32)
+                })
+                .collect();
+            let racers = e
+                .lds
+                .check_read(w.wid, e.epoch, pc, &bytes, e.texts, &ins.text)?;
+            if !racers.is_empty() {
+                let list: Vec<String> = racers.iter().map(ToString::to_string).collect();
+                return Err(fault(format!(
+                    "wave {} {}: reads LDS bytes written by wave(s) [{}] since the last barrier",
+                    w.wid,
+                    ins.text,
+                    list.join(", ")
+                )));
+            }
+            let mut raw_lds = [0u128; 64];
+            let mut any_tagged = false;
+            for l in 0..wn {
+                let base = addrs[l] as usize;
+                let mut v = 0u128;
+                for k in 0..lds_bytes as usize {
+                    v |= u128::from(e.lds.data[base + k]) << (8 * k);
+                    any_tagged |= e.lds.tags[base + k] != 0;
+                }
+                raw_lds[l] = v;
+            }
+            let n_elems = (8 * lds_bytes as usize) / elem_bits;
+            let lanes_per_k = 16 / n_elems;
+            let elem_mask = (1u128 << elem_bits) - 1;
+            let mut vals = vec![[0u32; MAX_W]; dwords];
+            let mut tags = vec![vec![[0 as Tag; 4]; wn]; dwords];
+            for l in 0..wn {
+                let (row, dst_col) = (l / 16, l % 16);
+                let mut out_bits = 0u128;
+                for k in 0..n_elems {
+                    let src_col = k * lanes_per_k + (dst_col / n_elems);
+                    let src_elem = dst_col % n_elems;
+                    let src_lane = row * 16 + src_col;
+                    let elem = (raw_lds[src_lane] >> (src_elem * elem_bits)) & elem_mask;
+                    out_bits |= elem << (k * elem_bits);
+                    if any_tagged && elem_bits >= 8 {
+                        let elem_bytes = elem_bits / 8;
+                        let src_base = addrs[src_lane] as usize + src_elem * elem_bytes;
+                        let dst_byte0 = k * elem_bytes;
+                        for b in 0..elem_bytes {
+                            let db = dst_byte0 + b;
+                            tags[db / 4][l][db % 4] = e.lds.tags[src_base + b];
+                        }
+                    }
+                }
+                if any_tagged && elem_bits < 8 {
+                    let mut src_set = Vec::new();
+                    for k in 0..n_elems {
+                        let src_lane = row * 16 + k * lanes_per_k + (dst_col / n_elems);
+                        let bit0 = (dst_col % n_elems) * elem_bits;
+                        let b0 = bit0 / 8;
+                        let b1 = (bit0 + elem_bits - 1) / 8;
+                        let base = addrs[src_lane] as usize;
+                        src_set.push(e.lds.tags[base + b0]);
+                        if b1 != b0 {
+                            src_set.push(e.lds.tags[base + b1]);
+                        }
+                    }
+                    let merged = crate::tags::src(&src_set);
+                    for d in 0..dwords {
+                        tags[d][l] = [merged; 4];
+                    }
+                }
+                for d in 0..dwords {
+                    vals[d][l] = (out_bits >> (32 * d)) as u32;
+                }
+            }
+            for d in 0..dwords {
+                w.vwrite(
+                    &ops[0],
+                    d as u32,
+                    &vals[d],
+                    any_tagged.then_some(tags[d].as_slice()),
                     exec,
                 )?;
             }

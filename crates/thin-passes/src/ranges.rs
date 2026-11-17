@@ -952,7 +952,7 @@ impl Ranges<'_> {
             self.offset(st, i, k, a, ds_reg, report)?;
         }
         if let (true, Some((_, reg))) = (vmem_lds, region) {
-            self.dma_lds(st, k, reg, report)?;
+            self.dma_lds(st, k, f.mem_bytes, reg, report)?;
         }
         Ok(())
     }
@@ -962,6 +962,7 @@ impl Ranges<'_> {
         &self,
         st: &State,
         k: usize,
+        mem_bytes: u32,
         reg: &thin_ir::Region,
         report: &mut Report,
     ) -> Result<(), Diag> {
@@ -994,7 +995,8 @@ impl Ranges<'_> {
             None if self.launch.wgsize > 0 => i128::from(self.launch.wgsize.min(wave)),
             None => i128::from(wave),
         };
-        let bytes = (iv.lo, iv.hi + 4 * lanes);
+        let stride = if mem_bytes > 4 { 16 } else { 4 };
+        let bytes = (iv.lo, iv.hi + stride * lanes);
         self.inside(k, report, bytes, iv, reg)
     }
 
