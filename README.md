@@ -107,6 +107,10 @@ With uv:
     uv run pytest
     cargo test --workspace
 
+The tests check thin's encodings and wait states against LLVM 22, so
+`llvm-mc`, `llc` and `llvm-objcopy` from LLVM 22 must be on `PATH`; they
+fail, rather than skip, without them.
+
 The first build compiles the Rust core; after that, a Rust edit rebuilds
 the extension in about a second (with pip, run `pip install -e .` again).
 Hardware tests run per target: `pytest -m gfx1201` on RDNA 4,

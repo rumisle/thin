@@ -11,11 +11,17 @@ use thin_target::{assemble, descriptor, read_s, CodeItem, Elem, Encoded, Flags, 
 
 const ARCH: &str = "gfx950";
 
-fn llvm_mc_available() -> bool {
-    Command::new("llvm-mc")
+/// Fails unless `tool` (LLVM 22, which knows this target) is on PATH: the LLVM
+/// parity checks must fail, never pass, when their reference is missing.
+fn require(tool: &str) {
+    let found = Command::new(tool)
         .arg("--version")
         .output()
-        .is_ok_and(|o| o.status.success())
+        .is_ok_and(|o| o.status.success());
+    assert!(
+        found,
+        "`{tool}` from LLVM 22 must be on PATH for the LLVM parity checks"
+    );
 }
 
 fn llvm_mc_bytes(lines: &[String]) -> Vec<Vec<u8>> {
@@ -278,14 +284,13 @@ fn cdna4_new_instructions_and_vop3px2_match_llvm_mc_byte_for_byte() {
         }
     }
 
-    if llvm_mc_available() {
-        let mc_bytes = llvm_mc_bytes(&lines);
-        for ((line, ours), mc) in lines.iter().zip(&our_bytes).zip(&mc_bytes) {
-            assert_eq!(
-                ours, mc,
-                "llvm-mc byte mismatch for `{line}`:\n  ours: {ours:02x?}\n  mc:   {mc:02x?}"
-            );
-        }
+    require("llvm-mc");
+    let mc_bytes = llvm_mc_bytes(&lines);
+    for ((line, ours), mc) in lines.iter().zip(&our_bytes).zip(&mc_bytes) {
+        assert_eq!(
+            ours, mc,
+            "llvm-mc byte mismatch for `{line}`:\n  ours: {ours:02x?}\n  mc:   {mc:02x?}"
+        );
     }
 }
 
@@ -716,44 +721,43 @@ fn cdna4_descriptor_and_160kb_lds_match_llvm_mc_and_elf_0x54f() {
         );
         let parsed = read_s(&asm, true).expect("read_s");
         let desc = descriptor(&parsed, t).expect("descriptor");
-        if llvm_mc_available() {
-            let tmp = std::env::temp_dir().join(format!(
-                "thin_gfx950_desc_{}_{}_{}.s",
-                std::process::id(),
-                vgpr,
-                lds
-            ));
-            let obj = tmp.with_extension("o");
-            let rod = tmp.with_extension("rodata");
-            std::fs::write(&tmp, &asm).unwrap();
-            assert!(Command::new("llvm-mc")
-                .args(["-filetype=obj", "-triple=amdgcn-amd-amdhsa", "-mcpu=gfx950"])
-                .arg(&tmp)
-                .arg("-o")
-                .arg(&obj)
-                .status()
-                .unwrap()
-                .success());
-            let elf_bytes = std::fs::read(&obj).unwrap();
-            // ELF64 header e_flags is at bytes [48..52] little-endian (`0x54F`).
-            let e_flags = u32::from_le_bytes(elf_bytes[48..52].try_into().unwrap());
-            assert_eq!(e_flags, t.hooks().e_flags());
-            assert!(Command::new("llvm-objcopy")
-                .arg("--dump-section")
-                .arg(format!(".rodata={}", rod.display()))
-                .arg(&obj)
-                .status()
-                .unwrap()
-                .success());
-            let mut mc_desc = std::fs::read(&rod).unwrap();
-            let _ = std::fs::remove_file(&tmp);
-            let _ = std::fs::remove_file(&obj);
-            let _ = std::fs::remove_file(&rod);
-            mc_desc[16..24].fill(0);
-            let mut ours = desc.to_vec();
-            ours[16..24].fill(0);
-            assert_eq!(ours, mc_desc, "descriptor mismatch for lds={lds}");
-        }
+        require("llvm-mc");
+        let tmp = std::env::temp_dir().join(format!(
+            "thin_gfx950_desc_{}_{}_{}.s",
+            std::process::id(),
+            vgpr,
+            lds
+        ));
+        let obj = tmp.with_extension("o");
+        let rod = tmp.with_extension("rodata");
+        std::fs::write(&tmp, &asm).unwrap();
+        assert!(Command::new("llvm-mc")
+            .args(["-filetype=obj", "-triple=amdgcn-amd-amdhsa", "-mcpu=gfx950"])
+            .arg(&tmp)
+            .arg("-o")
+            .arg(&obj)
+            .status()
+            .unwrap()
+            .success());
+        let elf_bytes = std::fs::read(&obj).unwrap();
+        // ELF64 header e_flags is at bytes [48..52] little-endian (`0x54F`).
+        let e_flags = u32::from_le_bytes(elf_bytes[48..52].try_into().unwrap());
+        assert_eq!(e_flags, t.hooks().e_flags());
+        assert!(Command::new("llvm-objcopy")
+            .arg("--dump-section")
+            .arg(format!(".rodata={}", rod.display()))
+            .arg(&obj)
+            .status()
+            .unwrap()
+            .success());
+        let mut mc_desc = std::fs::read(&rod).unwrap();
+        let _ = std::fs::remove_file(&tmp);
+        let _ = std::fs::remove_file(&obj);
+        let _ = std::fs::remove_file(&rod);
+        mc_desc[16..24].fill(0);
+        let mut ours = desc.to_vec();
+        ours[16..24].fill(0);
+        assert_eq!(ours, mc_desc, "descriptor mismatch for lds={lds}");
     }
 }
 
@@ -786,13 +790,6 @@ fn cdna4_lds_banks_hook_models_64_banks() {
             }
         }
     }
-}
-
-fn llc_available() -> bool {
-    Command::new("llc")
-        .arg("--version")
-        .output()
-        .is_ok_and(|o| o.status.success())
 }
 
 /// Runs `llc -mtriple=amdgcn-amd-amdhsa -mcpu=gfx950 -x mir -run-pass=post-RA-hazard-rec`
@@ -1176,8 +1173,8 @@ fn cdna4_hazard_rules_match_llvm_gfx950_wait_states() {
     assert!(thin_passes::hazards::clear(&placed_snap, m950).is_ok());
 
     // 3. Direct oracle comparison against LLVM 22 `llc -mcpu=gfx950 -x mir -run-pass=post-RA-hazard-rec`.
-    if llc_available() {
-        let mir_oracle_cases: &[(&str, &str, &str, &str)] = &[
+    require("llc");
+    let mir_oracle_cases: &[(&str, &str, &str, &str)] = &[
             (
                 "v_mfma_f32_4x4x4_16b_f16 a[0:3], v[0:1], v[2:3], a[0:3]",
                 "v_accvgpr_read_b32 v8, a0",
@@ -1252,18 +1249,17 @@ fn cdna4_hazard_rules_match_llvm_gfx950_wait_states() {
             ),
         ];
 
-        let mir_pairs: Vec<(&str, &str)> = mir_oracle_cases
-            .iter()
-            .map(|&(_, _, pm, cm)| (pm, cm))
-            .collect();
-        let llc_waits = llc_mir_pair_wait_states(&mir_pairs);
-        for (i, &(pa, ca, _, _)) in mir_oracle_cases.iter().enumerate() {
-            let ours = states_of(t950, m950, &[pa, ca])[1];
-            assert_eq!(
-                ours, llc_waits[i],
-                "LLVM GCNHazardRecognizer mismatch on `{pa}` -> `{ca}`: thin={ours}, llc={}",
-                llc_waits[i]
-            );
-        }
+    let mir_pairs: Vec<(&str, &str)> = mir_oracle_cases
+        .iter()
+        .map(|&(_, _, pm, cm)| (pm, cm))
+        .collect();
+    let llc_waits = llc_mir_pair_wait_states(&mir_pairs);
+    for (i, &(pa, ca, _, _)) in mir_oracle_cases.iter().enumerate() {
+        let ours = states_of(t950, m950, &[pa, ca])[1];
+        assert_eq!(
+            ours, llc_waits[i],
+            "LLVM GCNHazardRecognizer mismatch on `{pa}` -> `{ca}`: thin={ours}, llc={}",
+            llc_waits[i]
+        );
     }
 }

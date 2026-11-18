@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -469,7 +468,6 @@ def test_gfx950_tables_preserve_cdna_common_roles_and_cdna4_delta():
             assert rows942[key][attr] == rows950[key][attr], f"{key}: {attr}"
 
 
-@pytest.mark.skipif(shutil.which("llvm-mc") is None, reason="llvm-mc required")
 def test_gfx950_isa_tables_bidirectional_round_trip_against_llvm_mc():
     it950 = json.loads((ROOT / "crates/thin-targets/data/gfx950/isa_tables.json").read_text())
     encodings = {e["class"]: e for e in it950["encodings"]}
@@ -506,7 +504,6 @@ def test_gfx950_isa_tables_bidirectional_round_trip_against_llvm_mc():
             assert b2 == b1, f"{m}: {text}"
 
 
-@pytest.mark.skipif(shutil.which("llvm-mc") is None, reason="llvm-mc required")
 def test_gfx950_operand_table_bidirectional_round_trip_against_llvm_mc():
     ot950 = json.loads((ROOT / "crates/thin-targets/data/gfx950/operand_table.json").read_text())
     rows = [r for r in ot950 if r["mnemonic"] not in _LLVM_OMITTED_GFX9_VARIANTS]

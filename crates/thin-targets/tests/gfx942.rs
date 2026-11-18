@@ -6,11 +6,17 @@ use thin_target::{assemble, descriptor, read_s, CodeItem, Encoded, Footer};
 
 const ARCH: &str = "gfx942";
 
-fn llvm_mc_available() -> bool {
-    Command::new("llvm-mc")
+/// Fails unless `tool` (LLVM 22, which knows this target) is on PATH: the LLVM
+/// parity checks must fail, never pass, when their reference is missing.
+fn require(tool: &str) {
+    let found = Command::new(tool)
         .arg("--version")
         .output()
-        .is_ok_and(|o| o.status.success())
+        .is_ok_and(|o| o.status.success());
+    assert!(
+        found,
+        "`{tool}` from LLVM 22 must be on PATH for the LLVM parity checks"
+    );
 }
 
 /// Assembles `lines` with `llvm-mc -triple=amdgcn-amd-amdhsa -mcpu=gfx942 --show-encoding`
@@ -254,14 +260,13 @@ fn encoder_and_decoder_match_llvm_mc_byte_for_byte() {
         our_bytes.push(bytes);
     }
 
-    if llvm_mc_available() {
-        let mc_bytes = llvm_mc_bytes(lines);
-        for ((&line, ours), mc) in lines.iter().zip(&our_bytes).zip(&mc_bytes) {
-            assert_eq!(
-                ours, mc,
-                "llvm-mc byte mismatch for `{line}`:\n  ours: {ours:02x?}\n  mc:   {mc:02x?}"
-            );
-        }
+    require("llvm-mc");
+    let mc_bytes = llvm_mc_bytes(lines);
+    for ((&line, ours), mc) in lines.iter().zip(&our_bytes).zip(&mc_bytes) {
+        assert_eq!(
+            ours, mc,
+            "llvm-mc byte mismatch for `{line}`:\n  ours: {ours:02x?}\n  mc:   {mc:02x?}"
+        );
     }
 }
 
@@ -602,43 +607,42 @@ fn cdna3_descriptor_matches_llvm_mc_with_and_without_agprs() {
         );
         let parsed = read_s(&asm, true).expect("read_s");
         let desc = descriptor(&parsed, t).expect("descriptor");
-        if llvm_mc_available() {
-            let tmp = std::env::temp_dir().join(format!(
-                "thin_gfx942_desc_{}_{}_{}.s",
-                std::process::id(),
-                vgpr,
-                agpr
-            ));
-            let obj = tmp.with_extension("o");
-            let rod = tmp.with_extension("rodata");
-            std::fs::write(&tmp, &asm).unwrap();
-            assert!(Command::new("llvm-mc")
-                .args(["-filetype=obj", "-triple=amdgcn-amd-amdhsa", "-mcpu=gfx942",])
-                .arg(&tmp)
-                .arg("-o")
-                .arg(&obj)
-                .status()
-                .unwrap()
-                .success());
-            assert!(Command::new("llvm-objcopy")
-                .arg("--dump-section")
-                .arg(format!(".rodata={}", rod.display()))
-                .arg(&obj)
-                .status()
-                .unwrap()
-                .success());
-            let mut mc_desc = std::fs::read(&rod).unwrap();
-            let _ = std::fs::remove_file(&tmp);
-            let _ = std::fs::remove_file(&obj);
-            let _ = std::fs::remove_file(&rod);
-            mc_desc[16..24].fill(0);
-            let mut ours = desc.to_vec();
-            ours[16..24].fill(0);
-            assert_eq!(
-                ours, mc_desc,
-                "descriptor mismatch for vgpr={vgpr}, agpr={agpr}"
-            );
-        }
+        require("llvm-mc");
+        let tmp = std::env::temp_dir().join(format!(
+            "thin_gfx942_desc_{}_{}_{}.s",
+            std::process::id(),
+            vgpr,
+            agpr
+        ));
+        let obj = tmp.with_extension("o");
+        let rod = tmp.with_extension("rodata");
+        std::fs::write(&tmp, &asm).unwrap();
+        assert!(Command::new("llvm-mc")
+            .args(["-filetype=obj", "-triple=amdgcn-amd-amdhsa", "-mcpu=gfx942",])
+            .arg(&tmp)
+            .arg("-o")
+            .arg(&obj)
+            .status()
+            .unwrap()
+            .success());
+        assert!(Command::new("llvm-objcopy")
+            .arg("--dump-section")
+            .arg(format!(".rodata={}", rod.display()))
+            .arg(&obj)
+            .status()
+            .unwrap()
+            .success());
+        let mut mc_desc = std::fs::read(&rod).unwrap();
+        let _ = std::fs::remove_file(&tmp);
+        let _ = std::fs::remove_file(&obj);
+        let _ = std::fs::remove_file(&rod);
+        mc_desc[16..24].fill(0);
+        let mut ours = desc.to_vec();
+        ours[16..24].fill(0);
+        assert_eq!(
+            ours, mc_desc,
+            "descriptor mismatch for vgpr={vgpr}, agpr={agpr}"
+        );
     }
 }
 
@@ -669,19 +673,18 @@ fn cdna3_all_46_matrix_forms_match_isa_dwords_and_f64_neg_roundtrips() {
         "v_mfma_f64_16x16x4_f64 a[0:7], v[0:1], v[2:3], a[0:7] neg:[1,0,1]",
         "v_mfma_f64_4x4x4_4b_f64 v[0:1], a[0:1], v[2:3], 1.0 neg:[0,1,1]",
     ];
-    if llvm_mc_available() {
-        let want = llvm_mc_bytes(&neg_lines);
-        for (line, expected) in neg_lines.iter().zip(want) {
-            let Encoded::Bytes(bytes) = t.hooks().encode(line).expect(line) else {
-                panic!("expected Bytes encoding");
-            };
-            assert_eq!(bytes, expected, "encode mismatch on `{line}`");
-            let decoded = thin_targets::decode(ARCH, &bytes).expect("decode");
-            assert_eq!(decoded.len(), 1);
-            let reencoded =
-                thin_targets::encode_one(ARCH, &decoded[0]).expect("re-encode decoded f64 MFMA");
-            assert_eq!(reencoded, expected, "roundtrip mismatch on `{line}`");
-        }
+    require("llvm-mc");
+    let want = llvm_mc_bytes(&neg_lines);
+    for (line, expected) in neg_lines.iter().zip(want) {
+        let Encoded::Bytes(bytes) = t.hooks().encode(line).expect(line) else {
+            panic!("expected Bytes encoding");
+        };
+        assert_eq!(bytes, expected, "encode mismatch on `{line}`");
+        let decoded = thin_targets::decode(ARCH, &bytes).expect("decode");
+        assert_eq!(decoded.len(), 1);
+        let reencoded =
+            thin_targets::encode_one(ARCH, &decoded[0]).expect("re-encode decoded f64 MFMA");
+        assert_eq!(reencoded, expected, "roundtrip mismatch on `{line}`");
     }
     assert!(
         t.hooks()
@@ -707,19 +710,17 @@ fn cdna3_lds_dma_encoding_flags_and_m0_hazard_match_llvm_mc() {
         "global_load_lds_sshort v0, s[4:5] sc0",
         "global_load_lds_dword v0, s[4:5] offset:256 sc0",
     ];
-    if llvm_mc_available() {
-        let want = llvm_mc_bytes(&dma_lines);
-        for (line, expected) in dma_lines.iter().zip(want) {
-            let Encoded::Bytes(bytes) = t.hooks().encode(line).expect(line) else {
-                panic!("expected Bytes encoding");
-            };
-            assert_eq!(bytes, expected, "encode mismatch on `{line}`");
-            let decoded = thin_targets::decode(ARCH, &bytes).expect("decode");
-            assert_eq!(decoded.len(), 1);
-            let reencoded =
-                thin_targets::encode_one(ARCH, &decoded[0]).expect("re-encode decoded DMA");
-            assert_eq!(reencoded, expected, "roundtrip mismatch on `{line}`");
-        }
+    require("llvm-mc");
+    let want = llvm_mc_bytes(&dma_lines);
+    for (line, expected) in dma_lines.iter().zip(want) {
+        let Encoded::Bytes(bytes) = t.hooks().encode(line).expect(line) else {
+            panic!("expected Bytes encoding");
+        };
+        assert_eq!(bytes, expected, "encode mismatch on `{line}`");
+        let decoded = thin_targets::decode(ARCH, &bytes).expect("decode");
+        assert_eq!(decoded.len(), 1);
+        let reencoded = thin_targets::encode_one(ARCH, &decoded[0]).expect("re-encode decoded DMA");
+        assert_eq!(reencoded, expected, "roundtrip mismatch on `{line}`");
     }
 
     // CDNA3 rejects `lds` on multi-dword and d16 buffer_load forms.
