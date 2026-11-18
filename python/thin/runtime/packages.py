@@ -446,7 +446,9 @@ def read_by(code: str) -> set[str]:
     The audit hook is installed after the interpreter's startup (site and
     its.pth files untraced); what counts is every str path of an ``open``
     event while ``code`` runs and the file of every module it imports, as
-    real paths, less non-files, ``__pycache__`` and the standard library.
+    real paths, less non-files, ``__pycache__``, the standard library and
+    the operating system's own files (macOS's ``/System``, whose version
+    file the standard library's ``sysconfig`` reads): none is a source.
     """
     from thin.runtime.env import child
 
@@ -463,7 +465,12 @@ def read_by(code: str) -> set[str]:
     out = set()
     for p in filter(None, r.stdout.split("\0")):
         real = _real(p)
-        if not os.path.isfile(real) or "__pycache__" in real.split(os.sep) or _stdlib(real):
+        if (
+            not os.path.isfile(real)
+            or "__pycache__" in real.split(os.sep)
+            or _stdlib(real)
+            or (sys.platform == "darwin" and _inside(real, "/System"))
+        ):
             continue
         out.add(real)
     return out
