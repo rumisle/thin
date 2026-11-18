@@ -879,19 +879,30 @@ def test_a_script_named_as_no_module_is_still_hashed(tmp_path):
     assert files == ["helper.py", "my-gen.py"]
 
 
-def test_special_files_beside_a_script_are_not_read(tmp_path):
-    """A socket or FIFO (e.g. a session bus in /tmp) has no bytes; opening a FIFO would block."""
+def _socket_file(path) -> None:
+    """A Unix socket at ``path``, bound by its name from its folder: a socket's
+    path may be 104 bytes on macOS, which a temporary folder there can pass."""
     import socket
 
+    here = os.getcwd()
+    os.chdir(os.path.dirname(path))
+    try:
+        s = socket.socket(socket.AF_UNIX)
+        s.bind(os.path.basename(path))
+        s.close()
+    finally:
+        os.chdir(here)
+
+
+def test_special_files_beside_a_script_are_not_read(tmp_path):
+    """A socket or FIFO (e.g. a session bus in /tmp) has no bytes; opening a FIFO would block."""
     gen = tmp_path / "gen.py"
     gen.write_text("")
     (tmp_path / "pkg").mkdir()
     (tmp_path / "pkg" / "__init__.py").write_text("")
     for folder in (tmp_path, tmp_path / "pkg"):
         os.mkfifo(folder / "fifo.py")
-        s = socket.socket(socket.AF_UNIX)
-        s.bind(str(folder / "bus.py"))
-        s.close()
+        _socket_file(folder / "bus.py")
         os.symlink(folder / "missing", folder / "broken.py")
     _, files = _loose(gen)
     assert files == ["gen.py", "pkg/__init__.py"]
@@ -923,15 +934,12 @@ def test_a_huge_unrelated_tree_beside_a_script_is_not_walked(tmp_path, monkeypat
 def test_a_script_in_a_busy_folder_compiles_through_the_store(tmp_path):
     """A generator beside a socket and a FIFO, compiled in a fresh process."""
     import shutil
-    import socket
 
     folder = tmp_path / "busy"
     folder.mkdir()
     shutil.copy(os.path.join(ROOT, "examples", "vadd.py"), folder / "gen.py")
     os.mkfifo(folder / "fifo")
-    s = socket.socket(socket.AF_UNIX)
-    s.bind(str(folder / "bus"))
-    s.close()
+    _socket_file(folder / "bus")
     code = (
         f"import sys; sys.path.insert(0, {str(folder)!r})\n"
         "import thin, gen\n"

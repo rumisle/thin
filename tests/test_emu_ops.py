@@ -87,8 +87,14 @@ def test_pack_b32_f16_and_mul_f64_with_the_gpus_nans():
     got = _valu("v_mul_f64", 2, [x, y], x, wide=True)
     with np.errstate(all="ignore"):
         want = (x.view(np.float64) * y.view(np.float64)).view(np.uint64)
-    # x86's NaN rules are the GPU's here: the first NaN operand quieted, an
-    # invalid product 0xFFF8000000000000.
+    # The GPU's NaN rules, written out rather than taken from the host (an
+    # Arm host's NaNs differ): the first NaN operand quieted, else an invalid
+    # product 0xFFF8000000000000.
+    x_nan, y_nan = (np.isnan(v.view(np.float64)) for v in (x, y))
+    quiet = np.uint64(1 << 51)
+    want = np.where(np.isnan(want.view(np.float64)), np.uint64(0xFFF8000000000000), want)
+    want = np.where(y_nan, y | quiet, want)
+    want = np.where(x_nan, x | quiet, want)
     assert np.array_equal(got, want)
 
 
