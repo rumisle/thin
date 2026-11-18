@@ -7,7 +7,7 @@ Sources of truth cross-checked here without MI350X/MI355X hardware:
    the 44 shared CDNA 3/4 matrix forms (with OCP FP8/BF8 on `gfx950`).
 2. Independent exact IEEE/OCP bit-level formulas, `mpmath` (256-bit precision), and
    `ml_dtypes` (`float8_e4m3fn`, `float8_e5m2`, `float6_e2m3fn`, `float6_e3m2fn`,
-   `float4_e2m1fn`, `float8_e8m0fnu`, verified via `uv run --with ml_dtypes pytest`).
+   `float4_e2m1fn`, `float8_e8m0fnu`).
 
 Note: AMD's `matrix_calculator.py` has no `cdna4` architecture data; all new CDNA 4
 matrix layouts and grouped-summation numerics are derived from the ISA manual (`provisional=True`).
@@ -19,6 +19,7 @@ import gzip
 import json
 from pathlib import Path
 
+import ml_dtypes
 import mpmath
 import numpy as np
 
@@ -329,11 +330,6 @@ def test_cdna4_matrix_inventory_and_isa_manual_layout_bijections():
 
 def test_cdna4_ocp_formats_and_scaled_cvt_against_independent_and_ml_dtypes_ref():
     """Exhaustively cross-check all 6 OCP dtypes and `v_cvt_scalef32_*` against `ml_dtypes`."""
-    try:
-        import ml_dtypes  # type: ignore[import-not-found]
-    except ImportError:
-        ml_dtypes = None
-
     # 1) Exhaustive codepoint decode across all 6 OCP formats in `thin.formats`:
     ocp_specs = [
         ("e4m3fn", 256, "float8_e4m3fn"),
@@ -359,13 +355,12 @@ def test_cdna4_ocp_formats_and_scaled_cvt_against_independent_and_ml_dtypes_ref(
         fin = ~indep_nan
         np.testing.assert_array_equal(got_u32[fin], indep_u32[fin], err_msg=f"{name} decode")
 
-        if ml_dtypes is not None:
-            ml_dt = getattr(ml_dtypes, ml_attr)
-            ml_f32 = codes.view(ml_dt).astype(np.float32)
-            np.testing.assert_array_equal(np.isnan(ml_f32), indep_nan, err_msg=f"{name} ml NaN")
-            np.testing.assert_array_equal(
-                got_u32[fin], ml_f32.view(np.uint32)[fin], err_msg=f"{name} vs ml_dtypes"
-            )
+        ml_dt = getattr(ml_dtypes, ml_attr)
+        ml_f32 = codes.view(ml_dt).astype(np.float32)
+        np.testing.assert_array_equal(np.isnan(ml_f32), indep_nan, err_msg=f"{name} ml NaN")
+        np.testing.assert_array_equal(
+            got_u32[fin], ml_f32.view(np.uint32)[fin], err_msg=f"{name} vs ml_dtypes"
+        )
 
     # 2) Single batched `Cluster` launch testing exhaustive decode in `thin.emu`:
     #    256 threads (4 WGs x 64): thread `gid` decodes code `gid` for FP8/BF8 (scale=1.0 and 2.0),
@@ -631,25 +626,24 @@ def test_cdna4_ocp_formats_and_scaled_cvt_against_independent_and_ml_dtypes_ref(
     np.testing.assert_array_equal(got_dec_fp6, ref_tables["e2m3"])
     np.testing.assert_array_equal(got_dec_bf6, ref_tables["e3m2"])
 
-    if ml_dtypes is not None:
-        # Cross-check finite AND overflow/Inf conversions against `ml_dtypes` across all 5 dtypes:
-        non_nan = ~is_nan_sw
-        scaled_sw = sweep[non_nan] / np.float32(2.0)
+    # Cross-check finite AND overflow/Inf conversions against `ml_dtypes` across all 5 dtypes:
+    non_nan = ~is_nan_sw
+    scaled_sw = sweep[non_nan] / np.float32(2.0)
+    np.testing.assert_array_equal(
+        got_e4[non_nan], scaled_sw.astype(ml_dtypes.float8_e4m3fn).view(np.uint8)
+    )
+    np.testing.assert_array_equal(
+        got_e5[non_nan], scaled_sw.astype(ml_dtypes.float8_e5m2).view(np.uint8)
+    )
+    for got_arr, max_v, ml_dt in [
+        (got_fp6, 7.5, ml_dtypes.float6_e2m3fn),
+        (got_bf6, 28.0, ml_dtypes.float6_e3m2fn),
+        (got_f4, 6.0, ml_dtypes.float4_e2m1fn),
+    ]:
+        in_rng = np.isfinite(sweep) & (np.abs(sweep / 2.0) <= max_v)
         np.testing.assert_array_equal(
-            got_e4[non_nan], scaled_sw.astype(ml_dtypes.float8_e4m3fn).view(np.uint8)
+            got_arr[in_rng], (sweep[in_rng] / np.float32(2.0)).astype(ml_dt).view(np.uint8)
         )
-        np.testing.assert_array_equal(
-            got_e5[non_nan], scaled_sw.astype(ml_dtypes.float8_e5m2).view(np.uint8)
-        )
-        for got_arr, max_v, ml_dt in [
-            (got_fp6, 7.5, ml_dtypes.float6_e2m3fn),
-            (got_bf6, 28.0, ml_dtypes.float6_e3m2fn),
-            (got_f4, 6.0, ml_dtypes.float4_e2m1fn),
-        ]:
-            in_rng = np.isfinite(sweep) & (np.abs(sweep / 2.0) <= max_v)
-            np.testing.assert_array_equal(
-                got_arr[in_rng], (sweep[in_rng] / np.float32(2.0)).astype(ml_dt).view(np.uint8)
-            )
 
 
 def _exact_dyadic(x: float) -> tuple[int, int]:

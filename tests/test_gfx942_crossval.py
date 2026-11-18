@@ -13,6 +13,7 @@ import gzip
 import json
 from pathlib import Path
 
+import ml_dtypes
 import mpmath
 import numpy as np
 import pytest
@@ -486,15 +487,11 @@ def test_fnuz_exhaustive_256_decode_and_16384_f32_sweep():
     f8_dt = formats.DTYPES["e4m3fnuz"]
     b8_dt = formats.DTYPES["e5m2fnuz"]
 
-    # Optional live cross-check when torch or ml_dtypes is installed in this Python env:
+    # A further live cross-check when torch is installed in this Python env:
     try:
         import torch  # type: ignore[import-not-found]
     except ImportError:
         torch = None
-    try:
-        import ml_dtypes  # type: ignore[import-not-found]
-    except ImportError:
-        ml_dtypes = None
 
     # 1) Exhaustive 256-code decode in `thin.formats`:
     for dt, ref_bits_list, t_attr, m_attr in [
@@ -512,10 +509,9 @@ def test_fnuz_exhaustive_256_decode_and_16384_f32_sweep():
             np.testing.assert_array_equal(
                 got_f32.view(np.uint32)[fin], t_dec.numpy().view(np.uint32)[fin]
             )
-        if ml_dtypes is not None:
-            m_dec = raw_u8.view(getattr(ml_dtypes, m_attr)).astype(np.float32)
-            assert np.flatnonzero(np.isnan(m_dec)).tolist() == [0x80]
-            np.testing.assert_array_equal(got_f32.view(np.uint32)[fin], m_dec.view(np.uint32)[fin])
+        m_dec = raw_u8.view(getattr(ml_dtypes, m_attr)).astype(np.float32)
+        assert np.flatnonzero(np.isnan(m_dec)).tolist() == [0x80]
+        np.testing.assert_array_equal(got_f32.view(np.uint32)[fin], m_dec.view(np.uint32)[fin])
 
     # 2) Exhaustive 256-code decode in `thin.emu` (`v_cvt_f32_fp8/bf8` and `v_cvt_pk_f32_fp8/bf8`):
     asm_dec = """\
