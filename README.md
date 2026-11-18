@@ -139,8 +139,8 @@ Or use the BibTeX citation:
 
 ## License
 
-thin is licensed under the [Functional Source License, Version 1.1, ALv2
-Future License][license]. Third-party notices are in [NOTICE][notice].
+thin is licensed under the [Apache License, Version 2.0][license].
+Third-party notices are in [NOTICE][notice].
 
-[license]: https://github.com/rumisle/thin/blob/main/LICENSE.md
+[license]: https://github.com/rumisle/thin/blob/main/LICENSE
 [notice]: https://github.com/rumisle/thin/blob/main/NOTICE

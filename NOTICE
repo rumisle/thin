@@ -1,8 +1,9 @@
 thin
 ====
 
-Copyright 2026 rumisle. thin is licensed under the Functional Source
-License, Version 1.1, ALv2 Future License (FSL-1.1-ALv2); see LICENSE.md.
+Copyright 2026 rumisle
+
+Licensed under the Apache License, Version 2.0; see LICENSE.
 
 This product contains algorithms adapted from rocjitsu, AMD's GPU
 emulator (https://github.com/ROCm/rocm-systems/tree/develop/emulation/rocjitsu;
@@ -83,4 +84,7 @@ LLVM encoding cross-checks
 Golden encoder lines contain instruction encodings generated with llvm-mc
 for cross-checking. LLVM is distributed under Apache-2.0 WITH LLVM-exception:
 https://llvm.org/LICENSE.txt
-No LLVM source code is included in these generated test results.
+No LLVM source code is included in these generated test results. The CDNA
+wait-state rules in crates/thin-targets/src/cdna/hazards.rs follow the AMD
+ISA guides and the wait states of LLVM's GCNHazardRecognizer; the code is
+thin's own.

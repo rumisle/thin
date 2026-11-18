@@ -7,7 +7,7 @@ name = "thin"
 description = "A Python DSL for writing AMD GPU kernels (gfx1201 RDNA 4, gfx942 CDNA 3 / MI300X, gfx950 CDNA 4 / MI350X) at the instruction level, with an emulator"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "FSL-1.1-ALv2"
+license = "Apache-2.0"
 authors = [{ name = "rumisle" }]
 dynamic = ["version"]
 classifiers = [

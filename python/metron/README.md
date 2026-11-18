@@ -13,4 +13,4 @@ from a checkout with `pip install -e python/metron`; install thin separately
 for `metron.thin` and `metron.maker`. Supply the torch build for your GPU.
 
 See `docs/dev/ARCHITECTURE.md`, `docs/dev/hardware.md` and `docs/dev/limitations.md` in the
-repository. Licensed under FSL-1.1-ALv2 (source-available); see LICENSE.md.
+repository. Licensed under Apache-2.0; see LICENSE.
