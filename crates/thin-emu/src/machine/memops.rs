@@ -1080,7 +1080,11 @@ fn pk_add_bf16(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins) -> Result<(), EmuError
     let bufs = bufs_of(&lanes);
     e.check_ipc(ins, &bufs, None)?;
     let site = e.site(w);
-    let returns = e.facts.scope.returns.is_some_and(|f| ins.field(f).is_some())
+    let returns = e
+        .facts
+        .scope
+        .returns
+        .is_some_and(|f| ins.field(f).is_some())
         || matches!(ins.field("th"), Some(Field::Int(1)));
     let mut records = Vec::new();
     let mut old_vals = [0u32; MAX_W];
@@ -1193,7 +1197,11 @@ fn pk_add_bf16(e: &mut Exec<'_>, w: &mut Wave, ins: &Ins) -> Result<(), EmuError
         }
     }
     w.progress += 1;
-    let returns = e.facts.scope.returns.is_some_and(|f| ins.field(f).is_some())
+    let returns = e
+        .facts
+        .scope
+        .returns
+        .is_some_and(|f| ins.field(f).is_some())
         || matches!(ins.field("th"), Some(Field::Int(1)));
     if returns {
         w.vwrite(&ops[0], 0, &old_vals, None, exec)?;

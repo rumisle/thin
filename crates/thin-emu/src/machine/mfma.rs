@@ -509,10 +509,10 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
     let scale_regs = if form.scaled {
         let (_, sa) = reg_lanes(w, ins, 4, 1, true)?;
         let (_, sb) = reg_lanes(w, ins, 5, 1, true)?;
-        let sel_a =
-            (((list_at(ins, "op_sel_hi", 0, 0) as usize) & 1) << 1) | ((list_at(ins, "op_sel", 0, 0) as usize) & 1);
-        let sel_b =
-            (((list_at(ins, "op_sel_hi", 1, 0) as usize) & 1) << 1) | ((list_at(ins, "op_sel", 1, 0) as usize) & 1);
+        let sel_a = (((list_at(ins, "op_sel_hi", 0, 0) as usize) & 1) << 1)
+            | ((list_at(ins, "op_sel", 0, 0) as usize) & 1);
+        let sel_b = (((list_at(ins, "op_sel_hi", 1, 0) as usize) & 1) << 1)
+            | ((list_at(ins, "op_sel", 1, 0) as usize) & 1);
         Some((sa, sb, sel_a, sel_b))
     } else {
         None

@@ -523,13 +523,7 @@ pub fn ds(c: &Ctx<'_>, store: bool, data: &Reg, addr: Val, o: Opts) -> Result<Fa
 
 /// `ds_read_tr(dst, addr, elem_bits, offset)`: transpose LDS read (`ds.load.b64.tr.b{4,8,16}`
 /// or `ds.load.b96.tr.b6`).
-pub fn ds_read_tr(
-    c: &Ctx<'_>,
-    data: &Reg,
-    addr: Val,
-    elem_bits: Val,
-    o: Opts,
-) -> Result<Family> {
+pub fn ds_read_tr(c: &Ctx<'_>, data: &Reg, addr: Val, elem_bits: Val, o: Opts) -> Result<Family> {
     let bits = match elem_bits {
         Val::Int(v) => v,
         Val::Str(s) => match s.trim().to_ascii_lowercase().as_str() {

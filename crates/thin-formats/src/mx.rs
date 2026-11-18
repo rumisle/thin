@@ -183,7 +183,14 @@ mod tests {
         assert!(quantize(&x, &[48], dtype("e2m1").unwrap(), &mut codes, &mut scales).is_err());
         let (mut codes, mut scales) = ([0; 32], [0; 1]);
         let x = [0; 32];
-        assert!(quantize(&x, &[32], dtype("e4m3fnuz").unwrap(), &mut codes, &mut scales).is_err());
+        assert!(quantize(
+            &x,
+            &[32],
+            dtype("e4m3fnuz").unwrap(),
+            &mut codes,
+            &mut scales
+        )
+        .is_err());
         assert!(quantize(&x, &[32], dtype("f16").unwrap(), &mut codes, &mut scales).is_err());
         let e2m1 = dtype("e2m1").unwrap();
         assert!(quantize(&[], &[3, 0], e2m1, &mut [], &mut []).is_ok());

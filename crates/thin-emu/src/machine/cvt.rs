@@ -155,7 +155,11 @@ fn get_6bit(words: &[u32; 6], idx: usize) -> u32 {
     let bit_lo = 6 * idx;
     let (dw, sh) = (bit_lo / 32, bit_lo % 32);
     let lo = words[dw] >> sh;
-    let hi = if sh > 26 { words[dw + 1] << (32 - sh) } else { 0 };
+    let hi = if sh > 26 {
+        words[dw + 1] << (32 - sh)
+    } else {
+        0
+    };
     (lo | hi) & 0x3F
 }
 
@@ -661,12 +665,8 @@ fn cvt_scalef32(wv: &mut Wave, ins: &Ins, rest: &str, fnuz: bool) -> Result<bool
             }
         }
         // 13. v_cvt_scalef32_sr_pk32_{fp6,bf6}_{f32,f16,bf16}: 32 elements -> D[0..6], advancing PRNG per pass.
-        "sr.pk32.fp6.f32"
-        | "sr.pk32.bf6.f32"
-        | "sr.pk32.fp6.f16"
-        | "sr.pk32.bf6.f16"
-        | "sr.pk32.fp6.bf16"
-        | "sr.pk32.bf6.bf16" => {
+        "sr.pk32.fp6.f32" | "sr.pk32.bf6.f32" | "sr.pk32.fp6.f16" | "sr.pk32.bf6.f16"
+        | "sr.pk32.fp6.bf16" | "sr.pk32.bf6.bf16" => {
             let fmt = small(&rest[8..11], fnuz).expect("fp6/bf6");
             let src_ty = &rest[12..];
             let ndw = if src_ty == "f32" { 32 } else { 16 };

@@ -609,14 +609,7 @@ fn build_cdna_rules(cdna4: bool) -> Vec<Rule> {
         ),
         // 9b. Matrix -> VMEM / DS RAW: pass-count-aware
         //     (CDNA3: XDL p+3; CDNA4: XDL p+3+(p!=2); SMFMA: p+2; DGEMM: 9/18).
-        dyn_rule(
-            mat(),
-            vmem_ds(),
-            Dep::Raw,
-            window,
-            mat_to_mem,
-            no_late,
-        ),
+        dyn_rule(mat(), vmem_ds(), Dep::Raw, window, mat_to_mem, no_late),
         // 9c. DGEMM -> v_fma_f64 / v_fmac_f64 pipeline hazard: 2 wait states.
         dyn_rule(mat(), valu(), Dep::None, 2, dgemm_to_fma64, no_late),
         // 10. Matrix -> Matrix reading result as SrcA/SrcB/Idx/Scale (non-SrcC): pass-count-aware.
