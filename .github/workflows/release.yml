@@ -32,6 +32,7 @@ jobs:
     name: wheel (${{ matrix.os }})
     needs: version
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -41,6 +42,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v7
+      # The pinned toolchain on the host too: the tests run cargo metadata.
+      - run: rustup toolchain install
       - uses: actions/setup-python@v7
         with:
           python-version: |
