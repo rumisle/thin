@@ -19,3 +19,4 @@ For contributors, in [dev/](dev/):
 - [Limits of the internals](dev/limitations.md).
 - [Continuous integration](dev/ci.md): the pinned Rust toolchain and how
   to bump it, the MSRV, and the test-time budgets on a slower machine.
+- [Releasing](dev/release.md): versions and publishing to PyPI.

@@ -1,0 +1,110 @@
+# Publishes thin to PyPI: one abi3 wheel for Linux x86_64, one for macOS
+# arm64, and the sdist. A `v<version>` tag publishes to PyPI; running the
+# workflow by hand publishes the same build to TestPyPI, as a rehearsal.
+# Both upload through PyPI trusted publishing (no token) from the `pypi` or
+# `testpypi` environment. docs/dev/release.md has the steps.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  THIN_BUDGET_SCALE: "2"
+
+jobs:
+  version:
+    name: the tag is the Cargo version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"$/\1/p' Cargo.toml)
+          echo "Cargo.toml: $version"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "the tag $GITHUB_REF_NAME is not v$version"
+            exit 1
+          fi
+
+  wheel:
+    name: wheel (${{ matrix.os }})
+    needs: version
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64
+          - os: macos-latest
+            target: aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: |
+            3.10
+            3.13
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: "2_28"
+          args: --profile dist --out dist
+      # The suite against the installed wheel, as in ci.yml, with LLVM 22 as
+      # the reference of the parity tests.
+      - if: runner.os == 'Linux'
+        run: |
+          codename=$(lsb_release -cs)
+          sudo install -d /etc/apt/keyrings
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/keyrings/llvm.asc >/dev/null
+          echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] https://apt.llvm.org/$codename/ llvm-toolchain-$codename-22 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+          sudo apt-get update -q && sudo apt-get install -yq llvm-22
+          echo /usr/lib/llvm-22/bin >> "$GITHUB_PATH"
+      - if: runner.os == 'macOS'
+        run: |
+          brew install llvm@22
+          echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
+      - run: |
+          for py in python3.10 python3.13; do
+            $py -m venv "venv-$py"
+            "venv-$py/bin/pip" install dist/*.whl
+            "venv-$py/bin/python" -c "import thin._native"
+          done
+          venv-python3.13/bin/pip install ./python/metron numpy "pytest>=8" "mpmath>=1.3" "ml_dtypes>=0.5"
+          venv-python3.13/bin/python -m pytest
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wheel-${{ matrix.os }}
+          path: dist/*.whl
+
+  sdist:
+    name: sdist
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  publish:
+    name: publish to ${{ github.ref_type == 'tag' && 'PyPI' || 'TestPyPI' }}
+    needs: [wheel, sdist]
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_type == 'tag' && 'pypi' || 'testpypi' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ github.ref_type == 'tag' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
