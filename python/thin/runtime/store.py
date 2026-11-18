@@ -51,7 +51,8 @@ HEAD = 65536
 """The bytes a lookup reads first: magic and header must fit in them."""
 
 LOCK_PREFIX = "thin-store-"
-"""The per-user lock directory's prefix, under /dev/shm."""
+"""The per-user lock directory's prefix, under /dev/shm (a tmpfs, emptied at
+boot) where there is one, else under the user's temporary folder (macOS)."""
 
 log = logging.getLogger("thin.store")
 """The store's logger."""
@@ -348,7 +349,10 @@ def _raced(root, addr, members) -> str:
 
 
 def _lock_path(root, addr) -> str:
-    folder = f"/dev/shm/{LOCK_PREFIX}{os.getuid()}"
+    import tempfile
+
+    base = "/dev/shm" if os.path.isdir("/dev/shm") else tempfile.gettempdir()
+    folder = os.path.join(base, f"{LOCK_PREFIX}{os.getuid()}")
     os.makedirs(folder, mode=0o700, exist_ok=True)
     real = os.path.realpath(os.path.expanduser(root))
     rid = hashlib.sha256(real.encode()).hexdigest()[:16]
