@@ -252,11 +252,11 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, group_size: usize) -> u32
         return num::DNAN32;
     }
     let cv = f64::from(f32_of(c_bits));
-    let mut products = [0.0f64; 128];
     let n = av.len();
+    let product = |q: usize| av[q] * bv[q];
     let mut has_pos_inf = cv == f64::INFINITY;
     let mut has_neg_inf = cv == f64::NEG_INFINITY;
-    for (q, (&x, &y)) in av.iter().zip(bv).enumerate() {
+    for (&x, &y) in av.iter().zip(bv) {
         let p = x * y;
         if p.is_nan() {
             return num::DNAN32;
@@ -266,7 +266,6 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, group_size: usize) -> u32
         } else if p == f64::NEG_INFINITY {
             has_neg_inf = true;
         }
-        products[q] = p;
     }
     if has_pos_inf && has_neg_inf {
         return num::DNAN32;
@@ -283,7 +282,7 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, group_size: usize) -> u32
     for s0 in (0..n).step_by(g) {
         let end = (s0 + g).min(n);
         let Some(top) = (s0..end)
-            .filter(|&q| products[q] != 0.0)
+            .filter(|&q| product(q) != 0.0)
             .map(|q| floor_log2(av[q].abs()) + floor_log2(bv[q].abs()))
             .max()
         else {
@@ -292,8 +291,9 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, group_size: usize) -> u32
         let qe = top - 24;
         let step = 2f64.powi(qe);
         let s: i128 = (s0..end)
-            .filter(|&q| products[q] != 0.0)
-            .map(|q| (products[q] / step).trunc() as i128)
+            .map(product)
+            .filter(|&p| p != 0.0)
+            .map(|p| (p / step).trunc() as i128)
             .sum();
         acc = if acc == 0.0 {
             round_exact(s, qe, Elem::F32)
@@ -314,7 +314,7 @@ fn eval_xdlop_dot(av: &[f64], bv: &[f64], c_bits: u32, group_size: usize) -> u32
 
     if acc == 0.0 {
         let neg = |x: f64| x == 0.0 && x.is_sign_negative();
-        let all_neg = neg(cv) && products[..n].iter().all(|&p| neg(p));
+        let all_neg = neg(cv) && (0..n).all(|q| neg(product(q)));
         return if all_neg { 0x8000_0000 } else { 0 };
     }
     (acc as f32).to_bits()
@@ -533,12 +533,83 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
     let active_terms = if form.sparse { k / 2 } else { k };
     let mut av = vec![0.0f64; active_terms];
     let mut bv = vec![0.0f64; active_terms];
-    let mut a_raw32 = vec![0u32; active_terms];
-    let mut b_raw32 = vec![0u32; active_terms];
-    let mut a_raw64 = vec![0u64; active_terms];
-    let mut b_raw64 = vec![0u64; active_terms];
+    // Sparse forms only take f16/bf16/fp8/bf8/i8 inputs: no raw f32/f64 terms.
+    let (a_raw32, b_raw32, a_raw64, b_raw64) = (
+        Vec::<u32>::new(),
+        Vec::<u32>::new(),
+        Vec::<u64>::new(),
+        Vec::<u64>::new(),
+    );
+
+    // Dense operands depend on (row, k) or (column, k) alone: decode them once
+    // per block instead of once per output element.
+    let dense = !form.sparse;
+    let (rows_a, rows_b) = if dense { (m, n) } else { (0, 0) };
+    let mut a_val = vec![0.0f64; rows_a * k];
+    let mut b_val = vec![0.0f64; rows_b * k];
+    let mut a_r32 = vec![0u32; rows_a * k];
+    let mut b_r32 = vec![0u32; rows_b * k];
+    let mut a_r64 = vec![0u64; rows_a * k];
+    let mut b_r64 = vec![0u64; rows_b * k];
+    let raw32 = a_ty == Elem::F32 && b_ty == Elem::F32;
+    let scale = |regs: &[[u32; MAX_DWORDS]], sel: usize, row: usize, rows: usize, kk: usize| {
+        let byte = (regs[(kk / 32) * rows + row][0] >> (8 * sel)) & 0xFF;
+        if byte == 0xFF {
+            f64::NAN
+        } else {
+            2f64.powi(byte as i32 - 127)
+        }
+    };
 
     for b in 0..blocks {
+        if dense {
+            for i in 0..m {
+                for kk in 0..k {
+                    let (dw, lo, lane) =
+                        input_loc(m, k, blocks, i, kk, b, a_bits, false, false, cbsz, abid, 0);
+                    let at = i * k + kk;
+                    if is_f64 {
+                        let mut x =
+                            u64::from(a_regs[lane][dw]) | (u64::from(a_regs[lane][dw + 1]) << 32);
+                        if neg_f64[0] {
+                            x ^= 1u64 << 63;
+                        }
+                        a_r64[at] = x;
+                    } else if raw32 {
+                        a_r32[at] = a_regs[lane][dw];
+                    } else {
+                        let mut x = decode_elem(&a_regs[lane], a_ty, dw, lo);
+                        if let Some((sa, _, sel_a, _)) = scale_regs.as_ref() {
+                            x *= scale(sa, *sel_a, i, m, kk);
+                        }
+                        a_val[at] = x;
+                    }
+                }
+            }
+            for j in 0..n {
+                for kk in 0..k {
+                    let (dw, lo, lane) =
+                        input_loc(n, k, blocks, j, kk, b, b_bits, false, false, 0, 0, blgp);
+                    let at = j * k + kk;
+                    if is_f64 {
+                        let mut y =
+                            u64::from(b_regs[lane][dw]) | (u64::from(b_regs[lane][dw + 1]) << 32);
+                        if neg_f64[1] {
+                            y ^= 1u64 << 63;
+                        }
+                        b_r64[at] = y;
+                    } else if raw32 {
+                        b_r32[at] = b_regs[lane][dw];
+                    } else {
+                        let mut y = decode_elem(&b_regs[lane], b_ty, dw, lo);
+                        if let Some((_, sb, _, sel_b)) = scale_regs.as_ref() {
+                            y *= scale(sb, *sel_b, j, n, kk);
+                        }
+                        b_val[at] = y;
+                    }
+                }
+            }
+        }
         for i in 0..m {
             for j in 0..n {
                 let (d_dw, d_lane) = output_loc(m, n, i, j, b, d_bits);
@@ -587,48 +658,27 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                         bv[2 * g] = decode_elem(&b_regs[b0_lane], form.b, b0_dw, b0_lo);
                         bv[2 * g + 1] = decode_elem(&b_regs[b1_lane], form.b, b1_dw, b1_lo);
                     }
-                } else {
-                    for kk in 0..k {
-                        let (a_dw, a_lo, a_lane) =
-                            input_loc(m, k, blocks, i, kk, b, a_bits, false, false, cbsz, abid, 0);
-                        let (b_dw, b_lo, b_lane) =
-                            input_loc(n, k, blocks, j, kk, b, b_bits, false, false, 0, 0, blgp);
-                        if is_f64 {
-                            let mut xa = u64::from(a_regs[a_lane][a_dw])
-                                | (u64::from(a_regs[a_lane][a_dw + 1]) << 32);
-                            let mut yb = u64::from(b_regs[b_lane][b_dw])
-                                | (u64::from(b_regs[b_lane][b_dw + 1]) << 32);
-                            if neg_f64[0] {
-                                xa ^= 1u64 << 63;
-                            }
-                            if neg_f64[1] {
-                                yb ^= 1u64 << 63;
-                            }
-                            a_raw64[kk] = xa;
-                            b_raw64[kk] = yb;
-                        } else if a_ty == Elem::F32 && b_ty == Elem::F32 {
-                            a_raw32[kk] = a_regs[a_lane][a_dw];
-                            b_raw32[kk] = b_regs[b_lane][b_dw];
-                        } else {
-                            let mut xa = decode_elem(&a_regs[a_lane], a_ty, a_dw, a_lo);
-                            let mut yb = decode_elem(&b_regs[b_lane], b_ty, b_dw, b_lo);
-                            if let Some((sa, sb, sel_a, sel_b)) = scale_regs.as_ref() {
-                                let k_blk = kk / 32;
-                                let sa_byte = (sa[k_blk * m + i][0] >> (8 * sel_a)) & 0xFF;
-                                let sb_byte = (sb[k_blk * n + j][0] >> (8 * sel_b)) & 0xFF;
-                                if sa_byte == 0xFF || sb_byte == 0xFF {
-                                    xa = f64::NAN;
-                                    yb = f64::NAN;
-                                } else {
-                                    xa *= 2f64.powi(sa_byte as i32 - 127);
-                                    yb *= 2f64.powi(sb_byte as i32 - 127);
-                                }
-                            }
-                            av[kk] = xa;
-                            bv[kk] = yb;
-                        }
-                    }
                 }
+                let (av, bv, a_raw32, b_raw32, a_raw64, b_raw64) = if dense {
+                    let (ra, rb) = (i * k..(i + 1) * k, j * k..(j + 1) * k);
+                    (
+                        &a_val[ra.clone()],
+                        &b_val[rb.clone()],
+                        &a_r32[ra.clone()],
+                        &b_r32[rb.clone()],
+                        &a_r64[ra],
+                        &b_r64[rb],
+                    )
+                } else {
+                    (
+                        &av[..],
+                        &bv[..],
+                        &a_raw32[..],
+                        &b_raw32[..],
+                        &a_raw64[..],
+                        &b_raw64[..],
+                    )
+                };
 
                 if is_f64 {
                     let mut c_bits = u64::from(c_regs[d_lane][d_dw])
@@ -636,21 +686,21 @@ pub fn mfma(w: &mut Wave, ins: &Ins, form: &MatrixForm) -> Result<(), EmuError> 
                     if neg_f64[2] {
                         c_bits ^= 1u64 << 63;
                     }
-                    let res = eval_f64_dot(&a_raw64, &b_raw64, c_bits);
+                    let res = eval_f64_dot(a_raw64, b_raw64, c_bits);
                     out[d_dw][d_lane] = res as u32;
                     out[d_dw + 1][d_lane] = (res >> 32) as u32;
                 } else if is_int {
                     let mut acc = c_regs[d_lane][d_dw] as i32 as i64;
-                    for (&x, &y) in av.iter().zip(&bv) {
+                    for (&x, &y) in av.iter().zip(bv) {
                         acc = acc.wrapping_add((x as i64) * (y as i64));
                     }
                     out[d_dw][d_lane] = acc as i32 as u32;
                 } else if a_ty == Elem::F32 && b_ty == Elem::F32 {
                     let c_bits = c_regs[d_lane][d_dw];
-                    out[d_dw][d_lane] = eval_sgemm_fma(&a_raw32, &b_raw32, c_bits);
+                    out[d_dw][d_lane] = eval_sgemm_fma(a_raw32, b_raw32, c_bits);
                 } else {
                     let c_bits = c_regs[d_lane][d_dw];
-                    out[d_dw][d_lane] = eval_xdlop_dot(&av, &bv, c_bits, dot_group);
+                    out[d_dw][d_lane] = eval_xdlop_dot(av, bv, c_bits, dot_group);
                 }
             }
         }
