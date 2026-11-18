@@ -7,7 +7,7 @@ from tests import budgets
 
 def test_without_the_variable_the_budgets_are_as_written():
     assert budgets.time_scale({}) == 1.0
-    assert budgets.load(scale=1.0)["pytest"]["suite_seconds"] == 10
+    assert budgets.load(scale=1.0)["pytest"]["test_seconds"] == 1.0
 
 
 @pytest.mark.parametrize("raw", ["1", "2", "2.5", "4"])

@@ -2,8 +2,8 @@
 
 Every run prints the slowest tests, the session's wall time and peak RSS,
 and fails when one exceeds its budget: a test not marked ``slow`` above
-``test_seconds``, the session above ``suite_seconds`` (slow tests not
-counted), or the process above its RSS ceiling. A test marked
+``test_seconds``, or the process above its RSS ceiling. The session's
+time is reported, not budgeted: more tests are not a regression. A test marked
 ``slow("<section>")`` is held to that section's ``seconds`` and
 ``peak_rss_mb`` instead.
 
@@ -235,7 +235,7 @@ def _torch_mb() -> float:
 def _violations() -> list[str]:
     """Every budget the session exceeded."""
     pytest_budget = BUDGETS["pytest"]
-    seconds, rss, children = _cost()
+    _, rss, children = _cost()
     found = []
     for nodeid, spent in DURATIONS.items():
         limit = (
@@ -243,8 +243,6 @@ def _violations() -> list[str]:
         )
         if spent > limit:
             found.append(f"{nodeid}: {spent:.2f} s > {_scaled(limit)}")
-    if seconds > pytest_budget["suite_seconds"]:
-        found.append(f"the suite: {seconds:.2f} s > {_scaled(pytest_budget['suite_seconds'])}")
     # With torch, its import and CUDA context (measured as the session
     # starts) are not ours: the ceiling is the same budget above them.
     ceiling = max(pytest_budget["peak_rss_mb"] + _torch_mb(), TORCH_PEAK_MB[0] or 0.0)
@@ -280,8 +278,7 @@ def pytest_terminal_summary(terminalreporter):
     else:
         ours = f" (torch {torch:.0f} MB of it, ours {rss - torch:.0f} MB)"
     terminalreporter.write_line(
-        f"  suite {seconds:.2f} s{f' (+ torch {TORCH_S[0]:.2f} s)' if TORCH_S[0] else ''} "
-        f"(budget {_scaled(BUDGETS['pytest']['suite_seconds'])}), "
+        f"  suite {seconds:.2f} s{f' (+ torch {TORCH_S[0]:.2f} s)' if TORCH_S[0] else ''}, "
         f"peak RSS {mb(rss)}{ours} (budget {BUDGETS['pytest']['peak_rss_mb']:g} MB ours), "
         f"largest child {mb(children)}"
     )

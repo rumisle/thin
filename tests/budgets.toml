@@ -1,9 +1,9 @@
-# Test-resource ceilings. Slow sections exclude their duration from the
-# default suite. Torch startup cost is measured separately by conftest.
+# Test-resource ceilings. Time is held per test, not per suite: a test
+# that gets slower is a regression, a suite that gets more tests is not.
+# Torch startup cost is measured separately by conftest.
 # Rust golden binaries enforce [cargo]; pytest uses the remaining sections.
 
 [pytest]
-suite_seconds = 10
 test_seconds = 1.0
 peak_rss_mb = 300
 torch_mb_unmeasured = 750

@@ -8,9 +8,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # GitHub's runners run the suites about 2x slower than the machine
-  # tests/budgets.toml is calibrated on (pytest: 5.7 s there, 9.5-12.3 s
-  # here): the time budgets are scaled by that, and every report says so.
+  # GitHub's runners run the tests about 2x slower than the machine
+  # tests/budgets.toml is calibrated on: the time budgets are scaled by
+  # that, and every report says so.
   # Memory budgets are not scaled. docs/dev/ci.md has the rule.
   THIN_BUDGET_SCALE: "2"
 
