@@ -43,6 +43,10 @@ __all__ = sorted(_LAZY)
 
 def __getattr__(name: str) -> object:
     """Loads a public name's module on first use."""
+    if name == "__version__":
+        from importlib.metadata import version
+
+        return version("thin")
     module = _LAZY.get(name)
     if module is None:
         raise AttributeError(f"module 'thin' has no attribute '{name}'")
