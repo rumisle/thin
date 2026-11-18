@@ -56,6 +56,7 @@ def test_default_gemm_gfx950_configs_compile_cleanly() -> None:
         (64, 128, 64, {"BM": 64, "BN": 128, "GROUP_M": 1}),
         (128, 256, 192, {"BM": 128, "BN": 256, "GROUP_M": 1}),
         (100, 256, 256, {"BM": 64, "BN": 128, "GROUP_M": 2}),
+        (192, 256, 256, {"BM": 64, "BN": 128, "GROUP_M": 2}),
     ],
 )
 def test_gemm_bf16_gfx950_emulator_numerics_and_zero_bank_conflicts(
