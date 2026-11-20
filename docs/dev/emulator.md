@@ -43,16 +43,20 @@ Bit-level conversions and ALU routines explicitly handle NaNs, signed zero,
 subnormals, fused rounding and destination halves. A host floating-point
 operation is used only where its behavior matches the implemented instruction.
 Hardware tests include payload-heavy NaNs, cancellation, midpoints and dense
-transcendental sweeps. The `gfx1201` WMMA dot model incorporates measured summation and rounding
-behavior (some bf8 random cases still disagree; this is a documented model
-limit, not a license to accept a wrong output). On `gfx942` (measured on an
+transcendental sweeps. Every dense `gfx1201` WMMA runs through one model of
+its dot unit (`machine::dot`): steps of four (f16, bf16 inputs; k 0-3, 8-11,
+4-7, 12-15) or eight (fp8, bf8; two quads) exact products, aligned by floor,
+rounded once per step to D's format (a bf16 D the binary32 rounding's high
+half). C's `neg_lo` / `neg_hi` apply to 16-bit inputs only; integer forms
+saturate with `clamp` after each half of k. It matches more than 10^5 random,
+raw-encoding and edge-case outputs of each dense form measured on an RX 9070
+XT bit for bit. `v_swmmac_*` is not emulated. On `gfx942` (measured on an
 Instinct MI300X), integer and `f64` DGEMM forms, sequential single-rounded
 `f32` SGEMM forms (including NaN payload propagation), `xf32` bitwise mantissa
 truncation (`raw & 0xFFFF_E000`) and the 128-bit grouped XDLOP dot model (`f16`,
 `bf16`, `xf32`, `fp8`/`bf8`, dense and sparse `v_smfmac_*`, with canonical
 `0xFFC0_0000` NaN output) match hardware bit for bit across the hardware suite
-(extreme wide-exponent `fp8`/`bf8` randoms remain a documented model limit, as
-on `gfx1201`).
+(extreme wide-exponent `fp8`/`bf8` randoms remain a documented model limit).
 
 On `gfx950` (CDNA 4 / Instinct MI350X & MI355X, verified offline against
 `amdgpu_isa_cdna4.xml`, LLVM 22, `ml_dtypes`, and the CDNA 4 ISA manual,

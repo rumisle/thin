@@ -123,6 +123,11 @@ pub enum Summation {
         /// The fraction bits kept below a group's top reference exponent.
         fraction: i32,
     },
+    /// gfx1201's dot unit (thin_emu `machine::dot`): steps of four (16-bit
+    /// inputs) or eight (8-bit) products, each step's exact products
+    /// aligned in two groups by floor and rounded once into the
+    /// accumulator in D's format.
+    DotUnit,
 }
 
 /// One hardware matrix-multiply-accumulate instruction form (`blocks` blocks of

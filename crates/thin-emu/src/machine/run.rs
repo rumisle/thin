@@ -682,8 +682,10 @@ fn semantics(
     pc_layout: Option<&super::pc::Layout>,
 ) -> Result<Option<usize>, EmuError> {
     for omod in ["clamp", "mul", "div", "omod"] {
-        let allowed_clamp =
-            omod == "clamp" && (ins.canon.starts_with("v.pk.") || ins.canon == "v.dot2.f32.bf16");
+        let allowed_clamp = omod == "clamp"
+            && (ins.canon.starts_with("v.pk.")
+                || ins.canon == "v.dot2.f32.bf16"
+                || ins.canon.starts_with("v.wmma.i32."));
         if ins.field(omod).is_some() && !allowed_clamp {
             return Err(limit(format!(
                 "`{}`: its output modifier (clamp, mul, div) is not modelled for {}",

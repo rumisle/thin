@@ -607,16 +607,9 @@ fn wmma_form(mnemonic: &str) -> Option<MatrixForm> {
         scaled: false,
         cbsz_abid: false,
         blgp: false,
-        // Measured on an RX 9070 XT for fp8 and bf8
-        // inputs. f16 and bf16 inputs with an f32 or bf16 D run through the
-        // emulator's dot unit instead (thin_emu machine::dot, measured: every
-        // random output bit for bit); f16 D keeps this model (also exact on
-        // the random set).
-        sum: Summation::Grouped {
-            group_half: 4,
-            group_byte: 8,
-            fraction: 24,
-        },
+        // Every float form, measured on an RX 9070 XT bit for bit (integer
+        // forms ignore it).
+        sum: Summation::DotUnit,
         provisional: false,
     })
 }

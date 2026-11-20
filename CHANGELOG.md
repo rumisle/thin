@@ -5,6 +5,14 @@ versioning; before 1.0 a breaking release raises the minor version.
 
 ## Unreleased
 
+- Emulator, gfx1201: every dense float WMMA uses the dot unit model.
+  Fixes `v_wmma_f16_16x16x16_f16` after a step overflows (∞ took the wrong
+  sign, ∞ − ∞ was missed) and below 2^-40, and the fp8 / bf8 forms on
+  denormal inputs, products summed in quads, NaNs decided per step, C's
+  `neg_lo` / `neg_hi` (ignored there) and −0 sums (+0).
+- Emulator, gfx1201: integer WMMA with `clamp`, saturating after each half
+  of k.
+
 ## 0.1.0
 
 The first release.

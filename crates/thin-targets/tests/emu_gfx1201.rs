@@ -362,7 +362,7 @@ fn wmma_f32_places_every_element_by_the_dot_unit() {
     // each D element of the whole WMMA is the dot unit's four steps over its
     // row and column (k in 0..4, 8..12, 4..8, 12..16; measured on gfx1201,
     // tests/hw/test_wmma.py test_random_f16_and_bf16_sums_are_the_gpus).
-    use thin_emu::machine::dot::step;
+    use thin_emu::machine::dot::{step, Step, F16, F32};
     let a = |l: usize, d: usize| word(l, d, 5) & 0xBBFF_BBFF;
     let b = |l: usize, d: usize| word(l, d, 77) & 0xBBFF_BBFF;
     let out = wmma_out("v_wmma_f32_16x16x16_f16 D, A, B, 0", 4, 4, 8, &a, &b);
@@ -379,7 +379,12 @@ fn wmma_f32_places_every_element_by_the_dot_unit() {
             }
             let mut want = 0;
             for s0 in [0, 8, 4, 12] {
-                want = step(&ab[s0..s0 + 4], &bb[s0..s0 + 4], want, false);
+                want = step(
+                    &ab[s0..s0 + 4],
+                    &bb[s0..s0 + 4],
+                    want,
+                    Step::new(F16, F16, F32),
+                );
             }
             let got = out[8 * l + e];
             assert_eq!(got, want, "D[{i}][{j}]: {got:#x} want {want:#x}");
@@ -389,4 +394,48 @@ fn wmma_f32_places_every_element_by_the_dot_unit() {
     }
     // The inputs' sums round: the dot unit is not the ordered sum here.
     assert!(ordered_differs > 0);
+}
+
+/// D = A·B + C with C preset to `c` in every element (v[30:37]).
+fn wmma_with_c(
+    op: &str,
+    ad: usize,
+    a: &dyn Fn(usize, usize) -> u32,
+    b: &dyn Fn(usize, usize) -> u32,
+    c: u32,
+) -> Vec<u32> {
+    let movs: String = (30..38)
+        .map(|r| format!("v_mov_b32 v{r}, {c:#x}\n"))
+        .collect();
+    wmma_out(&format!("{movs}{op}"), ad, ad, 8, a, b)
+}
+
+#[test]
+fn wmma_fp8_ignores_cs_neg_and_abs() {
+    // Measured on gfx1201: neg_lo / neg_hi on C change an f16 WMMA's C,
+    // not an fp8 one's.
+    let zero = |_: usize, _: usize| 0;
+    for mods in [" neg_lo:[0,0,1]", " neg_hi:[0,0,1]"] {
+        let op = format!("v_wmma_f32_16x16x16_fp8_fp8 D, A, B, D{mods}");
+        let out = wmma_with_c(&op, 2, &zero, &zero, 0xbf80_0000);
+        assert!(out.iter().all(|&d| d == 0xbf80_0000), "{mods}");
+    }
+    let op = "v_wmma_f32_16x16x16_f16 D, A, B, D neg_lo:[0,0,1]";
+    let out = wmma_with_c(op, 4, &zero, &zero, 0xbf80_0000);
+    assert!(out.iter().all(|&d| d == 0x3f80_0000));
+}
+
+#[test]
+fn wmma_iu8_clamp_saturates_each_half_of_k() {
+    // Signed: k 0..8 add 8·127·127 to C = 2^31 - 16, saturating; k 8..16
+    // then add 8·(−128)·127 (measured on gfx1201). Without clamp the sum
+    // wraps.
+    let a = |l: usize, _: usize| if l < 16 { 0x7f7f_7f7f } else { 0x8080_8080 };
+    let b = |_: usize, _: usize| 0x7f7f_7f7f;
+    let run = |m: &str| {
+        let op = format!("v_wmma_i32_16x16x16_iu8 D, A, B, D neg_lo:[1,1,0]{m}");
+        wmma_with_c(&op, 2, &a, &b, 0x7fff_fff0)
+    };
+    assert!(run(" clamp").iter().all(|&d| d == 0x7ffe_03ff));
+    assert!(run("").iter().all(|&d| d == 0x7fff_fbf8));
 }

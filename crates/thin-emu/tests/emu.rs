@@ -1038,47 +1038,57 @@ fn claims_case(case: &Case<'_>) -> Result<(), String> {
     Ok(())
 }
 
-/// `wmma.json.gz`: one D element of measured model, bit for bit.
+/// `wmma.json.gz`: one D element of the dot unit's model, bit for bit.
 fn wmma_case(case: &Case<'_>) -> Result<(), String> {
-    use thin_emu::machine::wmma::grouped_element;
-    use thin_target::{Elem, Summation};
+    use thin_emu::machine::dot::{wmma_element, Format, Step, BF16, BF8, F16, F32, FP8};
+    use thin_emu::machine::numbers::{f16_one, Small};
     let c = case.value;
     let name = c["form"].as_str().ok_or("form")?;
-    let form = default_target()
-        .hooks()
-        .matrix_form(&format!("v_wmma_{name}"))
-        .ok_or_else(|| format!("no form {name}"))?;
-    let Summation::Grouped {
-        group_half,
-        group_byte,
-        fraction,
-    } = form.sum
-    else {
-        return Err(format!("{name}: not the grouped model"));
+    // The form's (A, B, D) formats from its suffix: <D>_16x16x16_<A>[_<B>].
+    let fmt = |s: &str| -> Result<Format, String> {
+        Ok(match s {
+            "f32" => F32,
+            "f16" => F16,
+            "bf16" => BF16,
+            "fp8" => FP8,
+            "bf8" => BF8,
+            _ => return Err(format!("{name}: format {s}")),
+        })
     };
-    let nums = |key: &str| -> Vec<f64> {
+    let parts: Vec<&str> = name.split('_').collect();
+    let (d, a_fmt) = (fmt(parts[0])?, fmt(parts[2])?);
+    let b_fmt = fmt(parts.get(3).copied().unwrap_or(parts[2]))?;
+    // A value the format holds exactly, as its bits.
+    let code = |x: f64, f: Format| -> Result<u32, String> {
+        let small = |s: Small| {
+            (0..256u32)
+                .find(|&k| s.value(k).to_bits() == x.to_bits())
+                .ok_or_else(|| format!("{name}: {x} not an 8-bit value"))
+        };
+        match f {
+            F32 => Ok((x as f32).to_bits()),
+            F16 => Ok(f16_one(x)),
+            BF16 => Ok((x as f32).to_bits() >> 16),
+            FP8 => small(Small::E4M3),
+            _ => small(Small::E5M2),
+        }
+    };
+    let codes = |key: &str, f: Format| -> Result<Vec<u32>, String> {
         c[key]
             .as_array()
             .into_iter()
             .flatten()
-            .filter_map(Value::as_f64)
+            .map(|v| code(v.as_f64().ok_or("number")?, f))
             .collect()
     };
-    let (a, b) = (nums("a"), nums("b"));
-    let cv = c["c"].as_f64().ok_or("c")?;
-    let byte = matches!(form.a, Elem::Fp8 | Elem::Bf8);
-    let params = (group_half as usize, group_byte as usize, fraction);
-    let got = grouped_element(&a, &b, cv, form.d, byte, params);
-    let want = c["d"].as_f64().ok_or("d")?;
-    let want_bits = match form.d {
-        Elem::F16 => thin_emu::machine::numbers::f16_one(want),
-        Elem::Bf16 => (want as f32).to_bits() >> 16,
-        _ => (want as f32).to_bits(),
-    };
-    if got != want_bits {
+    let (a, b) = (codes("a", a_fmt)?, codes("b", b_fmt)?);
+    let cv = code(c["c"].as_f64().ok_or("c")?, d)?;
+    let want = code(c["d"].as_f64().ok_or("d")?, d)?;
+    let got = wmma_element(&a, &b, cv, Step::new(a_fmt, b_fmt, d));
+    if got != want {
         return Err(format!(
-            "{name} {}: {got:#x}, want {want_bits:#x} ({want})",
-            c["probe"]
+            "{name} {}: {got:#x}, want {want:#x} ({})",
+            c["probe"], c["d"]
         ));
     }
     Ok(())

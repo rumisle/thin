@@ -7,10 +7,73 @@ use thin_target::{Elem, MatrixForm};
 use super::alu::{fma as fma_f32, int_field, list_at, tag_error};
 use super::numbers::{self as num, f16_value, f32_of, floor_log2, Small};
 use super::wave::{Wave, MAX_W};
-use super::wmma::{parts, round_exact};
 use super::Exec;
 use crate::tags::{self, is_record, MatrixOp, MatrixOperand, OperandFormat, Tag, ACC_MARK};
 use crate::{Base, Cause, EmuError, Ins};
+
+/// The exponent of the lowest set bit of a finite nonzero f64.
+fn lsb_exponent(x: f64) -> i32 {
+    let bits = x.abs().to_bits();
+    let (field, frac) = ((bits >> 52) as i32, bits & ((1 << 52) - 1));
+    let (m, e) = if field == 0 {
+        (frac, -1074)
+    } else {
+        (frac | 1 << 52, field - 1075)
+    };
+    e + m.trailing_zeros() as i32
+}
+
+/// An exact nonzero f64 as m · 2^e, |m| below 2^53.
+fn parts(x: f64) -> (i128, i32) {
+    let e = lsb_exponent(x);
+    let m = (x.abs() / 2f64.powi(e)) as i128;
+    (if x < 0.0 { -m } else { m }, e)
+}
+
+/// D's format: (significand bits, smallest normal exponent, largest
+/// exponent, toward zero).
+fn format_of(d: Elem) -> (u32, i32, i32, bool) {
+    match d {
+        Elem::F16 => (11, -14, 15, false),
+        Elem::Bf16 => (8, -126, 127, true),
+        _ => (24, -126, 127, false),
+    }
+}
+
+/// m · 2^e rounded to D's format (subnormals kept, overflow to ±inf), as
+/// an f64 that holds it exactly.
+fn round_exact(m: i128, e: i32, d: Elem) -> f64 {
+    if m == 0 {
+        return 0.0;
+    }
+    let (p, emin, emax, toward_zero) = format_of(d);
+    let a = m.unsigned_abs();
+    let top = e + (127 - a.leading_zeros() as i32);
+    let t = (top - (p as i32 - 1)).max(emin - (p as i32 - 1));
+    let shift = t - e;
+    // shift <= 0: m already fits D's format (shift >= -(p - 1)).
+    let (q, t) = if shift <= 0 {
+        (a, e)
+    } else if shift >= 128 {
+        (0, t)
+    } else {
+        let (q, rem) = (a >> shift, a & ((1u128 << shift) - 1));
+        let half = 1u128 << (shift - 1);
+        let up = !toward_zero && (rem > half || (rem == half && q & 1 == 1));
+        (q + u128::from(up), t)
+    };
+    let v = q as f64 * 2f64.powi(t);
+    let v = if v >= 2f64.powi(emax + 1) {
+        f64::INFINITY
+    } else {
+        v
+    };
+    if m < 0 {
+        -v
+    } else {
+        v
+    }
+}
 
 /// Largest dword count of any MFMA operand (`v_mfma_*_32x32x*_2b_*` uses 32).
 const MAX_DWORDS: usize = 32;

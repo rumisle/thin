@@ -171,7 +171,8 @@ pub fn fma(x: u32, y: u32, z: u32) -> u32 {
 /// `v_dot2_f32_bf16`: D = S0.lo · S1.lo + S0.hi · S1.hi + S2; one step of
 /// gfx1201's dot unit ([`super::dot::step`]).
 fn dot2_bf16(x: u32, y: u32, z: u32) -> u32 {
-    super::dot::step(&[x, x >> 16], &[y, y >> 16], z, true)
+    use super::dot::{Step, BF16, F32};
+    super::dot::step(&[x, x >> 16], &[y, y >> 16], z, Step::new(BF16, BF16, F32))
 }
 
 fn ldexp(x: u32, e: u32) -> u32 {
