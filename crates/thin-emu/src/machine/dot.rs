@@ -10,8 +10,9 @@
 //! is its format's smallest), by floor; the group sums and the accumulator
 //! are aligned to the step's grid, the larger of the products' grid and
 //! 2^(e_c − 26) (e_c the accumulator's leading exponent, at least D's
-//! smallest normal one), again by floor, an accumulator with no bit left
-//! contributing nothing even when negative. The total is rounded once to D
+//! smallest normal one), again by floor; a negative accumulator with no bit
+//! left contributes nothing while the grid is above D's smallest normal
+//! exponent, and the floor's -1 unit at or below it. The total is rounded once to D
 //! (RNE; a bf16 D is the binary32 rounding's high half), a zero +0.
 //! Measured on gfx1201: 32 768 random WMMA elements of f32_16x16x16_f16 and
 //! _bf16, v_dot2_f32_bf16's random, cancelling and accumulator-dominated sets
@@ -184,8 +185,10 @@ fn pack(units: i64, grid: i32, d: Format) -> u32 {
     let top = 63 - mag.leading_zeros() as i32;
     let mut e = top + grid;
     if e < emin {
-        // Denormal; a carry into the exponent field is the smallest normal.
-        return sign | shift_rne(mag, emin - fb - grid) as u32;
+        // Denormal; a carry into the exponent field is the smallest normal, and
+        // a result that rounds to zero is +0.
+        let f = shift_rne(mag, emin - fb - grid) as u32;
+        return if f == 0 { 0 } else { sign | f };
     }
     let mut s = shift_rne(mag, top - fb);
     if s == 1 << (fb + 1) {
@@ -198,8 +201,9 @@ fn pack(units: i64, grid: i32, d: Format) -> u32 {
     sign | ((e + d.bias()) as u32) << d.fb | (s as u32 & ((1 << fb) - 1))
 }
 
-/// `t` on the grid 2^grid by floor; an accumulator with no bit left is 0.
-fn align(t: Term, grid: i32, accumulator: bool) -> i64 {
+/// `t` on the grid 2^grid by floor; with `empty_is_zero`, a negative `t` with
+/// no bit left is 0 instead of -1.
+fn align(t: Term, grid: i32, empty_is_zero: bool) -> i64 {
     let shift = t.exp - grid;
     let mag = if t.sig == 0 || shift <= -64 {
         0
@@ -210,7 +214,7 @@ fn align(t: Term, grid: i32, accumulator: bool) -> i64 {
     };
     let tail = t.sig != 0 && shift < 0 && (shift <= -64 || t.sig & ((1 << -shift) - 1) != 0);
     if t.neg {
-        -(mag as i64) - i64::from(tail && (!accumulator || mag != 0))
+        -(mag as i64) - i64::from(tail && (!empty_is_zero || mag != 0))
     } else {
         mag as i64
     }
@@ -320,7 +324,10 @@ pub fn step(a: &[u32], b: &[u32], acc: u32, form: Step) -> u32 {
     }
     let products = grids.iter().copied().max().unwrap_or(EMPTY);
     let grid = products.max(c.leading().max(d.emin()) - 26);
-    let mut total = align(c, grid, true);
+    // A negative accumulator below one grid unit adds nothing above D's emin
+    // and the floor's -1 at or below it (measured: f16 D grids -14 / -13;
+    // bf16 products at -126 / -125).
+    let mut total = align(c, grid, grid > d.emin());
     for g in (0..a.len()).step_by(form.group) {
         let gg = form.group;
         let pg = grids[g..g + gg].iter().copied().max().unwrap_or(EMPTY);

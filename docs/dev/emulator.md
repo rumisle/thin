@@ -45,7 +45,9 @@ operation is used only where its behavior matches the implemented instruction.
 Hardware tests include payload-heavy NaNs, cancellation, midpoints and dense
 transcendental sweeps. Every dense `gfx1201` WMMA runs through one model of
 its dot unit (`machine::dot`): steps of four (f16, bf16 inputs; k 0-3, 8-11,
-4-7, 12-15) or eight (fp8, bf8; two quads) exact products, aligned by floor,
+4-7, 12-15) or eight (fp8, bf8; two quads) exact products, aligned by floor
+(a negative accumulator below one grid unit adds nothing while the step's grid
+is above D's smallest normal exponent, and -1 unit at or below it),
 rounded once per step to D's format (a bf16 D the binary32 rounding's high
 half). C's `neg_lo` / `neg_hi` apply to 16-bit inputs only; integer forms
 saturate with `clamp` after each half of k. It matches more than 10^5 random,

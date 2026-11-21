@@ -44,26 +44,30 @@ def test_every_case_in_whole_wmmas(form):
     assert not bad, (len(bad), bad[:3])
 
 
-RANDOMS = Path(__file__).parents[1] / "crates/thin-emu/tests/data/emu/wmma_randoms.json.gz"
+DATA = Path(__file__).parents[1] / "crates/thin-emu/tests/data/emu"
 
 
-def _randoms():
-    with gzip.open(RANDOMS) as f:
+def _recorded(name):
+    with gzip.open(DATA / name) as f:
         return json.load(f)
 
 
-RDOC = _randoms()
+# Whole WMMAs measured on gfx1201: thin's random set, and edge cases (a negative
+# accumulator below one grid unit, signed zeros, exact cancellation) from
+# amdgpu-matrix-model's frozen evidence.
+DOCS = {"randoms": _recorded("wmma_randoms.json.gz"), "edges": _recorded("wmma_edges.json.gz")}
+RECORDED = [(k, form) for k, doc in DOCS.items() for form in doc["summary"]]
 
 
-@pytest.mark.parametrize("form", list(RDOC["summary"]))
-def test_the_recorded_randoms(form, record_property):
+@pytest.mark.parametrize(("doc", "form"), RECORDED)
+def test_the_recorded_wmmas(doc, form, record_property):
     """each recorded WMMA as a whole emulated instruction; D equals
     the GPU's at every output not listed in model_mismatch. The listed ones are
     reported, and their count is the file's summary."""
     import numpy as np
 
     agree = total = 0
-    for w in (w for w in RDOC["wmmas"] if w["form"] == form):
+    for w in (w for w in DOCS[doc]["wmmas"] if w["form"] == form):
         emu, _ = wm.run(form, np.array(w["A"]), np.array(w["B"]), np.array(w["C"]), gpu=False)
         want = np.array([[int(x, 16) for x in row] for row in w["D"]], np.uint64)
         listed = {tuple(mn) for mn in w["model_mismatch"]}
@@ -73,6 +77,6 @@ def test_the_recorded_randoms(form, record_property):
         assert not bad, (len(bad), [(mn, hex(emu[mn]), hex(want[mn])) for mn in bad[:3]])
         agree += int(same.sum())
         total += same.size
-    s = RDOC["summary"][form]
+    s = DOCS[doc]["summary"][form]
     record_property("agree", f"{agree}/{total}")
     assert (agree, total) == (s["model_agrees"], s["outputs"])

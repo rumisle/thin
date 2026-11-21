@@ -5,6 +5,13 @@ versioning; before 1.0 a breaking release raises the minor version.
 
 ## Unreleased
 
+- Emulator, gfx1201 WMMA: a negative accumulator below one grid unit adds
+  -1 grid unit when the step's grid is at or below D's smallest normal
+  exponent (it adds nothing above), for f32, f16 and bf16 D; and a result
+  that rounds to zero is +0 again (the dot-unit rewrite had given -0).
+  Checked against edge-case evidence measured on an RX 9070 XT, now in
+  `wmma_edges.json.gz`.
+
 - Emulator, gfx1201: every dense float WMMA uses the dot unit model.
   Fixes `v_wmma_f16_16x16x16_f16` after a step overflows (∞ took the wrong
   sign, ∞ − ∞ was missed) and below 2^-40, and the fp8 / bf8 forms on
